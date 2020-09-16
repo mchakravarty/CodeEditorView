@@ -7,21 +7,22 @@
 
 import SwiftUI
 
+
 #if os(iOS)
 
 // MARK: -
 // MARK: UIKit version
 
 public struct CodeEditor: UIViewRepresentable {
-  var text: Binding<String>
+  @Binding var text: String
 
   public init(text: Binding<String>) {
-    self.text = text
+    self._text = text
   }
 
   public func makeUIView(context: Context) -> UITextView {
     let textView = UITextView()
-    textView.text = text.wrappedValue
+    textView.text = text
     textView.delegate = context.coordinator
     return textView
   }
@@ -30,18 +31,18 @@ public struct CodeEditor: UIViewRepresentable {
   }
 
   public func makeCoordinator() -> Coordinator {
-    return Coordinator(text)
+    return Coordinator($text)
   }
 
   public final class Coordinator: NSObject, UITextViewDelegate {
-    var text: Binding<String>
+    @Binding var text: String
 
     init(_ text: Binding<String>) {
-      self.text = text
+      self._text = text
     }
 
     public func textViewDidChange(_ textView: UITextView) {
-      self.text.wrappedValue = textView.text
+      self.text = textView.text
     }
   }
 }
@@ -52,19 +53,35 @@ public struct CodeEditor: UIViewRepresentable {
 // MARK: AppKit version
 
 public struct CodeEditor: NSViewRepresentable {
-  var text: Binding<String>
+  @Binding var text: String
 
   public init(text: Binding<String>) {
-    self.text = text
+    self._text = text
   }
 
   public func makeNSView(context: Context) -> NSTextView {
     let textView = NSTextView()
-    textView.textStorage?.setAttributedString(NSAttributedString(string: text.wrappedValue))
+    textView.textStorage?.setAttributedString(NSAttributedString(string: text))
     return textView
   }
 
   public func updateNSView(_ nsView: NSTextView, context: Context) {
+  }
+
+  public func makeCoordinator() -> Coordinator {
+    return Coordinator($text)
+  }
+
+  public final class Coordinator: NSObject, NSTextViewDelegate {
+    @Binding var text: String
+
+    init(_ text: Binding<String>) {
+      self._text = text
+    }
+
+    public func textViewDidChange(_ textView: NSTextView) {
+      self.text = textView.textStorage?.string ?? "" 
+    }
   }
 }
 
@@ -74,7 +91,6 @@ struct CodeEditor_Previews: PreviewProvider {
   static var previews: some View {
     VStack{
       CodeEditor(text: .constant("Hello World!"))
-      TextEditor(text: .constant("bla"))
     }
   }
 }
