@@ -28,6 +28,7 @@ public struct CodeEditor: UIViewRepresentable {
   }
 
   public func updateUIView(_ uiView: UITextView, context: Context) {
+    uiView.text =  text
   }
 
   public func makeCoordinator() -> Coordinator {
@@ -61,11 +62,15 @@ public struct CodeEditor: NSViewRepresentable {
 
   public func makeNSView(context: Context) -> NSTextView {
     let textView = NSTextView()
-    textView.textStorage?.setAttributedString(NSAttributedString(string: text))
+    textView.string = text
+//    textView.textStorage?.setAttributedString(NSAttributedString(string: text))
     return textView
   }
 
   public func updateNSView(_ nsView: NSTextView, context: Context) {
+    // FIXME: not good (by itself) as it kills all highlighting
+    nsView.string = text
+//    nsView.textStorage?.setAttributedString(NSAttributedString(string: text))
   }
 
   public func makeCoordinator() -> Coordinator {
