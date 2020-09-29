@@ -16,6 +16,10 @@ class GutterView: UIView {
   ///
   let textView: TextView
 
+  var optLayoutManager: NSLayoutManager? { textView.optLayoutManager }
+  var optTextContainer: NSTextContainer? { textView.optTextContainer }
+  var optTextStorage:   NSTextStorage?   { textView.optTextStorage }
+
   let backgroundColour = UIColor.lightGray  // TODO: eventually use the same bg colour as the rest of the text view
 
   /// Create and configure a gutter view for the given text view. This will also set the appropiate exclusion path for
@@ -28,7 +32,7 @@ class GutterView: UIView {
       gutterExclusionPath = UIBezierPath(rect: CGRect(origin: frame.origin,
                                                       size: CGSize(width: frame.width,
                                                                    height: CGFloat.greatestFiniteMagnitude)))
-    textView.textContainer.exclusionPaths = [gutterExclusionPath]
+    optTextContainer?.exclusionPaths = [gutterExclusionPath]
   }
 
   required init(coder: NSCoder) {
@@ -36,16 +40,18 @@ class GutterView: UIView {
   }
 
   override func draw(_ rect: CGRect) {
+    guard let layoutManager = optLayoutManager,
+          let textContainer = optTextContainer
+    else { return }
 
     // TODO: we leave the background drawing to the text view
     backgroundColour.setFill()
     UIBezierPath(rect: rect).fill()
 
     // All visible glyphs and all visible characters
-//  let glyphRange = layoutManager.glyphRange(forBoundingRectWithoutAdditionalLayout: visibleRect,
-//                                                                                in: textContainer!)
-//  let charRange  = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
-
+    let glyphRange = layoutManager.glyphRange(forBoundingRectWithoutAdditionalLayout: rect, in: textContainer),
+        charRange  = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+    /// TODO: now we need a line map to figure out on which line a particular character (given by its index) is located
   }
 
 }

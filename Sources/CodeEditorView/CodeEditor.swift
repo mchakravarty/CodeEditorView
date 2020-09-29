@@ -57,7 +57,7 @@ public struct CodeEditor: UIViewRepresentable {
   }
 
   public func updateUIView(_ uiView: UITextView, context: Context) {
-    uiView.text =  text
+    uiView.text = text
   }
 
   public func makeCoordinator() -> Coordinator {

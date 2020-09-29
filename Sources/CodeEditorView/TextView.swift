@@ -4,7 +4,7 @@
 //
 //  Created by Manuel M T Chakravarty on 28/09/2020.
 //
-//  Text view protocol extracts common functionality between 'UITextView' and 'NSTextView'.
+//  Text view protocol that extracts common functionality between 'UITextView' and 'NSTextView'.
 
 import Foundation
 
@@ -12,9 +12,9 @@ import Foundation
 /// A protocol that bundles up the commonalities of 'UITextView' and 'NSTextView'.
 ///
 protocol TextView {
-  var layoutManager: NSLayoutManager { get }
-  var textContainer: NSTextContainer { get }
-  var textStorage:   NSTextStorage   { get }
+  var optLayoutManager: NSLayoutManager? { get }
+  var optTextContainer: NSTextContainer? { get }
+  var optTextStorage:   NSTextStorage?   { get }
 }
 
 
@@ -22,14 +22,24 @@ protocol TextView {
 
 import UIKit
 
-extension UITextView: TextView { }
+extension UITextView: TextView {
+
+  var optLayoutManager: NSLayoutManager? { layoutManager }
+  var optTextContainer: NSTextContainer? { textContainer }
+  var optTextStorage:   NSTextStorage?   { textStorage }
+}
 
 
 #elseif os(macOS)
 
 import AppKit
 
-extension NSTextView: TextView { }
+extension NSTextView: TextView {
+
+  var optLayoutManager: NSLayoutManager? { layoutManager }
+  var optTextContainer: NSTextContainer? { textContainer }
+  var optTextStorage:   NSTextStorage?   { textStorage }
+}
 
 
 #endif
