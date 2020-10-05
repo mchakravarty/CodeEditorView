@@ -7,6 +7,8 @@ func mkRange(loc: Int, len: Int) -> LineMap<Void>.OneLine {
 
 final class LineMapTests: XCTestCase {
 
+  // Initialisation tests
+
   func testInit(_ string: String, _ lineMap: LineMap<Void>) {
     let computedLineMap = LineMap<Void>(string: string)
     XCTAssertEqual(computedLineMap.lines.map{ $0.range }, lineMap.lines.map{ $0.range })
@@ -52,6 +54,51 @@ final class LineMapTests: XCTestCase {
                                    mkRange(loc: 15, len: 0)]))
   }
 
+
+  // Lookup tests
+
+  func testLookupEmpty() {
+    XCTAssertNil(LineMap<Void>(string: "").lineContaining(index: 0))
+  }
+
+  func testLookupLineBreak() {
+    let lineMap = LineMap<Void>(string: "\n")
+    XCTAssertNil(lineMap.lineContaining(index: 1))
+    XCTAssertEqual(lineMap.lineContaining(index: 0), 1)
+  }
+
+  func testLookupSimple() {
+    let lineMap = LineMap<Void>(string: "abc")
+    XCTAssertNil(lineMap.lineContaining(index: 3))
+    XCTAssertEqual(lineMap.lineContaining(index: 0), 1)
+    XCTAssertEqual(lineMap.lineContaining(index: 2), 1)
+  }
+
+  func testLookupEmptyTrailing() {
+    let lineMap = LineMap<Void>(string: "abc\n")
+    XCTAssertNil(lineMap.lineContaining(index: 4))
+    XCTAssertEqual(lineMap.lineContaining(index: 0), 1)
+    XCTAssertEqual(lineMap.lineContaining(index: 2), 1)
+    XCTAssertEqual(lineMap.lineContaining(index: 3), 1)
+  }
+
+  func testLookupLines() {
+    let lineMap = LineMap<Void>(string: "abc\ndefg\nhij")
+    XCTAssertEqual(lineMap.lineContaining(index: 0), 1)
+    XCTAssertEqual(lineMap.lineContaining(index: 3), 1)
+    XCTAssertEqual(lineMap.lineContaining(index: 4), 2)
+    XCTAssertEqual(lineMap.lineContaining(index: 9), 3)
+  }
+
+  func testLookupEmptyLines() {
+    let lineMap = LineMap<Void>(string: "\nabc\n\n\ndefg\nhi\n")
+    XCTAssertEqual(lineMap.lineContaining(index: 0), 1)
+    XCTAssertEqual(lineMap.lineContaining(index: 4), 2)
+    XCTAssertEqual(lineMap.lineContaining(index: 5), 3)
+    XCTAssertEqual(lineMap.lineContaining(index: 11), 5)
+    XCTAssertEqual(lineMap.lineContaining(index: 14), 6)
+  }
+
   static var allTests = [
     ("testInitEmpty", testInitEmpty),
     ("testInitLineBreak", testInitLineBreak),
@@ -59,5 +106,7 @@ final class LineMapTests: XCTestCase {
     ("testInitEmptyTrailing", testInitEmptyTrailing),
     ("testInitLines", testInitLines),
     ("testInitEmptyLines", testInitEmptyLines),
+
+    ("textLookupEmpty", testLookupEmpty),
   ]
 }
