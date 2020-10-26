@@ -7,11 +7,6 @@
 
 import SwiftUI
 
-// TODO: Subclass NSTextStorage or provide an appropriate delegate to keep all the extra info on line maps, tokens maps, etc
-// To get a small overview rendering of the text like in Xcode and Sublime, use two 'NSLayoutManager's (and two 'NSTextContainer's and two 'NSTextView's) with one 'NSTextStorage' — see "TextKit Best Practices" (WWDC18) and "Advanced Cocoa Text Tips and Tricks" (WWDC10).
-// To change the rendering of an entire paragraph (eg, code block in a markdown document), use a custom paragraph style with a subclass of 'NSTextBlock' — see "TextKit Best Practices" (WWDC18).
-
-let gutterWidth: CGFloat = 30 // FIXME: would need to dynamically adjust to gutter view
 
 #if os(iOS)
 
@@ -21,17 +16,42 @@ let gutterWidth: CGFloat = 30 // FIXME: would need to dynamically adjust to gutt
 
 /// `UITextView` with a gutter
 ///
-fileprivate class UITextViewWithGutter: UITextView {
+fileprivate class CodeViewWithGutter: UITextView {
 
-  private var gutterView: GutterView?
+  private var gutterView:          GutterView<UITextView>?
+  private var codeStorageDelegate: CodeStorageDelegate?
 
-  override func willMove(toWindow newWindow: UIWindow?) {
-    guard gutterView == nil else { return }
+  /// Designated initializer for code views with a gutter.
+  ///
+  init(frame: CGRect) {
 
-    let gutterView = GutterView(frame: CGRect(x: 0, y: 0, width: gutterWidth, height: CGFloat.greatestFiniteMagnitude),
-                                textView: self)
+    // Use a custom layout manager that is gutter-aware
+    let codeLayoutManager = CodeLayoutManager(),
+        textContainer     = NSTextContainer(),
+        textStorage       = NSTextStorage()
+    textStorage.addLayoutManager(codeLayoutManager)
+    textContainer.layoutManager = codeLayoutManager
+    codeLayoutManager.addTextContainer(textContainer)
+
+    super.init(frame: frame, textContainer: textContainer)
+
+    // Add a text storage delegate that maintains a line map
+    self.codeStorageDelegate = CodeStorageDelegate()
+    textStorage.delegate     = self.codeStorageDelegate
+
+    // Add a gutter view
+    let gutterWidth = (font?.pointSize ?? UIFont.systemFontSize) * 3,
+        gutterView  = GutterView<UITextView>(frame: CGRect(x: 0,
+                                                           y: 0,
+                                                           width: gutterWidth,
+                                                           height:  CGFloat .greatestFiniteMagnitude),
+                                             textView: self)
     addSubview(gutterView)
     self.gutterView = gutterView
+  }
+
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
   }
 
   override func layoutSubviews() {
@@ -49,7 +69,7 @@ public struct CodeEditor: UIViewRepresentable {
   }
 
   public func makeUIView(context: Context) -> UITextView {
-    let textView = UITextViewWithGutter()
+    let textView = CodeViewWithGutter(frame: CGRect(x: 0, y: 0, width: 100, height: 40))
 
     textView.text     = text
     textView.delegate = context.coordinator
@@ -126,6 +146,22 @@ public struct CodeEditor: NSViewRepresentable {
 
 // MARK: -
 // MARK: Shared code
+
+/// Customised layout manager for code layout.
+///
+class CodeLayoutManager: NSLayoutManager {
+
+//  override func processEditing(for textStorage: NSTextStorage,
+//                               edited editMask: NSTextStorage.EditActions,
+//                               range newCharRange: NSRange,
+//                               changeInLength delta: Int,
+//                               invalidatedRange invalidatedCharRange: NSRange)
+//  {
+//    for textContainer in textContainers {
+//      let textView = textContainer.textView
+//    }
+//  }
+}
 
 
 // MARK: -

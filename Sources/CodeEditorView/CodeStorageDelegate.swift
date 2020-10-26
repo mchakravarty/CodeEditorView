@@ -17,12 +17,13 @@ import AppKit
 
 class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
 
-  private let lineMap = LineMap<Void>(string: "")
+  private(set) var lineMap = LineMap<Void>(string: "")
 
   func textStorage(_ textStorage: NSTextStorage,
                    willProcessEditing editedMask: NSTextStorage.EditActions,
                    range editedRange: NSRange,
                    changeInLength delta: Int) {
-    // FIXME: all the change processing has to go here
+
+    lineMap.updateAfterEditing(string: textStorage.string, range: editedRange, changeInLength: delta)
   }
 }

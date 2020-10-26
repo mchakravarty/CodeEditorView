@@ -5,27 +5,36 @@
 //  Created by Manuel M T Chakravarty on 23/09/2020.
 //
 
+import os
+
+
+private let logger = Logger(subsystem: "org.justtesting.CodeEditor", category: "GutterView")
+
 #if os(iOS)
+
+
+// MARK: -
+// MARK: UIKit version
 
 import UIKit
 
-
-class GutterView: UIView {
+class GutterView<TextViewType: TextView>: UIView where TextViewType.Color == UIColor, TextViewType.Font == UIFont {
 
   /// The text view (UIKit or AppKit) that this gutter belongs to.
   ///
-  let textView: TextView
+  let textView: TextViewType
 
   var optLayoutManager: NSLayoutManager? { textView.optLayoutManager }
   var optTextContainer: NSTextContainer? { textView.optTextContainer }
   var optTextStorage:   NSTextStorage?   { textView.optTextStorage }
+  var optLineMap:       LineMap<Void>?   { textView.optLineMap }
 
   let backgroundColour = UIColor.lightGray  // TODO: eventually use the same bg colour as the rest of the text view
 
   /// Create and configure a gutter view for the given text view. This will also set the appropiate exclusion path for
   /// text container.
   ///
-  init(frame: CGRect, textView: TextView) {
+  init(frame: CGRect, textView: TextViewType) {
     self.textView = textView
     super.init(frame: frame)
     let
@@ -33,6 +42,7 @@ class GutterView: UIView {
                                                       size: CGSize(width: frame.width,
                                                                    height: CGFloat.greatestFiniteMagnitude)))
     optTextContainer?.exclusionPaths = [gutterExclusionPath]
+    contentMode = .redraw
   }
 
   required init(coder: NSCoder) {
@@ -41,22 +51,67 @@ class GutterView: UIView {
 
   override func draw(_ rect: CGRect) {
     guard let layoutManager = optLayoutManager,
-          let textContainer = optTextContainer
+          let textContainer = optTextContainer,
+          let lineMap       = optLineMap
     else { return }
 
-    // TODO: we leave the background drawing to the text view
-    backgroundColour.setFill()
+    // Inherit background colour and line number font size from the text view.
+    textView.textBackgroundColor?.setFill()
     UIBezierPath(rect: rect).fill()
+    let fontSize = textView.textFont?.pointSize ?? UIFont.systemFontSize,
+        desc     = UIFont.systemFont(ofSize: fontSize).fontDescriptor.addingAttributes(
+                     [ UIFontDescriptor.AttributeName.featureSettings:
+                         [
+                           [
+                             UIFontDescriptor.FeatureKey.featureIdentifier: kNumberSpacingType,
+                             UIFontDescriptor.FeatureKey.typeIdentifier: kMonospacedNumbersSelector,
+                           ],
+                           [
+                             UIFontDescriptor.FeatureKey.featureIdentifier: kStylisticAlternativesType,
+                             UIFontDescriptor.FeatureKey.typeIdentifier: kStylisticAltOneOnSelector,  // alt 6 and 9
+                           ],
+                           [
+                             UIFontDescriptor.FeatureKey.featureIdentifier: kStylisticAlternativesType,
+                             UIFontDescriptor.FeatureKey.typeIdentifier: kStylisticAltTwoOnSelector,  // alt 4
+                           ]
+                         ]
+                     ]
+                   ),
+        font     = UIFont(descriptor: desc, size: 0)
 
-    // All visible glyphs and all visible characters
-    let glyphRange = layoutManager.glyphRange(forBoundingRectWithoutAdditionalLayout: rect, in: textContainer),
-        charRange  = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
-    /// TODO: now we need a line map to figure out on which line a particular character (given by its index) is located
+    // All visible glyphs and all visible characters that are in the text area to the right of the gutter view
+    let glyphRange = layoutManager.glyphRange(forBoundingRectWithoutAdditionalLayout: textRectFrom(gutterRect: rect),
+                                              in: textContainer),
+        charRange  = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil),
+        lineRange  = lineMap.linesContaining(range: charRange)
+
+    // Text attributes for the line numbers
+    let lineNumberStyle = NSMutableParagraphStyle()
+    lineNumberStyle.alignment = .right
+    lineNumberStyle.tailIndent = -fontSize / 11
+    let textAttributes = [NSAttributedString.Key.font: font,
+                          .foregroundColor: UIColor.secondaryLabel,
+                          .paragraphStyle: lineNumberStyle,
+                          .kern: NSNumber(value: Float(-fontSize / 11))]
+
+    for line in lineRange {
+      logger.log("Line: \(line)")
+
+      let lineGlyphRange = layoutManager.glyphRange(forCharacterRange: lineMap.lines[line].range,
+                                                    actualCharacterRange: nil),
+          lineGlyphRect  = layoutManager.boundingRect(forGlyphRange: lineGlyphRange, in: textContainer)
+
+      ("\(line)" as NSString).draw(in: gutterRectForLineNumbersFrom(textRect: lineGlyphRect),
+                                   withAttributes: textAttributes)
+    }
   }
-
 }
 
 #elseif os(macOS)
+
+
+// MARK: -
+// MARK: AppKit version
 
 import AppKit
 
@@ -67,35 +122,36 @@ class GutterView: NSView {
 
 #endif
 
-/* Good way to enumerate all the visible line numbers (what did we do in HfM?)
- [self enumerateLineFragmentsForGlyphRange:glyphsToShow
-                                usingBlock:^(CGRect rect, CGRect usedRect, NSTextContainer *textContainer, NSRange glyphRange, BOOL *stop) {
-                                    NSRange charRange = [self characterRangeForGlyphRange:glyphRange actualGlyphRange:nil];
-                                    NSRange paraRange = [self.textStorage.string paragraphRangeForRange:charRange];
 
-                                    //   Only draw line numbers for the paragraph's first line fragment.  Subsiquent fragments are wrapped portions of the paragraph and don't
-                                    //   get the line number.
-                                    if (charRange.location == paraRange.location) {
-                                        gutterRect = CGRectOffset(CGRectMake(0, rect.origin.y, 40.0, rect.size.height), origin.x, origin.y);
-                                        paraNumber = [self _paraNumberForRange:charRange];
-                                        NSString* ln = [NSString stringWithFormat:@"%ld", (unsigned long) paraNumber + 1];
-                                        CGSize size = [ln sizeWithAttributes:atts];
+// MARK: -
+// MARK: Shared code
 
-                                        [ln drawInRect:CGRectOffset(gutterRect, CGRectGetWidth(gutterRect) - 4 - size.width, (CGRectGetHeight(gutterRect) - size.height) / 2.0)
-                                        withAttributes:atts];
-                                    }
-                                }];
+extension GutterView {
 
- //  Deal with the special case of an empty last line where enumerateLineFragmentsForGlyphRange has no line
- //  fragments to draw.
- if (NSMaxRange(glyphsToShow) > self.numberOfGlyphs) {
-     NSString* ln = [NSString stringWithFormat:@"%ld", (unsigned long) paraNumber + 2];
-     CGSize size = [ln sizeWithAttributes:atts];
+  /// Compute the full width rectangle in the gutter from a text container rectangle, such that they both have the same
+  /// vertical extension.
+  ///
+  private func gutterRectFrom(textRect: CGRect) -> CGRect {
+    return CGRect(origin: CGPoint(x: 0, y: textRect.origin.y + textView.textContainerOrigin.y),
+                  size: CGSize(width: frame.size.width, height: textRect.size.height))
+  }
 
-     gutterRect = CGRectOffset(gutterRect, 0.0, CGRectGetHeight(gutterRect));
-     [ln drawInRect:CGRectOffset(gutterRect, CGRectGetWidth(gutterRect) - 4 - size.width, (CGRectGetHeight(gutterRect) - size.height) / 2.0)
-     withAttributes:atts];
- }
+  /// Compute the line number glyph rectangle in the gutter from a text container rectangle, such that they both have
+  /// the same vertical extension.
+  ///
+  private func gutterRectForLineNumbersFrom(textRect: CGRect) -> CGRect {
+    let gutterRect = gutterRectFrom(textRect: textRect)
+    return CGRect(x: gutterRect.origin.x + gutterRect.size.width * 2/7,
+                  y: gutterRect.origin.y,
+                  width: gutterRect.size.width * 4/7,
+                  height: gutterRect.size.height)
+  }
 
- */
-
+  /// Compute the full width rectangle in the text container from a gutter rectangle, such that they both have the same
+  /// vertical extension.
+  ///
+  private func textRectFrom(gutterRect: CGRect) -> CGRect {
+    return CGRect(origin: CGPoint(x: frame.size.width, y: gutterRect.origin.y - textView.textContainerOrigin.y),
+                  size: CGSize(width: optTextContainer?.size.width ?? 0, height: gutterRect.size.height))
+  }
+}
