@@ -8,6 +8,25 @@
 import SwiftUI
 
 
+/// Specificies the language-dependent aspects of a code editor.
+///
+public struct LanguageConfiguration {
+  public let singleLineComment: String?
+}
+
+/// Empty language configuration
+///
+public let noConfiguration = LanguageConfiguration(singleLineComment: nil)
+
+/// Language configuration for Haskell
+///
+public let haskellConfiguration = LanguageConfiguration(singleLineComment: "--")
+
+/// Language configuration for Swift
+///
+public let swiftConfiguration = LanguageConfiguration(singleLineComment: "//")
+
+
 #if os(iOS)
 
 
@@ -23,7 +42,7 @@ fileprivate class CodeViewWithGutter: UITextView {
 
   /// Designated initializer for code views with a gutter.
   ///
-  init(frame: CGRect) {
+  init(frame: CGRect, with language: LanguageConfiguration) {
 
     // Use a custom layout manager that is gutter-aware
     let codeLayoutManager = CodeLayoutManager(),
@@ -35,8 +54,17 @@ fileprivate class CodeViewWithGutter: UITextView {
 
     super.init(frame: frame, textContainer: textContainer)
 
+    // Set basic display and input properties
+    font = UIFont.monospacedSystemFont(ofSize: UIFont.systemFontSize, weight: .regular)
+    autocapitalizationType = .none
+    autocorrectionType     = .no
+    spellCheckingType      = .no
+    smartQuotesType        = .no
+    smartDashesType        = .no
+    smartInsertDeleteType  = .no
+
     // Add a text storage delegate that maintains a line map
-    self.codeStorageDelegate = CodeStorageDelegate()
+    self.codeStorageDelegate = CodeStorageDelegate(with: language)
     textStorage.delegate     = self.codeStorageDelegate
 
     // Add a gutter view
@@ -62,14 +90,18 @@ fileprivate class CodeViewWithGutter: UITextView {
 /// SwiftUI code editor based on TextKit
 ///
 public struct CodeEditor: UIViewRepresentable {
+  let language: LanguageConfiguration
+
   @Binding var text: String
 
-  public init(text: Binding<String>) {
-    self._text = text
+  public init(text: Binding<String>, with language: LanguageConfiguration = noConfiguration) {
+    self._text    = text
+    self.language = language
   }
 
   public func makeUIView(context: Context) -> UITextView {
-    let textView = CodeViewWithGutter(frame: CGRect(x: 0, y: 0, width: 100, height: 40))
+    let textView = CodeViewWithGutter(frame: CGRect(x: 0, y: 0, width: 100, height: 40),
+                                      with: language)
 
     textView.text     = text
     textView.delegate = context.coordinator
@@ -105,10 +137,13 @@ public struct CodeEditor: UIViewRepresentable {
 /// SwiftUI code editor based on TextKit
 ///
 public struct CodeEditor: NSViewRepresentable {
+  let language: LanguageConfiguration
+
   @Binding var text: String
 
-  public init(text: Binding<String>) {
-    self._text = text
+  public init(text: Binding<String>, with language: LanguageConfiguration = noConfiguration) {
+    self._text    = text
+    self.language = language
   }
 
   public func makeNSView(context: Context) -> NSTextView {
@@ -137,7 +172,7 @@ public struct CodeEditor: NSViewRepresentable {
     }
 
     public func textViewDidChange(_ textView: NSTextView) {
-      self.text = textView.textStorage?.string ?? "" 
+      self.text = textView.textStorage?.string ?? ""
     }
   }
 }
@@ -157,9 +192,21 @@ class CodeLayoutManager: NSLayoutManager {
 //                               changeInLength delta: Int,
 //                               invalidatedRange invalidatedCharRange: NSRange)
 //  {
-//    for textContainer in textContainers {
-//      let textView = textContainer.textView
+//    // Generate temporary attributes for syntax highlighting from custom token attributes.
+//    //
+//
+//    // Comments
+//    textStorage.enumerateAttribute(.comment, in: newCharRange){ (commentStyle, range, _) in
+//      self.addTemporaryAttribute(NSAttributedString.Key.foregroundColor,
+//                                 value: UIColor.darkGray,
+//                                 forCharacterRange: range)
 //    }
+//
+//    super.processEditing(for: textStorage,
+//                         edited: editMask,
+//                         range: newCharRange,
+//                         changeInLength: delta,
+//                         invalidatedRange: invalidatedCharRange)
 //  }
 }
 
@@ -170,7 +217,7 @@ class CodeLayoutManager: NSLayoutManager {
 struct CodeEditor_Previews: PreviewProvider {
   static var previews: some View {
     VStack{
-      CodeEditor(text: .constant("Hello World!"))
+      CodeEditor(text: .constant("-- Hello World!"), with: haskellConfiguration)
     }
   }
 }

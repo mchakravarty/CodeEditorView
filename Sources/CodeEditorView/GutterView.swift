@@ -95,7 +95,6 @@ class GutterView<TextViewType: TextView>: UIView where TextViewType.Color == UIC
                           .kern: NSNumber(value: Float(-fontSize / 11))]
 
     for line in lineRange {
-      logger.log("Line: \(line)")
 
       let lineGlyphRange = layoutManager.glyphRange(forCharacterRange: lineMap.lines[line].range,
                                                     actualCharacterRange: nil),

@@ -42,6 +42,14 @@ struct LineMap<LineInfo> {
   ///
   func lookup(line: Int) -> OneLine? { return line < lines.count ? lines[line] : nil }
 
+  /// Return the character range covered by the given range of lines. Safely handles out of bounds situations.
+  ///
+  func charRangeOf(lines: Range<Int>) -> NSRange {
+    let startRange = lookup(line: lines.first ?? 1)?.range ?? NSRange(location: 0, length: 0),
+        endRange   = lookup(line: lines.last ?? 1)?.range ?? NSRange(location: 0, length: 0)
+    return NSRange(location: startRange.location, length: NSMaxRange(endRange) - startRange.location)
+  }
+
   /// Determine the line that contains the characters at the given string index. (Safe to be called with an out of
   /// bounds index.)
   ///
@@ -143,7 +151,7 @@ struct LineMap<LineInfo> {
   ///
   /// - Parameters:
   ///   - string: The string after editing.
-  ///   - editedRange: The character range that was affected by editing (after editing).
+  ///   - editedRange: The character range that was affected by editing (after the edit).
   ///   - delta: The length increase of the edited string (negative if it got shorter).
   ///
   /// NB: The line after the `editedRange` will be updated (and info fields be invalidated) if the `editedRange` ends on
@@ -151,34 +159,28 @@ struct LineMap<LineInfo> {
   ///
   mutating func updateAfterEditing(string: String, range editedRange: NSRange, changeInLength delta: Int) {
 
-    // If the given ranges are out of bounds of the given string, just recompute the complete line map.
-    //
-    let maxEditedRange = NSMaxRange(editedRange)
-    if editedRange.location < 0 || editedRange.length < 0 || editedRange.length - delta < 0
-        || maxEditedRange > string.count
-        || maxEditedRange - delta > NSMaxRange(lines.last?.range ?? NSRange(location: 0, length: 0))
-    {
-
-      lines = [(range: NSRange(location: 0, length: 0), info: nil)] + linesOf(string: string)
+    // Extend the `range` by one character, clipped by the `stringRange`, but such that a zero length range after the
+    // end of the string is preserved.
+    func extend(range: NSRange, clippingTo stringRange: NSRange) -> NSRange {
       return
-
+        range.location == NSMaxRange(stringRange)
+        ? NSRange(location: range.location, length: 0)
+        : NSIntersectionRange(NSRange(location: range.location, length: range.length + 1), stringRange)
     }
 
-    // Unless the edited range reaches to the end of the string, extend it by one character. This is crucial as, if the
+    // To compute line ranges, we extend all character ranges by one extra character. This is crucial as, if the
     // edited range ends on a newline, this may insert a new line break, which means, we also need to update the line
     // *after* the new line break.
-    let extendedEditedRange
-      = maxEditedRange == string.count
-      ? editedRange
-      : NSRange(location: editedRange.location, length: editedRange.length + 1)
-
-    let
-      nsString       = string as NSString,
-      oldLinesRange  = linesContaining(range: NSRange(location: extendedEditedRange.location,
-                                                      length: extendedEditedRange.length - delta)),
-      newLinesRange  = nsString.lineRange(for: extendedEditedRange),
-      newLinesString = nsString.substring(with: newLinesRange),
-      newLines       = linesOf(string: newLinesString).map{ shift(line: $0, by: newLinesRange.location) }
+    //
+    let oldStringRange = NSRange(location: 0, length: NSMaxRange(lines.last?.range ?? NSRange(location: 0, length: 0))),
+        newStringRange = NSRange(location: 0, length: string.count),
+        nsString       = string as NSString,
+        oldLinesRange  = linesContaining(range: extend(range: NSRange(location: editedRange.location,
+                                                                      length: editedRange.length - delta), clippingTo: oldStringRange)),
+        newLinesRange  = nsString.lineRange(for: extend(range: editedRange,
+                                                        clippingTo: newStringRange)),
+        newLinesString = nsString.substring(with: newLinesRange),
+        newLines       = linesOf(string: newLinesString).map{ shift(line: $0, by: newLinesRange.location) }
 
     // If the newly inserted text ends on a new line, we need to remove the empty trailing line in the new lines array
     // unless the range of those lines extends until the end of the string.
