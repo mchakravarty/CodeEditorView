@@ -8,25 +8,6 @@
 import SwiftUI
 
 
-/// Specificies the language-dependent aspects of a code editor.
-///
-public struct LanguageConfiguration {
-  public let singleLineComment: String?
-}
-
-/// Empty language configuration
-///
-public let noConfiguration = LanguageConfiguration(singleLineComment: nil)
-
-/// Language configuration for Haskell
-///
-public let haskellConfiguration = LanguageConfiguration(singleLineComment: "--")
-
-/// Language configuration for Swift
-///
-public let swiftConfiguration = LanguageConfiguration(singleLineComment: "//")
-
-
 #if os(iOS)
 
 
