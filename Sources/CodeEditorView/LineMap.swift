@@ -32,8 +32,8 @@ struct LineMap<LineInfo> {
   ///
   init(string: String) { lines.append(contentsOf: linesOf(string: string)) }
 
-  /// MARK: -
-  /// MARK: Queries
+  // MARK: -
+  // MARK: Queries
 
   /// Safe lookup of the information pertaining to a given line.
   ///
@@ -144,8 +144,20 @@ struct LineMap<LineInfo> {
     }
   }
 
-  /// MARK: -
-  /// MARK: Editing
+  // MARK: -
+  // MARK: Editing
+
+  /// Set the info field for the given line.
+  ///
+  /// - Parameters:
+  ///   - line: The line whose info field ought to be set.
+  ///   - info: The new info value for that line.
+  ///
+  mutating func setInfoOf(line: Int, to info: LineInfo?) {
+    guard line < lines.count else { return }
+
+    lines[line] = (range: lines[line].range, info: info)
+  }
 
   /// Update line map given the specified editing activity of the underlying string.
   ///
@@ -196,8 +208,8 @@ struct LineMap<LineInfo> {
     }
   }
 
-  /// MARK: -
-  /// MARK: Helpers
+  // MARK: -
+  // MARK: Helpers
 
   /// Shift the range of `line` by `delta`.
   ///

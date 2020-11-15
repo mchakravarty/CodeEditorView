@@ -28,7 +28,7 @@ protocol TextView {
 }
 
 extension TextView {
-  var optLineMap: LineMap<Void>? {    // FIXME: need to use a specific instance
+  var optLineMap: LineMap<LineInfo>? {    // FIXME: need to use a specific instance
     return (optTextStorage?.delegate as? CodeStorageDelegate)?.lineMap
   }
 }

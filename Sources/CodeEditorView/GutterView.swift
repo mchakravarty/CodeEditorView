@@ -24,10 +24,10 @@ class GutterView<TextViewType: TextView>: UIView where TextViewType.Color == UIC
   ///
   let textView: TextViewType
 
-  var optLayoutManager: NSLayoutManager? { textView.optLayoutManager }
-  var optTextContainer: NSTextContainer? { textView.optTextContainer }
-  var optTextStorage:   NSTextStorage?   { textView.optTextStorage }
-  var optLineMap:       LineMap<Void>?   { textView.optLineMap }
+  var optLayoutManager: NSLayoutManager?   { textView.optLayoutManager }
+  var optTextContainer: NSTextContainer?   { textView.optTextContainer }
+  var optTextStorage:   NSTextStorage?     { textView.optTextStorage }
+  var optLineMap:       LineMap<LineInfo>? { textView.optLineMap }
 
   let backgroundColour = UIColor.lightGray  // TODO: eventually use the same bg colour as the rest of the text view
 

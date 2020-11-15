@@ -24,6 +24,13 @@ public struct LanguageConfiguration {
   /// Supported tokens
   ///
   enum Token {
+    case roundBracketOpen
+    case roundBracketClose
+    case squareBracketOpen
+    case squareBracketClose
+    case curlyBracketOpen
+    case curlyBracketClose
+    case string
     case singleLineComment
     case nestedCommentOpen
     case nestedCommentClose
@@ -31,23 +38,27 @@ public struct LanguageConfiguration {
 
   public typealias BracketPair = (open: String, close: String)
 
+  public let stringRegexp:      String?
   public let singleLineComment: String?
-  public let nestedComment: BracketPair?
+  public let nestedComment:     BracketPair?
 }
 
 /// Empty language configuration
 ///
-public let noConfiguration = LanguageConfiguration(singleLineComment: nil,
+public let noConfiguration = LanguageConfiguration(stringRegexp: nil,
+                                                   singleLineComment: nil,
                                                    nestedComment: nil)
 
 /// Language configuration for Haskell
 ///
-public let haskellConfiguration = LanguageConfiguration(singleLineComment: "--",
+public let haskellConfiguration = LanguageConfiguration(stringRegexp: "\"(?:\\\"|.)*\"",
+                                                        singleLineComment: "--",
                                                         nestedComment: (open: "{-", close: "-}"))
 
 /// Language configuration for Swift
 ///
-public let swiftConfiguration = LanguageConfiguration(singleLineComment: "//",
+public let swiftConfiguration = LanguageConfiguration(stringRegexp: "\"(?:\\\"|.)*\"",
+                                                      singleLineComment: "//",
                                                       nestedComment: (open: "/*", close: "*/"))
 
 extension LanguageConfiguration {
@@ -56,9 +67,18 @@ extension LanguageConfiguration {
 
     var tokenDictionary = TokenDictionary<LanguageConfiguration.Token>()
 
-    if let lexeme = singleLineComment { tokenDictionary.updateValue(Token.singleLineComment, forKey: lexeme) }
-    if let lexeme = nestedComment?.open { tokenDictionary.updateValue(Token.nestedCommentOpen, forKey: lexeme) }
-    if let lexeme = nestedComment?.close { tokenDictionary.updateValue(Token.nestedCommentClose, forKey: lexeme) }
+    tokenDictionary.updateValue(Token.roundBracketOpen, forKey: .string("("))
+    tokenDictionary.updateValue(Token.roundBracketClose, forKey: .string(")"))
+    tokenDictionary.updateValue(Token.squareBracketOpen, forKey: .string("["))
+    tokenDictionary.updateValue(Token.squareBracketClose, forKey: .string("]"))
+    tokenDictionary.updateValue(Token.curlyBracketOpen, forKey: .string("{"))
+    tokenDictionary.updateValue(Token.curlyBracketClose, forKey: .string("}"))
+    if let lexeme = stringRegexp { tokenDictionary.updateValue(Token.string, forKey: .pattern(lexeme)) }
+    if let lexeme = singleLineComment { tokenDictionary.updateValue(Token.singleLineComment, forKey: .string(lexeme)) }
+    if let lexemes = nestedComment {
+      tokenDictionary.updateValue(Token.nestedCommentOpen, forKey: .string(lexemes.open))
+      tokenDictionary.updateValue(Token.nestedCommentClose, forKey: .string(lexemes.close))
+    }
 
     return tokenDictionary
   }

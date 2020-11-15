@@ -6,6 +6,7 @@
 //
 //  Extensions to `NSMutableAttributedString`
 
+import os
 import Foundation
 #if os(iOS)
 import UIKit
@@ -14,23 +15,79 @@ import AppKit
 #endif
 
 
-/// Mapping from token lexemes to token kinds.
+private let logger = Logger(subsystem: "org.justtesting.CodeEditor", category: "MutableAttributedString")
+
+
+/// Token descriptions
 ///
-typealias TokenDictionary<TokenType> = [String: TokenType]
+enum TokenPattern: Hashable {
+
+  /// The token has only one lexeme, given as a simple string
+  ///
+  case string(String)
+
+  /// The token has multiple lexemes, specified in the form of a regular expression string
+  ///
+  case pattern(String)
+}
+
+/// Mapping from token patterns to token kinds.
+///
+typealias TokenDictionary<TokenType> = [TokenPattern: TokenType]
+
+/// Pre-compiled regular expression tokeniser
+///
+struct Tokeniser<TokenType> {
+
+  /// The matching regular expression
+  ///
+  let regexp: NSRegularExpression
+
+  /// The lookup table for single-lexeme tokens
+  ///
+  let stringTokenTypes: [String: TokenType]
+
+  /// The token types for multi-lexeme tokens
+  ///
+  /// The order of the token types in the array is the same as that of the matching groups for those tokens in the
+  /// regular expression.
+  ///
+  let patternTokenTypes: [TokenType]
+}
 
 extension NSMutableAttributedString {
 
-  /// Determine a regular expression matching all lexemes in the given token dictionary.
+  /// Create a tokeniser from the given token dictionary.
   ///
-  /// - Parameter tokenMap: The token dictionary determining the lexemes to match.
-  /// - Returns: A regular expression that is able to match all lexemes contained in the token dictionary.
+  /// - Parameter tokenMap: The token dictionary determining the lexemes to match and their token type.
+  /// - Returns: A tokeniser that matches all lexemes contained in the token dictionary.
   ///
-  static func regularExpression<TokenType>(for tokenMap: TokenDictionary<TokenType>) -> NSRegularExpression? {
-    let pattern = tokenMap.keys.reduce("") { (regexp, lexeme) in
-      if regexp.isEmpty { return NSRegularExpression.escapedPattern(for: lexeme) }
-      else { return regexp + "|" + NSRegularExpression.escapedPattern(for: lexeme) }
+  static func tokeniser<TokenType>(for tokenMap: TokenDictionary<TokenType>) -> Tokeniser<TokenType>? {
+
+    let pattern = tokenMap.keys.reduce("") { (regexp, pattern) in
+
+      let regexpPattern: String
+      switch pattern {
+      case .string(let lexeme):   regexpPattern = NSRegularExpression.escapedPattern(for: lexeme)
+      case .pattern(let pattern): regexpPattern = "(" + pattern + ")"     // each pattern gets a capture group
+      }
+      if regexp.isEmpty { return regexpPattern } else { return regexp + "|" + regexpPattern}
     }
-    return try? NSRegularExpression(pattern: pattern, options: [])
+    let stringTokenTypes: [(String, TokenType)] = tokenMap.compactMap{ (pattern, type) in
+      if case .string(let lexeme) = pattern { return (lexeme, type)  } else { return nil }
+    }
+    let patternTokenTypes: [TokenType] = tokenMap.compactMap{ (pattern, type) in
+      if case .pattern(_) = pattern { return type } else { return nil }
+    }
+
+    do {
+
+      let regexp = try NSRegularExpression(pattern: pattern, options: [])
+      return Tokeniser(regexp: regexp,
+                       stringTokenTypes: Dictionary<String, TokenType>(stringTokenTypes){ (left, right) in return left },
+                       patternTokenTypes: patternTokenTypes)
+
+    } catch let err { logger.error("failed to compile regexp: \(err.localizedDescription)"); return nil }
   }
 
   /// Parse the given range and set the corresponding token attribute value on all matching lexeme ranges.
@@ -43,23 +100,32 @@ extension NSMutableAttributedString {
   ///
   /// All previously existing uses of `attribute` in the given range are removed.
   ///
-  func determineAndSetTokenAttribute<TokenType>(attribute: NSAttributedString.Key,
-                                                tokenMap: TokenDictionary<TokenType>,
-                                                with regexp: NSRegularExpression,
-                                                in range: NSRange)
+  func tokeniseAndSetTokenAttribute<TokenType>(attribute: NSAttributedString.Key,
+                                               with tokeniser: Tokeniser<TokenType>,
+                                               in range: NSRange)
   {
     // Clear existing attributes
     removeAttribute(attribute, range: range)
 
     // Tokenise and set appropriate attributes
-    regexp.enumerateMatches(in: self.string, options: [], range: range) { (result, _, _) in
+    tokeniser.regexp.enumerateMatches(in: self.string, options: [], range: range) { (result, _, _) in
 
-      guard
-        let result = result,
-        let value  = tokenMap[(self.string as NSString).substring(with: result.range)]
-      else { return }
+      guard let result = result else { return }
 
-      self.addAttribute(attribute, value: value, range: result.range)
+      var tokenType: TokenType?
+      for i in stride(from: result.numberOfRanges - 1, through: 1, by: -1) {
+
+        if result.range(at: i).location != NSNotFound { // match by a capture group => complex pattern match
+
+          tokenType = tokeniser.patternTokenTypes[i - 1]
+        }
+      }
+      if tokenType == nil {                             // no capture group matched => we matched a simple string lexeme
+
+        tokenType = tokeniser.stringTokenTypes[(self.string as NSString).substring(with: result.range)]
+      }
+
+      if let value = tokenType { self.addAttribute(attribute, value: value, range: result.range) }
     }
   }
 }
