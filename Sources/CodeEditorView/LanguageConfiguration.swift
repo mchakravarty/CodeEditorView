@@ -51,13 +51,13 @@ public let noConfiguration = LanguageConfiguration(stringRegexp: nil,
 
 /// Language configuration for Haskell
 ///
-public let haskellConfiguration = LanguageConfiguration(stringRegexp: "\"(?:\\\"|.)*\"",
+public let haskellConfiguration = LanguageConfiguration(stringRegexp: "\"(?:\\\\\"|[^\"])*\"",
                                                         singleLineComment: "--",
                                                         nestedComment: (open: "{-", close: "-}"))
 
 /// Language configuration for Swift
 ///
-public let swiftConfiguration = LanguageConfiguration(stringRegexp: "\"(?:\\\"|.)*\"",
+public let swiftConfiguration = LanguageConfiguration(stringRegexp: "\"(?:\\\\\"|[^\"])*\"",
                                                       singleLineComment: "//",
                                                       nestedComment: (open: "/*", close: "*/"))
 
