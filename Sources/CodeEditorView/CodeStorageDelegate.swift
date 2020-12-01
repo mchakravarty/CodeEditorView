@@ -11,6 +11,21 @@
 import SwiftUI
 
 
+// MARK: -
+// MARK: Visual debugging support
+
+// FIXME: It should be possible to enable this via a defaults setting and the colours ought to depend on the theme background.
+
+private let visualDebugging               = true
+private let visualDebuggingEditedColour   = UIColor(red: 0.9, green: 1.0, blue: 0.9, alpha: 1.0)
+private let visualDebuggingLinesColour    = UIColor(red: 0.9, green: 0.9, blue: 1.0, alpha: 1.0)
+private let visualDebuggingTrailingColour = UIColor(red: 1.0, green: 0.9, blue: 0.9, alpha: 1.0)
+private let visualDebuggingTokenColour    = UIColor(red: 1.0, green: 0.0, blue: 0.0, alpha: 0.5)
+
+
+// MARK: -
+// MARK: Tokens
+
 // Custom token attributes
 //
 extension NSAttributedString.Key {
@@ -33,18 +48,26 @@ enum CommentStyle {
 
 /// Information that is tracked on a line by line basis in the line map.
 ///
+/// NB: We need the comment depth at the start and the end of each line as, during editing, lines are replaced in the
+///     line map before comment attributes are recalculated. During this replacement, we lose the line info of all the
+///     replaced lines.
+///
 struct LineInfo {
-  var roundBracketDiff:  Int  // increase or decrease of the nesting level of round brackets on this line
-  var squareBracketDiff: Int  // increase or decrease of the nesting level of square brackets on this line
-  var curlyBracketDiff:  Int  // increase or decrease of the nesting level of curly brackets on this line
+  var commentDepthStart: Int   // nesting depth for nested comments at the start of this line
+  var commentDepthEnd:   Int   // nesting depth for nested comments at the end of this line
+  var roundBracketDiff:  Int   // increase or decrease of the nesting level of round brackets on this line
+  var squareBracketDiff: Int   // increase or decrease of the nesting level of square brackets on this line
+  var curlyBracketDiff:  Int   // increase or decrease of the nesting level of curly brackets on this line
 }
+
+
+// MARK: -
+// MARK: Delegate class
 
 class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
 
-  // TODO: we need two regular expressions: one regular one and one that tokenizes inside a (nested) comment
-
   let language:  LanguageConfiguration
-  let tokeniser: Tokeniser<LanguageConfiguration.Token>?    // cache the tokeniser for token matching
+  let tokeniser: Tokeniser<LanguageConfiguration.Token, LanguageConfiguration.State>?    // cache the tokeniser
 
   private(set) var lineMap = LineMap<LineInfo>(string: "")
 
@@ -62,34 +85,40 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
     // If only attributes change, the line map and syntax highlighting remains the same => nothing for us to do
     guard editedMask.contains(.editedCharacters) else { return }
 
-    lineMap.updateAfterEditing(string: textStorage.string, range: editedRange, changeInLength: delta)
+    if visualDebugging {
+      let wholeTextRange = NSRange(location: 0, length: textStorage.length)
+      textStorage.removeAttribute(.backgroundColor, range: wholeTextRange)
+      textStorage.removeAttribute(.underlineColor, range: wholeTextRange)
+      textStorage.removeAttribute(.underlineStyle, range: wholeTextRange)
+    }
 
-    // We need to extend the range to account for lexemes that extend beyond the currently edited range. In principle,
-    // going to the previous and next word boundary (whitespace character) would be sufficient, but it doesn't seem as
-    // straightforward to find those boundaries as finding the line boundaries.
-    let extendedRange = (textStorage.string as NSString).lineRange(for: editedRange)
-    tokeniseAttributesFor(range: extendedRange, in: textStorage)
+    lineMap.updateAfterEditing(string: textStorage.string, range: editedRange, changeInLength: delta)
+    tokeniseAttributesFor(range: editedRange, in: textStorage)
+
+    if visualDebugging {
+      textStorage.addAttribute(.backgroundColor, value: visualDebuggingEditedColour, range: editedRange)
+    }
   }
 }
+
+
+// MARK: -
+// MARK: Tokenisation
 
 extension CodeStorageDelegate {
 
   /// Tokenise the substring of the given text storage that contains the specified lines and set token attributes as
   /// needed.
   ///
-  func tokeniseAttributesFor(range: NSRange, in textStorage: NSTextStorage) {
-    guard let tokeniser = tokeniser else { return }
+  /// - Parameters:
+  ///   - originalRange: The character range that contains all characters that have changed.
+  ///   - textStorage: The text storage that contains the changed characters.
+  ///
+  /// Tokenisation happens at line granularity. Hence, the range is correspondingly extended.
+  ///
+  func tokeniseAttributesFor(range originalRange: NSRange, in textStorage: NSTextStorage) {
 
-    // Set the token attribute in range.
-    textStorage.tokeniseAndSetTokenAttribute(attribute: .token,
-                                             with: tokeniser,
-                                             in: range)
-
-    // For all lines in range, collect the tokens line by line
-    let lines           = lineMap.linesContaining(range: range)
-    var linesWithTokens = Array<(lineRange: NSRange,
-                                 tokens: Array<(token: LanguageConfiguration.Token, range: NSRange)>)>()
-    for line in lines {
+    func tokeniseAndUpdateInfo(for line: Int, commentDepth: inout Int, lastCommentStart: inout Int?) {
 
       if let lineRange = lineMap.lookup(line: line)?.range {
 
@@ -101,12 +130,32 @@ extension CodeStorageDelegate {
         var tokens = Array<(token: LanguageConfiguration.Token, range: NSRange)>()
         textStorage.enumerateAttribute(.token, in: lineRange, options: []){ (value, range, _) in
 
-          if let tokenValue = value as? LanguageConfiguration.Token { tokens.append((token: tokenValue, range: range)) }
-        }
-        linesWithTokens.append((lineRange: lineRange, tokens: tokens))
+          if let tokenValue = value as? LanguageConfiguration.Token {
 
-        // FIXME: this has to change with nested comments
-        var lineInfo = LineInfo(roundBracketDiff: 0, squareBracketDiff: 0, curlyBracketDiff: 0)
+            tokens.append((token: tokenValue, range: range))
+
+            if visualDebugging {
+
+              textStorage.addAttribute(.underlineColor, value: visualDebuggingTokenColour, range: range)
+              if range.length > 0 {
+                textStorage.addAttribute(.underlineStyle,
+                                         value: NSNumber(value: NSUnderlineStyle.double.rawValue),
+                                         range: NSRange(location: range.location, length: 1))
+              }
+              if range.length > 1 {
+                textStorage.addAttribute(.underlineStyle,
+                                         value: NSNumber(value: NSUnderlineStyle.single.rawValue),
+                                         range: NSRange(location: range.location + 1, length: range.length - 1))
+              }
+            }
+          }
+        }
+
+        var lineInfo = LineInfo(commentDepthStart: commentDepth,
+                                commentDepthEnd: 0,
+                                roundBracketDiff: 0,
+                                squareBracketDiff: 0,
+                                curlyBracketDiff: 0)
         tokenLoop: for token in tokens {
 
           switch token.token {
@@ -133,99 +182,121 @@ extension CodeStorageDelegate {
             let commentStart = token.range.location,
                 commentRange = NSRange(location: commentStart, length: NSMaxRange(lineRange) - commentStart)
             textStorage.addAttribute(.comment, value: CommentStyle.singleLineComment, range: commentRange)
-            break tokenLoop           // the rest of the tokens are ignored as they are commented out
+            break tokenLoop   // the rest of the tokens are ignored as they are commented out and we'll rescan on change
+
+          case .nestedCommentOpen:
+            if commentDepth == 0 { lastCommentStart = token.range.location }    // start of an outermost nested comment
+            commentDepth += 1
+
+          case .nestedCommentClose:
+            if commentDepth > 0 {
+
+              commentDepth -= 1
+
+              // If we just closed an outermost nested comment, attribute the comment range
+              if let start = lastCommentStart, commentDepth == 0
+              {
+                textStorage.addAttribute(.comment,
+                                         value: CommentStyle.nestedComment,
+                                         range: NSRange(location: start, length: NSMaxRange(token.range) - start))
+                lastCommentStart = nil
+              }
+            }
 
           default:
             break
           }
         }
+
+        // If the line ends while we are still in an open comment, we need a comment attribute up to the end of the line
+        if let start = lastCommentStart, commentDepth > 0 {
+
+          textStorage.addAttribute(.comment,
+                                   value: CommentStyle.nestedComment,
+                                   range: NSRange(location: start, length: NSMaxRange(lineRange) - start))
+
+        }
+
+        // Retain computed line information
+        lineInfo.commentDepthEnd = commentDepth
         lineMap.setInfoOf(line: line, to: lineInfo)
       }
     }
 
-    /*
-    // FIXME: the following interacts with nested comments as the comment tokens can cancel each other (in some configurations)
+    guard let tokeniser = tokeniser else { return }
 
-    // Add `.comment` attribute for single line comments and calculate brackets diff.
-    for lineWithToken in linesWithTokens {
+    // Extend the range to line boundaries. Because we cannot parse partial tokens, we at least need to go to word
+    // boundaries, but because we have line bounded constructs like comments to the end of the line and it is easier to
+    // determine the line boundaries, we use those.
+    let lines = lineMap.linesContaining(range: originalRange),
+        range = lineMap.charRangeOf(lines: lines)
 
+    // Determine the comment depth as determined by the preceeeding code. This is needed to determine the correct
+    // tokeniser and to compute attribute information from the resulting tokens. NB: We need to get that info from
+    // the previous line, because the line info of the current line was set to `nil` during updating the line map.
+    let initialCommentDepth  = lineMap.lookup(line: lines.startIndex - 1)?.info?.commentDepthEnd ?? 0
+
+    // Set the token attribute in range.
+    let initialTokeniserState: LanguageConfiguration.State
+      = initialCommentDepth > 0 ? .tokenisingComment(initialCommentDepth) : .tokenisingCode
+    textStorage.tokeniseAndSetTokenAttribute(attribute: .token,
+                                             with: tokeniser,
+                                             state: initialTokeniserState,
+                                             in: range)
+
+    // For all lines in range, collect the tokens line by line, while keeping track of nested comments
+    //
+    // - `lastCommentStart` keeps track of the last start of an *outermost* nested comment.
+    //
+    var commentDepth     = initialCommentDepth
+    var lastCommentStart = initialCommentDepth > 0 ? lineMap.lookup(line: lines.startIndex)?.range.location : nil
+    for line in lines {
+      tokeniseAndUpdateInfo(for: line, commentDepth: &commentDepth, lastCommentStart: &lastCommentStart)
     }
 
-//----
+    // Continue to re-process line by line until there is no longer a change in the comment depth before and after
+    // re-processing
+    //
+    var currentLine       = lines.endIndex
+    var highlightingRange = range
+    trailingLineLoop: while currentLine < lineMap.lines.count {
 
-    // Collect all tokens in range.
-    var tokens = Array<(token: LanguageConfiguration.Token, range: NSRange)>()
-    textStorage.enumerateAttribute(.token, in: range, options: []){ (value, range, _) in
+      if let lineEntry = lineMap.lookup(line: currentLine) {
 
-      if let tokenValue = value as? LanguageConfiguration.Token { tokens.append((token: tokenValue, range: range)) }
-    }
+        // If this line has got a line info entry and the expected comment depth at the start of the line matches
+        // the current comment depth, we reached the end of the range of lines affected by this edit => break the loop
+        if let depth = lineEntry.info?.commentDepthStart, depth == commentDepth { break trailingLineLoop }
 
-//    let lines = lineMap.linesContaining(range: range)
+        // Re-tokenise line
+        let initialTokeniserState: LanguageConfiguration.State
+          = commentDepth > 0 ? .tokenisingComment(commentDepth) : .tokenisingCode
+        textStorage.tokeniseAndSetTokenAttribute(attribute: .token,
+                                                 with: tokeniser,
+                                                 state: initialTokeniserState,
+                                                 in: lineEntry.range)
 
-    // TODO: we need a flag in the line map to indicate for every line whether it is an inner comment line; i.e., a line
-    //       where all characters are within a nested comment that neither starts not stops on that very line. If we
-    //       edit such lines, we need to mark everything with the appropriate comment attribute, but we want to do that
-    //       locally without l0oking at the whole —possibly long— comment.
+        // Collect the tokens and update line info
+        tokeniseAndUpdateInfo(for: currentLine, commentDepth: &commentDepth, lastCommentStart: &lastCommentStart)
 
-    // Make sure the comment attribute is properly set in the edited range and determine the highlighting range, which
-    // may be larger as (new) comments may extent outside of the edited range,
-    textStorage.removeAttribute(.comment, range: range)
-    let highlightingRange = attributeAllCommentedCharacters(range: range, with: tokens, in: textStorage)
-
- */
-//    textStorage.removeAttribute(.foregroundColor, range: highlightingRange)
-    textStorage.removeAttribute(.foregroundColor, range: range)
-
-//    fixHighlightingAttributes(lines: highlightingLines, in: textStorage)
-    fixHighlightingAttributes(range: range, in: textStorage)
-    // FIXME: if `affectedLines` wider than `lines`, don't we have to explicitly tigger a redraw for the rectangles covering the extra lines??
-  }
-
-  /*
-  /// Ensure that all characters that are commented out in the given range, receive the `.comment` attributes. We assume
-  /// that the `.token` attribute has been properly set on all comment-related lexemes.
-  ///
-  /// - Parameters:
-  ///   - range: Range of characters to consider.
-  ///   - tokens: Array of the tokens identified in the given range.
-  ///   - textStorage: The text storage containing the text to be attributed.
-  /// - Returns: Cheracter range extended, such it encompasses all characters whose `.comment` status was affected by
-  ///            by the currently processed edit.
-  ///
-  func attributeAllCommentedCharacters(range: NSRange,
-                                       with tokens: Array<(token: LanguageConfiguration.Token, range: NSRange)>,
-                                       in textStorage: NSTextStorage) -> NSRange
-  {
-    var extendedRange = range
-
-    // TODO: handle nested comments
-
-    // For all single line comment tokens, set the comment attribute up to the end of the line on which the token
-    // appears and ensure that the `extendedRange` reaches up to the end of that line. (We don't care about multiple
-    // tokens per line as they don't affect the attributes to be set.)
-    for token in (tokens.filter{ $0.token == .singleLineComment }) {
-
-      let commentStart   = token.range.location
-      if let commentLine = lineMap.lineOf(index: commentStart),
-         let lineRange   = lineMap.lookup(line: commentLine)?.range
-      {
-
-        let commentRange = NSRange(location: commentStart, length: NSMaxRange(lineRange) - commentStart)
-        textStorage.addAttribute(.comment, value: CommentStyle.singleLineComment, range: commentRange)
-        extendedRange = NSUnionRange(extendedRange, commentRange)
+        // The currently processed line needs to be highlighted, too
+        highlightingRange = NSUnionRange(highlightingRange, lineEntry.range)
 
       }
+      currentLine += 1
     }
-    return extendedRange
+
+    if visualDebugging {
+      textStorage.addAttribute(.backgroundColor, value: visualDebuggingTrailingColour, range: highlightingRange)
+      textStorage.addAttribute(.backgroundColor, value: visualDebuggingLinesColour, range: range)
+    }
+
+    fixHighlightingAttributes(range: highlightingRange, in: textStorage)
   }
- */
 
   /// Based on the token attributes, set the highlighting attributes of the characters in the given line range.
   ///
-//  func fixHighlightingAttributes(lines: Range<Int>, in textStorage: NSTextStorage) {
   func fixHighlightingAttributes(range: NSRange, in textStorage: NSTextStorage) {
 
-//    let range = lineMap.charRangeOf(lines: lines)
     textStorage.addAttribute(.foregroundColor, value: UIColor.label, range: range)
     textStorage.enumerateAttribute(.token, in: range){ (optionalValue, attrRange, _) in
 

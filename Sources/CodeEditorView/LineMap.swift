@@ -107,7 +107,8 @@ struct LineMap<LineInfo> {
   /// line. Deal with out of bounds conditions by clipping to the front and end of the line range, respectively.
   ///
   /// - Parameter range: The character range for which we want to know the line range.
-  /// - Returns: The smallest range of lines that includes all characters in the given character range.
+  /// - Returns: The smallest range of lines that includes all characters in the given character range. The start value
+  ///     of that range is greater or equal 1.
   ///
   /// There are two special cases:
   /// - If the resulting line range is being followed by a trailing empty line, that trailing empty line is also
