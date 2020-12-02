@@ -28,7 +28,7 @@ protocol TextView {
 }
 
 extension TextView {
-  var optLineMap: LineMap<LineInfo>? {    // FIXME: need to use a specific instance
+  var optLineMap: LineMap<LineInfo>? {
     return (optTextStorage?.delegate as? CodeStorageDelegate)?.lineMap
   }
 }
@@ -72,7 +72,7 @@ extension NSTextView: TextView {
 
   var textBackgroundColor: Color? { backgroundColor }
   var textFont:            Font? { font }
-  var textContainerOrigin: CGPoint { return CGPoint(x: textContainerInset.left, y: textContainerInset.top) }
+  var textContainerOrigin: CGPoint { return CGPoint(x: textContainerInset.width, y: textContainerInset.height) }
 }
 
 

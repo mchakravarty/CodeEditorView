@@ -8,7 +8,6 @@
 //  code in the respective languages, such as comment syntax, bracketing syntax, and syntax highlighting
 //  characteristics.
 
-import Foundation
 #if os(iOS)
 import UIKit
 #elseif os(macOS)

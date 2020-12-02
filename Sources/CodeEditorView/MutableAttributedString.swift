@@ -7,7 +7,6 @@
 //  Extensions to `NSMutableAttributedString`
 
 import os
-import Foundation
 #if os(iOS)
 import UIKit
 #elseif os(macOS)

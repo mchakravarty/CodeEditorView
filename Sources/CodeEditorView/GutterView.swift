@@ -18,23 +18,26 @@ private let logger = Logger(subsystem: "org.justtesting.CodeEditor", category: "
 
 import UIKit
 
-class GutterView<TextViewType: TextView>: UIView where TextViewType.Color == UIColor, TextViewType.Font == UIFont {
 
-  /// The text view (UIKit or AppKit) that this gutter belongs to.
+private typealias BezierPath     = UIBezierPath
+private typealias Font           = UIFont
+private typealias FontDescriptor = UIFontDescriptor
+
+private let fontDescriptorFeatureIdentifier = FontDescriptor.FeatureKey.featureIdentifier
+private let fontDescriptorTypeIdentifier    = FontDescriptor.FeatureKey.typeIdentifier
+
+private let lineNumberColour = UIColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 0.5)
+
+class GutterView: UIView {
+
+  /// The text view that this gutter belongs to.
   ///
-  let textView: TextViewType
-
-  var optLayoutManager: NSLayoutManager?   { textView.optLayoutManager }
-  var optTextContainer: NSTextContainer?   { textView.optTextContainer }
-  var optTextStorage:   NSTextStorage?     { textView.optTextStorage }
-  var optLineMap:       LineMap<LineInfo>? { textView.optLineMap }
-
-  let backgroundColour = UIColor.lightGray  // TODO: eventually use the same bg colour as the rest of the text view
+  let textView: UITextView
 
   /// Create and configure a gutter view for the given text view. This will also set the appropiate exclusion path for
   /// text container.
   ///
-  init(frame: CGRect, textView: TextViewType) {
+  init(frame: CGRect, textView: UITextView) {
     self.textView = textView
     super.init(frame: frame)
     let
@@ -48,6 +51,64 @@ class GutterView<TextViewType: TextView>: UIView where TextViewType.Color == UIC
   required init(coder: NSCoder) {
     fatalError("CodeEditorView.GutterView.init(coder:) not implemented")
   }
+}
+
+#elseif os(macOS)
+
+
+// MARK: -
+// MARK: AppKit version
+
+import AppKit
+
+
+private typealias BezierPath     = NSBezierPath
+private typealias Font           = NSFont
+private typealias FontDescriptor = NSFontDescriptor
+
+private let fontDescriptorFeatureIdentifier = FontDescriptor.FeatureKey.typeIdentifier
+private let fontDescriptorTypeIdentifier    = FontDescriptor.FeatureKey.selectorIdentifier
+
+private let lineNumberColour = NSColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 0.5)
+
+class GutterView: NSView {
+
+  /// The text view that this gutter belongs to.
+  ///
+  let textView: NSTextView
+
+  /// Create and configure a gutter view for the given text view. This will also set the appropiate exclusion path for
+  /// text container.
+  ///
+  init(frame: CGRect, textView: NSTextView) {
+    self.textView = textView
+    super.init(frame: frame)
+    let
+      gutterExclusionPath = NSBezierPath(rect: CGRect(origin: frame.origin,
+                                                      size: CGSize(width: frame.width,
+                                                                   height: CGFloat.greatestFiniteMagnitude)))
+    optTextContainer?.exclusionPaths = [gutterExclusionPath]
+    // NB: If were decide to use layer backing, we need to set the `layerContentsRedrawPolicy` to redraw on resizing
+  }
+
+  required init(coder: NSCoder) {
+    fatalError("CodeEditorView.GutterView.init(coder:) not implemented")
+  }
+}
+
+#endif
+
+
+// MARK: -
+// MARK: Shared code
+
+
+extension GutterView {
+
+  var optLayoutManager: NSLayoutManager?   { textView.optLayoutManager }
+  var optTextContainer: NSTextContainer?   { textView.optTextContainer }
+  var optTextStorage:   NSTextStorage?     { textView.optTextStorage }
+  var optLineMap:       LineMap<LineInfo>? { textView.optLineMap }
 
   override func draw(_ rect: CGRect) {
     guard let layoutManager = optLayoutManager,
@@ -57,27 +118,32 @@ class GutterView<TextViewType: TextView>: UIView where TextViewType.Color == UIC
 
     // Inherit background colour and line number font size from the text view.
     textView.textBackgroundColor?.setFill()
-    UIBezierPath(rect: rect).fill()
-    let fontSize = textView.textFont?.pointSize ?? UIFont.systemFontSize,
-        desc     = UIFont.systemFont(ofSize: fontSize).fontDescriptor.addingAttributes(
-                     [ UIFontDescriptor.AttributeName.featureSettings:
+    BezierPath(rect: rect).fill()
+    let fontSize = textView.textFont?.pointSize ?? Font.systemFontSize,
+        desc     = Font.systemFont(ofSize: fontSize).fontDescriptor.addingAttributes(
+                     [ FontDescriptor.AttributeName.featureSettings:
                          [
                            [
-                             UIFontDescriptor.FeatureKey.featureIdentifier: kNumberSpacingType,
-                             UIFontDescriptor.FeatureKey.typeIdentifier: kMonospacedNumbersSelector,
+                             fontDescriptorFeatureIdentifier: kNumberSpacingType,
+                             fontDescriptorTypeIdentifier: kMonospacedNumbersSelector,
                            ],
                            [
-                             UIFontDescriptor.FeatureKey.featureIdentifier: kStylisticAlternativesType,
-                             UIFontDescriptor.FeatureKey.typeIdentifier: kStylisticAltOneOnSelector,  // alt 6 and 9
+                             fontDescriptorFeatureIdentifier: kStylisticAlternativesType,
+                             fontDescriptorTypeIdentifier: kStylisticAltOneOnSelector,  // alt 6 and 9
                            ],
                            [
-                             UIFontDescriptor.FeatureKey.featureIdentifier: kStylisticAlternativesType,
-                             UIFontDescriptor.FeatureKey.typeIdentifier: kStylisticAltTwoOnSelector,  // alt 4
+                             fontDescriptorFeatureIdentifier: kStylisticAlternativesType,
+                             fontDescriptorTypeIdentifier: kStylisticAltTwoOnSelector,  // alt 4
                            ]
                          ]
                      ]
-                   ),
-        font     = UIFont(descriptor: desc, size: 0)
+                   )
+    #if os(iOS)
+    let font = Font(descriptor: desc, size: 0)
+    #elseif os(macOS)
+    let font = Font(descriptor: desc, size: 0) ?? Font.systemFont(ofSize: 0)
+    #endif
+
 
     // All visible glyphs and all visible characters that are in the text area to the right of the gutter view
     let glyphRange = layoutManager.glyphRange(forBoundingRectWithoutAdditionalLayout: textRectFrom(gutterRect: rect),
@@ -90,7 +156,7 @@ class GutterView<TextViewType: TextView>: UIView where TextViewType.Color == UIC
     lineNumberStyle.alignment = .right
     lineNumberStyle.tailIndent = -fontSize / 11
     let textAttributes = [NSAttributedString.Key.font: font,
-                          .foregroundColor: UIColor.secondaryLabel,
+                          .foregroundColor: lineNumberColour,
                           .paragraphStyle: lineNumberStyle,
                           .kern: NSNumber(value: Float(-fontSize / 11))]
 
@@ -105,25 +171,6 @@ class GutterView<TextViewType: TextView>: UIView where TextViewType.Color == UIC
     }
   }
 }
-
-#elseif os(macOS)
-
-
-// MARK: -
-// MARK: AppKit version
-
-import AppKit
-
-
-class GutterView: NSView {
-
-}
-
-#endif
-
-
-// MARK: -
-// MARK: Shared code
 
 extension GutterView {
 

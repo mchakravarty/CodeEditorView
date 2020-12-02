@@ -8,7 +8,27 @@
 //  stored in the 'NSTextStorage' that they serve. This is needed to quickly navigate the text (e.g., at which character
 //  position does a particular line start) and to support code-specific rendering (e.g., syntax highlighting).
 
-import SwiftUI
+#if os(iOS)
+
+import UIKit
+
+private typealias Color = UIColor
+
+private let labelColor = UIColor.label
+
+typealias TextStorageEditActions = NSTextStorage.EditActions
+
+#elseif os(macOS)
+
+import AppKit
+
+private typealias Color = NSColor
+
+private let labelColor = NSColor.labelColor
+
+typealias TextStorageEditActions = NSTextStorageEditActions
+
+#endif
 
 
 // MARK: -
@@ -17,10 +37,10 @@ import SwiftUI
 // FIXME: It should be possible to enable this via a defaults setting and the colours ought to depend on the theme background.
 
 private let visualDebugging               = true
-private let visualDebuggingEditedColour   = UIColor(red: 0.9, green: 1.0, blue: 0.9, alpha: 1.0)
-private let visualDebuggingLinesColour    = UIColor(red: 0.9, green: 0.9, blue: 1.0, alpha: 1.0)
-private let visualDebuggingTrailingColour = UIColor(red: 1.0, green: 0.9, blue: 0.9, alpha: 1.0)
-private let visualDebuggingTokenColour    = UIColor(red: 1.0, green: 0.0, blue: 0.0, alpha: 0.5)
+private let visualDebuggingEditedColour   = Color(red: 0.9, green: 1.0, blue: 0.9, alpha: 1.0)
+private let visualDebuggingLinesColour    = Color(red: 0.9, green: 0.9, blue: 1.0, alpha: 1.0)
+private let visualDebuggingTrailingColour = Color(red: 1.0, green: 0.9, blue: 0.9, alpha: 1.0)
+private let visualDebuggingTokenColour    = Color(red: 1.0, green: 0.0, blue: 0.0, alpha: 0.5)
 
 
 // MARK: -
@@ -78,7 +98,7 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
   }
 
   func textStorage(_ textStorage: NSTextStorage,
-                   willProcessEditing editedMask: NSTextStorage.EditActions,
+                   willProcessEditing editedMask: TextStorageEditActions,
                    range editedRange: NSRange,  // Apple docs are incorrect here: this is the range *after* editing
                    changeInLength delta: Int)
   {
@@ -297,16 +317,17 @@ extension CodeStorageDelegate {
   ///
   func fixHighlightingAttributes(range: NSRange, in textStorage: NSTextStorage) {
 
-    textStorage.addAttribute(.foregroundColor, value: UIColor.label, range: range)
+    // FIXME: colours need to come from a theme
+    textStorage.addAttribute(.foregroundColor, value: labelColor, range: range)
     textStorage.enumerateAttribute(.token, in: range){ (optionalValue, attrRange, _) in
 
       if let value = optionalValue as? LanguageConfiguration.Token, value == .string {
-        textStorage.addAttribute(.foregroundColor, value: UIColor.systemGreen, range: attrRange)
+        textStorage.addAttribute(.foregroundColor, value: Color.systemGreen, range: attrRange)
       }
     }
     textStorage.enumerateAttribute(.comment, in: range){ (optionalValue, attrRange, _) in
 
-      if optionalValue != nil { textStorage.addAttribute(.foregroundColor, value: UIColor.darkGray, range: attrRange) }
+      if optionalValue != nil { textStorage.addAttribute(.foregroundColor, value: Color.darkGray, range: attrRange) }
     }
   }
 }

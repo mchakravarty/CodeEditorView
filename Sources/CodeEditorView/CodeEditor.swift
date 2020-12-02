@@ -10,7 +10,6 @@ import SwiftUI
 
 #if os(iOS)
 
-
 // MARK: -
 // MARK: UIKit version
 
@@ -18,7 +17,7 @@ import SwiftUI
 ///
 fileprivate class CodeViewWithGutter: UITextView {
 
-  private var gutterView:          GutterView<UITextView>?
+  private var gutterView:          GutterView?
   private var codeStorageDelegate: CodeStorageDelegate?
 
   /// Designated initializer for code views with a gutter.
@@ -37,6 +36,7 @@ fileprivate class CodeViewWithGutter: UITextView {
 
     // Set basic display and input properties
     font = UIFont.monospacedSystemFont(ofSize: UIFont.systemFontSize, weight: .regular)
+    backgroundColor        = UIColor.white
     autocapitalizationType = .none
     autocorrectionType     = .no
     spellCheckingType      = .no
@@ -50,11 +50,11 @@ fileprivate class CodeViewWithGutter: UITextView {
 
     // Add a gutter view
     let gutterWidth = (font?.pointSize ?? UIFont.systemFontSize) * 3,
-        gutterView  = GutterView<UITextView>(frame: CGRect(x: 0,
-                                                           y: 0,
-                                                           width: gutterWidth,
-                                                           height:  CGFloat .greatestFiniteMagnitude),
-                                             textView: self)
+        gutterView  = GutterView(frame: CGRect(x: 0,
+                                               y: 0,
+                                               width: gutterWidth,
+                                               height:  CGFloat.greatestFiniteMagnitude),
+                                 textView: self)
     addSubview(gutterView)
     self.gutterView = gutterView
   }
@@ -110,10 +110,71 @@ public struct CodeEditor: UIViewRepresentable {
   }
 }
 
+
 #elseif os(macOS)
 
 // MARK: -
 // MARK: AppKit version
+
+/// `UITextView` with a gutter
+///
+fileprivate class CodeViewWithGutter: NSTextView {
+
+  private var gutterView:          GutterView?
+  private var codeStorageDelegate: CodeStorageDelegate?
+
+  /// Designated initializer for code views with a gutter.
+  ///
+  init(frame: CGRect, with language: LanguageConfiguration) {
+
+    // Use a custom layout manager that is gutter-aware
+    let codeLayoutManager = CodeLayoutManager(),
+        textContainer     = NSTextContainer(),
+        textStorage       = NSTextStorage()
+    textStorage.addLayoutManager(codeLayoutManager)
+    textContainer.layoutManager = codeLayoutManager
+    codeLayoutManager.addTextContainer(textContainer)
+
+    super.init(frame: frame, textContainer: textContainer)
+
+    // Set basic display and input properties
+    font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+    backgroundColor                      = NSColor.white
+    isRichText                           = false
+    isAutomaticQuoteSubstitutionEnabled  = false
+    isAutomaticLinkDetectionEnabled      = false
+    smartInsertDeleteEnabled             = false
+    isContinuousSpellCheckingEnabled     = false
+    isGrammarCheckingEnabled             = false
+    isAutomaticDashSubstitutionEnabled   = false
+    isAutomaticDataDetectionEnabled      = false
+    isAutomaticSpellingCorrectionEnabled = false
+    isAutomaticTextReplacementEnabled    = false
+
+    // Add a text storage delegate that maintains a line map
+    self.codeStorageDelegate = CodeStorageDelegate(with: language)
+    textStorage.delegate     = self.codeStorageDelegate
+
+    // Add a gutter view
+    let gutterWidth = (font?.pointSize ?? NSFont.systemFontSize) * 3,
+        gutterView  = GutterView(frame: CGRect(x: 0,
+                                               y: 0,
+                                               width: gutterWidth,
+                                               height:  CGFloat.greatestFiniteMagnitude),
+                                 textView: self)
+    addSubview(gutterView)
+    self.gutterView = gutterView
+  }
+
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  override func layout() {
+    super.layout()
+    gutterView?.frame.size.height = frame.size.height
+  }
+}
 
 /// SwiftUI code editor based on TextKit
 ///
@@ -128,17 +189,16 @@ public struct CodeEditor: NSViewRepresentable {
   }
 
   public func makeNSView(context: Context) -> NSTextView {
-    // the NSTextContainer is unowned(unsafe); who owns it?
-    let textView = NSTextView()
-    textView.string = text
-//    textView.textStorage?.setAttributedString(NSAttributedString(string: text))
+    let textView = CodeViewWithGutter(frame: CGRect(x: 0, y: 0, width: 100, height: 40),
+                                      with: language)
+
+    textView.string   = text
+    textView.delegate = context.coordinator
     return textView
   }
 
   public func updateNSView(_ nsView: NSTextView, context: Context) {
-    // FIXME: not good (by itself) as it kills all highlighting
     nsView.string = text
-//    nsView.textStorage?.setAttributedString(NSAttributedString(string: text))
   }
 
   public func makeCoordinator() -> Coordinator {
@@ -153,12 +213,13 @@ public struct CodeEditor: NSViewRepresentable {
     }
 
     public func textViewDidChange(_ textView: NSTextView) {
-      self.text = textView.textStorage?.string ?? ""
+      self.text = textView.string
     }
   }
 }
 
 #endif
+
 
 // MARK: -
 // MARK: Shared code
@@ -200,5 +261,6 @@ struct CodeEditor_Previews: PreviewProvider {
     VStack{
       CodeEditor(text: .constant("-- Hello World!"), with: haskellConfiguration)
     }
+    .preferredColorScheme(.light)
   }
 }
