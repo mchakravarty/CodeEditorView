@@ -94,6 +94,9 @@ class GutterView: NSView {
   required init(coder: NSCoder) {
     fatalError("CodeEditorView.GutterView.init(coder:) not implemented")
   }
+
+  // Imitate the coordinate system of the associated text view.
+  override var isFlipped: Bool { textView.isFlipped }
 }
 
 #endif
