@@ -36,7 +36,7 @@ fileprivate class CodeViewWithGutter: UITextView {
 
     // Set basic display and input properties
     font = UIFont.monospacedSystemFont(ofSize: UIFont.systemFontSize, weight: .regular)
-    backgroundColor        = UIColor.white
+    backgroundColor        = UIColor.textBackgroundColor
     autocapitalizationType = .none
     autocorrectionType     = .no
     spellCheckingType      = .no
@@ -139,7 +139,8 @@ fileprivate class CodeViewWithGutter: NSTextView {
 
     // Set basic display and input properties
     font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
-    backgroundColor                      = NSColor.white
+    backgroundColor                      = NSColor.textBackgroundColor
+    insertionPointColor                  = NSColor.textColor
     isRichText                           = false
     isAutomaticQuoteSubstitutionEnabled  = false
     isAutomaticLinkDetectionEnabled      = false

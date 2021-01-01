@@ -37,9 +37,9 @@ typealias TextStorageEditActions = NSTextStorageEditActions
 // FIXME: It should be possible to enable this via a defaults setting and the colours ought to depend on the theme background.
 
 private let visualDebugging               = true
-private let visualDebuggingEditedColour   = Color(red: 0.9, green: 1.0, blue: 0.9, alpha: 1.0)
-private let visualDebuggingLinesColour    = Color(red: 0.9, green: 0.9, blue: 1.0, alpha: 1.0)
-private let visualDebuggingTrailingColour = Color(red: 1.0, green: 0.9, blue: 0.9, alpha: 1.0)
+private let visualDebuggingEditedColour   = Color(red: 0.5, green: 1.0, blue: 0.5, alpha: 0.3)
+private let visualDebuggingLinesColour    = Color(red: 0.5, green: 0.5, blue: 1.0, alpha: 0.3)
+private let visualDebuggingTrailingColour = Color(red: 1.0, green: 0.5, blue: 0.5, alpha: 0.3)
 private let visualDebuggingTokenColour    = Color(red: 1.0, green: 0.0, blue: 0.0, alpha: 0.5)
 
 
