@@ -189,17 +189,37 @@ public struct CodeEditor: NSViewRepresentable {
     self.language = language
   }
 
-  public func makeNSView(context: Context) -> NSTextView {
+  public func makeNSView(context: Context) -> NSScrollView {
+
+    // Set up scroll view
+    let scrollView = NSScrollView(frame: CGRect(x: 0, y: 0, width: 100, height: 40))
+    scrollView.borderType          = .noBorder
+    scrollView.hasVerticalScroller = true
+    scrollView.hasHorizontalRuler  = false
+    scrollView.autoresizingMask    = [.width, .height]
+
+    // Set up text view with gutter
     let textView = CodeViewWithGutter(frame: CGRect(x: 0, y: 0, width: 100, height: 40),
                                       with: language)
+    textView.minSize                 = CGSize(width: 0, height: scrollView.contentSize.height)
+    textView.maxSize                 = CGSize(width: CGFloat.greatestFiniteMagnitude,
+                                              height: CGFloat.greatestFiniteMagnitude)
+    textView.isVerticallyResizable   = true
+    textView.isHorizontallyResizable = false
+    textView.autoresizingMask        = .width
+
+    // Embedd text view in scroll view
+    scrollView.documentView = textView
 
     textView.string   = text
     textView.delegate = context.coordinator
-    return textView
+    return scrollView
   }
 
-  public func updateNSView(_ nsView: NSTextView, context: Context) {
-    nsView.string = text
+  public func updateNSView(_ nsView: NSScrollView, context: Context) {
+    guard let textView = nsView.documentView as? NSTextView else { return }
+
+    textView.string = text
   }
 
   public func makeCoordinator() -> Coordinator {
