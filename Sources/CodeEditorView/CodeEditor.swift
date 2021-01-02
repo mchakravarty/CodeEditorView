@@ -89,8 +89,8 @@ public struct CodeEditor: UIViewRepresentable {
     return textView
   }
 
-  public func updateUIView(_ uiView: UITextView, context: Context) {
-    uiView.text = text
+  public func updateUIView(_ textView: UITextView, context: Context) {
+    if text != textView.string { textView.text = text }  // Hoping for the string comparison fast path...
   }
 
   public func makeCoordinator() -> Coordinator {
@@ -219,7 +219,7 @@ public struct CodeEditor: NSViewRepresentable {
   public func updateNSView(_ nsView: NSScrollView, context: Context) {
     guard let textView = nsView.documentView as? NSTextView else { return }
 
-    textView.string = text
+    if text != textView.string { textView.string = text }  // Hoping for the string comparison fast path...
   }
 
   public func makeCoordinator() -> Coordinator {
@@ -233,7 +233,15 @@ public struct CodeEditor: NSViewRepresentable {
       self._text = text
     }
 
-    public func textViewDidChange(_ textView: NSTextView) {
+    public func textViewDidChangeSelection(_ notification: Notification) {
+      guard let textView = notification.object as? NSTextView else { return }
+
+
+    }
+
+    public func textDidChange(_ notification: Notification) {
+      guard let textView = notification.object as? NSTextView else { return }
+
       self.text = textView.string
     }
   }
