@@ -36,7 +36,7 @@ fileprivate class CodeViewWithGutter: UITextView {
 
     // Set basic display and input properties
     font = UIFont.monospacedSystemFont(ofSize: UIFont.systemFontSize, weight: .regular)
-    backgroundColor        = UIColor.textBackgroundColor
+    backgroundColor        = UIColor.systemBackground
     autocapitalizationType = .none
     autocorrectionType     = .no
     spellCheckingType      = .no
@@ -90,7 +90,7 @@ public struct CodeEditor: UIViewRepresentable {
   }
 
   public func updateUIView(_ textView: UITextView, context: Context) {
-    if text != textView.string { textView.text = text }  // Hoping for the string comparison fast path...
+    if text != textView.text { textView.text = text }  // Hoping for the string comparison fast path...
   }
 
   public func makeCoordinator() -> Coordinator {
@@ -236,7 +236,6 @@ public struct CodeEditor: NSViewRepresentable {
     public func textViewDidChangeSelection(_ notification: Notification) {
       guard let textView = notification.object as? NSTextView else { return }
 
-
     }
 
     public func textDidChange(_ notification: Notification) {
@@ -290,6 +289,5 @@ struct CodeEditor_Previews: PreviewProvider {
     VStack{
       CodeEditor(text: .constant("-- Hello World!"), with: haskellConfiguration)
     }
-    .preferredColorScheme(.light)
   }
 }
