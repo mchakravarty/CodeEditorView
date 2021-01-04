@@ -97,8 +97,17 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
     super.init()
   }
 
+  // NB: The choice of `didProcessEditing` versus `willProcessEditing` is crucial on macOS. The reason is that
+  //     the text storage performs "attribute fixing" between `willProcessEditing` and `didProcessEditing`. If we
+  //     modify attributes outside of `editedRange` (which we often do), then this triggers the movement of the
+  //     current selection to the end of the entire text.
+  //
+  //     By doing the highlighting work *after* attribute fixing, we avoid affecting the selection. However, it now
+  //     becomes *very* important to (a) refrain from any character changes and (b) from any attribute changes that
+  //     result in attributes that need to be fixed; otherwise, we end up with an inconsistent attributed string.
+  //     (In particular, changing the font attribute at this point is potentially dangerous.)
   func textStorage(_ textStorage: NSTextStorage,
-                   willProcessEditing editedMask: TextStorageEditActions,
+                   didProcessEditing editedMask: TextStorageEditActions,
                    range editedRange: NSRange,  // Apple docs are incorrect here: this is the range *after* editing
                    changeInLength delta: Int)
   {
