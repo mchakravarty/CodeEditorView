@@ -8,6 +8,7 @@
 //  stored in the 'NSTextStorage' that they serve. This is needed to quickly navigate the text (e.g., at which character
 //  position does a particular line start) and to support code-specific rendering (e.g., syntax highlighting).
 
+// FIXME: the aliases ought to be moved to some central place for os impedance matching
 #if os(iOS)
 
 import UIKit
@@ -36,7 +37,7 @@ typealias TextStorageEditActions = NSTextStorageEditActions
 
 // FIXME: It should be possible to enable this via a defaults setting and the colours ought to depend on the theme background.
 
-private let visualDebugging               = true
+private let visualDebugging               = false
 private let visualDebuggingEditedColour   = Color(red: 0.5, green: 1.0, blue: 0.5, alpha: 0.3)
 private let visualDebuggingLinesColour    = Color(red: 0.5, green: 0.5, blue: 1.0, alpha: 0.3)
 private let visualDebuggingTrailingColour = Color(red: 1.0, green: 0.5, blue: 0.5, alpha: 0.3)

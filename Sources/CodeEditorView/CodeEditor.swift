@@ -56,7 +56,8 @@ fileprivate class CodeViewWithGutter: UITextView {
                                                height:  CGFloat.greatestFiniteMagnitude),
                                  textView: self)
     addSubview(gutterView)
-    self.gutterView = gutterView
+    self.gutterView              = gutterView
+    codeLayoutManager.gutterView = gutterView
   }
 
   required init?(coder: NSCoder) {
@@ -116,7 +117,7 @@ public struct CodeEditor: UIViewRepresentable {
 // MARK: -
 // MARK: AppKit version
 
-/// `UITextView` with a gutter
+/// `NSTextView` with a gutter
 ///
 fileprivate class CodeViewWithGutter: NSTextView {
 
@@ -164,7 +165,8 @@ fileprivate class CodeViewWithGutter: NSTextView {
                                                height:  CGFloat.greatestFiniteMagnitude),
                                  textView: self)
     addSubview(gutterView)
-    self.gutterView = gutterView
+    self.gutterView              = gutterView
+    codeLayoutManager.gutterView = gutterView
   }
 
   required init?(coder: NSCoder) {
@@ -256,28 +258,26 @@ public struct CodeEditor: NSViewRepresentable {
 ///
 class CodeLayoutManager: NSLayoutManager {
 
-//  override func processEditing(for textStorage: NSTextStorage,
-//                               edited editMask: NSTextStorage.EditActions,
-//                               range newCharRange: NSRange,
-//                               changeInLength delta: Int,
-//                               invalidatedRange invalidatedCharRange: NSRange)
-//  {
-//    // Generate temporary attributes for syntax highlighting from custom token attributes.
-//    //
-//
-//    // Comments
-//    textStorage.enumerateAttribute(.comment, in: newCharRange){ (commentStyle, range, _) in
-//      self.addTemporaryAttribute(NSAttributedString.Key.foregroundColor,
-//                                 value: UIColor.darkGray,
-//                                 forCharacterRange: range)
-//    }
-//
-//    super.processEditing(for: textStorage,
-//                         edited: editMask,
-//                         range: newCharRange,
-//                         changeInLength: delta,
-//                         invalidatedRange: invalidatedCharRange)
-//  }
+  weak var gutterView: GutterView?
+
+  override func processEditing(for textStorage: NSTextStorage,
+                               edited editMask: TextStorageEditActions,
+                               range newCharRange: NSRange,
+                               changeInLength delta: Int,
+                               invalidatedRange invalidatedCharRange: NSRange) {
+    super.processEditing(for: textStorage,
+                         edited: editMask,
+                         range: newCharRange,
+                         changeInLength: delta,
+                         invalidatedRange: invalidatedCharRange)
+
+    // NB: Gutter drawing must be asynchronous, as the glyph generation that may be triggered in that process,
+    //     is not permitted until the enclosing editing block has completed; otherwise, we run into an internal
+    //     error in the layout manager.
+    if let gutterView = gutterView {
+      Dispatch.DispatchQueue.main.async { gutterView.invalidateGutter(forCharRange: invalidatedCharRange) }
+    }
+  }
 }
 
 

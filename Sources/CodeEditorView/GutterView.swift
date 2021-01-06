@@ -113,6 +113,38 @@ extension GutterView {
   var optTextStorage:   NSTextStorage?     { textView.optTextStorage }
   var optLineMap:       LineMap<LineInfo>? { textView.optLineMap }
 
+
+  // MARK: -
+  // MARK: Gutter notifications
+
+  /// Notifies the gutter view that a range of characters will be redrawn by the layout manager; thus, the corresponding
+  /// gutter area might require redrawing, too.
+  ///
+  /// - Parameters:
+  ///   - charRange: The invalidated range of characters.
+  ///
+  func invalidateGutter(forCharRange charRange: NSRange) {
+    guard let layoutManager = optLayoutManager,
+          let textContainer = optTextContainer
+    else { return }
+
+    #if os(iOS)
+    let documentVisibleRect = textView.bounds
+    #elseif os(macOS)
+    guard let documentVisibleRect = enclosingScrollView?.documentVisibleRect else { return }
+    #endif
+
+    let glyphRange         = layoutManager.glyphRange(forCharacterRange: charRange, actualCharacterRange: nil),
+        gutterRect         = gutterRectFrom(textRect: layoutManager.boundingRect(forGlyphRange: glyphRange,
+                                                                                 in: textContainer)),
+        extendedGutterRect = CGRect(origin: gutterRect.origin,
+                                    size: CGSize(width: gutterRect.size.width, height: CGFloat.greatestFiniteMagnitude))
+    setNeedsDisplay(extendedGutterRect.intersection(documentVisibleRect))
+  }
+
+  // MARK: -
+  // MARK: Gutter drawing
+
   override func draw(_ rect: CGRect) {
     guard let layoutManager = optLayoutManager,
           let textContainer = optTextContainer,
