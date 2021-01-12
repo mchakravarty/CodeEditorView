@@ -128,17 +128,12 @@ extension GutterView {
           let textContainer = optTextContainer
     else { return }
 
-    #if os(iOS)
-    let documentVisibleRect = textView.bounds
-    #elseif os(macOS)
-    guard let documentVisibleRect = enclosingScrollView?.documentVisibleRect else { return }
-    #endif
-
-    let glyphRange         = layoutManager.glyphRange(forCharacterRange: charRange, actualCharacterRange: nil),
-        gutterRect         = gutterRectFrom(textRect: layoutManager.boundingRect(forGlyphRange: glyphRange,
+    let documentVisibleRect = textView.documentVisibleRect,
+        glyphRange          = layoutManager.glyphRange(forCharacterRange: charRange, actualCharacterRange: nil),
+        gutterRect          = gutterRectFrom(textRect: layoutManager.boundingRect(forGlyphRange: glyphRange,
                                                                                  in: textContainer)),
-        extendedGutterRect = CGRect(origin: gutterRect.origin,
-                                    size: CGSize(width: gutterRect.size.width, height: CGFloat.greatestFiniteMagnitude))
+        extendedGutterRect  = CGRect(origin: gutterRect.origin,
+                                     size: CGSize(width: gutterRect.size.width, height: CGFloat.greatestFiniteMagnitude))
     setNeedsDisplay(extendedGutterRect.intersection(documentVisibleRect))
   }
 

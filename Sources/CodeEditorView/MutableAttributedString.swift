@@ -60,7 +60,7 @@ typealias TokenDictionary<TokenType, StateType: TokeniserState>
 
 /// Pre-compiled regular expression tokeniser
 ///
-/// The `TokenType` is identifies the various tokens that can be recognised by the tokeniser.
+/// The `TokenType` identifies the various tokens that can be recognised by the tokeniser.
 ///
 struct Tokeniser<TokenType, StateType: TokeniserState> {
 
@@ -87,13 +87,21 @@ struct Tokeniser<TokenType, StateType: TokeniserState> {
   /// Sub-tokeniser for all states of the compound tokeniser
   ///
   let states: [StateType.StateTag: State]
+
+  /// The token value to use to attribute all body characters of a token's lexeme; i.e., all characters except
+  /// for the initial one.
+  ///
+  let tokenBody: TokenType
 }
 
 extension NSMutableAttributedString {
 
   /// Create a tokeniser from the given token dictionary.
   ///
-  /// - Parameter tokenMap: The token dictionary determining the lexemes to match and their token type.
+  /// - Parameters:
+  ///   - tokenMap: The token dictionary determining the lexemes to match and their token type.
+  ///   - tokenBody: The token value to use to attribute all body characters of a token's lexeme; i.e., all characters
+  ///                except for the initial one.
   /// - Returns: A tokeniser that matches all lexemes contained in the token dictionary.
   ///
   /// The tokeniser is based on an eager regular expression matcher. Hence, it will match the first matching alternative
@@ -102,7 +110,13 @@ extension NSMutableAttributedString {
   /// of regular expressions are tried in an indeterminate order. Hence, no pattern should have as a full match a prefix
   /// of another pattern's full match, to avoid indeterminate results.
   ///
-  static func tokeniser<TokenType, StateType: TokeniserState>(for tokenMap: TokenDictionary<TokenType, StateType>)
+  /// For each token that has got a multi-character lexeme, the tokeniser attributes the first character of that lexeme
+  /// with the token-specific token type. All other characters of the lexeme —what we call the token body— gets
+  /// attributed with `tokenBody`. This is crucial to be able to distinguish the boundaries of multiple successive
+  /// tokens of the same type.
+  ///
+  static func tokeniser<TokenType, StateType: TokeniserState>(for tokenMap: TokenDictionary<TokenType, StateType>,
+                                                              with tokenBody: TokenType)
   -> Tokeniser<TokenType, StateType>?
   {
     func tokeniser(for stateMap: [TokenPattern: TokenAction<TokenType, StateType>])
@@ -139,7 +153,7 @@ extension NSMutableAttributedString {
     do {
 
       let states = try tokenMap.mapValues{ try tokeniser(for: $0) }
-      return Tokeniser(states: states)
+      return Tokeniser(states: states, tokenBody: tokenBody)
 
     } catch let err { logger.error("failed to compile regexp: \(err.localizedDescription)"); return nil }
   }
@@ -192,10 +206,16 @@ extension NSMutableAttributedString {
         tokenAction = stateTokeniser.stringTokenTypes[(self.string as NSString).substring(with: result.range)]
       }
 
-      if let action = tokenAction {
+      if let action = tokenAction, result.range.length > 0 {
 
-        // Set the token attribute on the lexeme range
-        self.addAttribute(attribute, value: action.token, range: result.range)
+        // Set the token attribute on the first character of the lexeme and the token body value on the other characters
+        self.addAttribute(attribute, value: action.token, range: NSRange(location: result.range.location, length: 1))
+        if result.range.length > 1 {
+
+          self.addAttribute(attribute, value: tokeniser.tokenBody, range: NSRange(location: result.range.location + 1,
+                                                                                  length: result.range.length - 1))
+
+        }
 
         // If there is an associated state transition function, apply it to the tokeniser state
         if let transition = action.transition { state = transition(state) }

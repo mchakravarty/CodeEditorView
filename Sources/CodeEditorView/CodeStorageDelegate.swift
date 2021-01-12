@@ -10,34 +10,17 @@
 
 // FIXME: the aliases ought to be moved to some central place for os impedance matching
 #if os(iOS)
-
 import UIKit
-
-private typealias Color = UIColor
-
-private let labelColor = UIColor.label
-
-typealias TextStorageEditActions = NSTextStorage.EditActions
-
 #elseif os(macOS)
-
 import AppKit
-
-private typealias Color = NSColor
-
-private let labelColor = NSColor.labelColor
-
-typealias TextStorageEditActions = NSTextStorageEditActions
-
 #endif
 
 
 // MARK: -
 // MARK: Visual debugging support
 
-// FIXME: It should be possible to enable this via a defaults setting and the colours ought to depend on the theme background.
-
-private let visualDebugging               = false
+// FIXME: It should be possible to enable this via a defaults setting.
+private let visualDebugging               = true
 private let visualDebuggingEditedColour   = Color(red: 0.5, green: 1.0, blue: 0.5, alpha: 0.3)
 private let visualDebuggingLinesColour    = Color(red: 0.5, green: 0.5, blue: 1.0, alpha: 0.3)
 private let visualDebuggingTrailingColour = Color(red: 1.0, green: 0.5, blue: 0.5, alpha: 0.3)
@@ -94,7 +77,7 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
 
   init(with language: LanguageConfiguration) {
     self.language  = language
-    self.tokeniser = NSMutableAttributedString.tokeniser(for: language.tokenDictionary)
+    self.tokeniser = NSMutableAttributedString.tokeniser(for: language.tokenDictionary, with: .tokenBody)
     super.init()
   }
 
@@ -158,25 +141,22 @@ extension CodeStorageDelegate {
         // Collect all tokens on this line.
         // (NB: In the block, we are not supposed to mutate outside the attribute range; hence, we only collect tokens.)
         var tokens = Array<(token: LanguageConfiguration.Token, range: NSRange)>()
-        textStorage.enumerateAttribute(.token, in: lineRange, options: []){ (value, range, _) in
+        textStorage.enumerateTokens(in: lineRange){ (tokenValue, range, _) in
 
-          if let tokenValue = value as? LanguageConfiguration.Token {
+          tokens.append((token: tokenValue, range: range))
 
-            tokens.append((token: tokenValue, range: range))
+          if visualDebugging {
 
-            if visualDebugging {
-
-              textStorage.addAttribute(.underlineColor, value: visualDebuggingTokenColour, range: range)
-              if range.length > 0 {
-                textStorage.addAttribute(.underlineStyle,
-                                         value: NSNumber(value: NSUnderlineStyle.double.rawValue),
-                                         range: NSRange(location: range.location, length: 1))
-              }
-              if range.length > 1 {
-                textStorage.addAttribute(.underlineStyle,
-                                         value: NSNumber(value: NSUnderlineStyle.single.rawValue),
-                                         range: NSRange(location: range.location + 1, length: range.length - 1))
-              }
+            textStorage.addAttribute(.underlineColor, value: visualDebuggingTokenColour, range: range)
+            if range.length > 0 {
+              textStorage.addAttribute(.underlineStyle,
+                                       value: NSNumber(value: NSUnderlineStyle.double.rawValue),
+                                       range: NSRange(location: range.location, length: 1))
+            }
+            if range.length > 1 {
+              textStorage.addAttribute(.underlineStyle,
+                                       value: NSNumber(value: NSUnderlineStyle.single.rawValue),
+                                       range: NSRange(location: range.location + 1, length: range.length - 1))
             }
           }
         }
@@ -329,11 +309,9 @@ extension CodeStorageDelegate {
 
     // FIXME: colours need to come from a theme
     textStorage.addAttribute(.foregroundColor, value: labelColor, range: range)
-    textStorage.enumerateAttribute(.token, in: range){ (optionalValue, attrRange, _) in
-
-      if let value = optionalValue as? LanguageConfiguration.Token, value == .string {
-        textStorage.addAttribute(.foregroundColor, value: Color.systemGreen, range: attrRange)
-      }
+    textStorage.enumerateTokens(in: range){ (value, attrRange, _) in
+      
+      if value == .string { textStorage.addAttribute(.foregroundColor, value: Color.systemGreen, range: attrRange) }
     }
     textStorage.enumerateAttribute(.comment, in: range){ (optionalValue, attrRange, _) in
 
@@ -341,4 +319,3 @@ extension CodeStorageDelegate {
     }
   }
 }
-

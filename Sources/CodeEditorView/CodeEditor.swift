@@ -122,6 +122,7 @@ public struct CodeEditor: UIViewRepresentable {
 fileprivate class CodeViewWithGutter: NSTextView {
 
   private var gutterView:          GutterView?
+  private var codeViewDelegate:    CodeViewDelegate?
   private var codeStorageDelegate: CodeStorageDelegate?
 
   /// Designated initializer for code views with a gutter.
@@ -153,9 +154,17 @@ fileprivate class CodeViewWithGutter: NSTextView {
     isAutomaticSpellingCorrectionEnabled = false
     isAutomaticTextReplacementEnabled    = false
 
+    // FIXME: properties that ought to be configurable
+    usesFindBar                   = true
+    isIncrementalSearchingEnabled = true
+
+    // Add the view delegate
+    codeViewDelegate = CodeViewDelegate()
+    delegate         = codeViewDelegate
+
     // Add a text storage delegate that maintains a line map
-    self.codeStorageDelegate = CodeStorageDelegate(with: language)
-    textStorage.delegate     = self.codeStorageDelegate
+    codeStorageDelegate  = CodeStorageDelegate(with: language)
+    textStorage.delegate = codeStorageDelegate
 
     // Add a gutter view
     let gutterWidth = (font?.pointSize ?? NSFont.systemFontSize) * 3,
@@ -176,6 +185,43 @@ fileprivate class CodeViewWithGutter: NSTextView {
   override func layout() {
     super.layout()
     gutterView?.frame.size.height = frame.size.height
+  }
+}
+
+fileprivate class CodeViewDelegate: NSObject, NSTextViewDelegate {
+
+  // Hooks for events
+  //
+  var textDidChange: ((NSTextView) -> ())?
+
+  // MARK: -
+  // MARK: NSTextViewDelegate protocol
+
+  func textDidChange(_ notification: Notification) {
+    guard let textView = notification.object as? NSTextView else { return }
+
+    textDidChange?(textView)
+  }
+
+  func textViewDidChangeSelection(_ notification: Notification) {
+    guard let textView = notification.object as? NSTextView,
+          let layoutManager = textView.layoutManager,
+          let textContainer = textView.textContainer
+          else { return }
+
+    let visibleRect = textView.documentVisibleRect,
+        glyphRange  = layoutManager.glyphRange(forBoundingRectWithoutAdditionalLayout: visibleRect,
+                                               in: textContainer),
+        charRange   = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+
+    if let location             = textView.insertionPoint,
+       location > 0,
+       let matchingBracketRange = textView.textStorage?.matchingBracket(forLocationAt: location - 1, in: charRange)
+    {
+
+      textView.showFindIndicator(for: matchingBracketRange)
+
+    }
   }
 }
 
@@ -213,8 +259,10 @@ public struct CodeEditor: NSViewRepresentable {
     // Embedd text view in scroll view
     scrollView.documentView = textView
 
-    textView.string   = text
-    textView.delegate = context.coordinator
+    textView.string = text
+    if let delegate = textView.delegate as? CodeViewDelegate {
+      delegate.textDidChange = context.coordinator.textDidChange
+    }
     return scrollView
   }
 
@@ -225,24 +273,23 @@ public struct CodeEditor: NSViewRepresentable {
   }
 
   public func makeCoordinator() -> Coordinator {
+
     return Coordinator($text)
   }
 
-  public final class Coordinator: NSObject, NSTextViewDelegate {
+  public final class Coordinator: NSObject {
     @Binding var text: String
 
     init(_ text: Binding<String>) {
       self._text = text
     }
 
-    public func textViewDidChangeSelection(_ notification: Notification) {
-      guard let textView = notification.object as? NSTextView else { return }
+//    public func textViewDidChangeSelection(_ notification: Notification) {
+//      guard let textView = notification.object as? NSTextView else { return }
+//
+//    }
 
-    }
-
-    public func textDidChange(_ notification: Notification) {
-      guard let textView = notification.object as? NSTextView else { return }
-
+    public func textDidChange(_ textView: NSTextView) {
       self.text = textView.string
     }
   }

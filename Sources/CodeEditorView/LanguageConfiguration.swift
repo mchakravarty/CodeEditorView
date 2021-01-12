@@ -19,7 +19,11 @@ import AppKit
 ///
 public struct LanguageConfiguration {
 
-  /// Supported tokens
+  /// Supported token attribute values
+  ///
+  /// The first character of each lexeme carries a token-specific value. All characters after the leading one, in a
+  /// multi-character lexeme, carry the value `.tokenBody`. (This is necessary to be able to generically determine
+  /// lexeme boundaries.)
   ///
   enum Token {
     case roundBracketOpen
@@ -32,6 +36,42 @@ public struct LanguageConfiguration {
     case singleLineComment
     case nestedCommentOpen
     case nestedCommentClose
+    case tokenBody
+
+    var isOpenBracket: Bool {
+      switch self {
+      case .roundBracketOpen, .squareBracketOpen, .curlyBracketOpen: return true
+      default:                                                       return false
+      }
+    }
+
+    var isCloseBracket: Bool {
+      switch self {
+      case .roundBracketClose, .squareBracketClose, .curlyBracketClose: return true
+      default:                                                          return false
+      }
+    }
+
+    var matchingBracket: Token? {
+      switch self {
+      case .roundBracketOpen:   return .roundBracketClose
+      case .squareBracketOpen:  return .squareBracketClose
+      case .curlyBracketOpen:   return .curlyBracketClose
+      case .roundBracketClose:  return .roundBracketOpen
+      case .squareBracketClose: return .squareBracketOpen
+      case .curlyBracketClose:  return .curlyBracketOpen
+      default:                  return nil
+      }
+    }
+
+    /// This is `true` for all characters of a multi-character lexeme, except for the lexeme's leading chracter.
+    ///
+    var isTokenBody: Bool {
+      switch self {
+      case .tokenBody: return true
+      default:         return false
+      }
+    }
   }
 
   /// Tokeniser state
