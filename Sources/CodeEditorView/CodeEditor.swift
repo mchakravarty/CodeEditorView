@@ -18,6 +18,7 @@ import SwiftUI
 fileprivate class CodeViewWithGutter: UITextView {
 
   private var gutterView:          GutterView?
+  private var codeViewDelegate:    CodeViewDelegate?
   private var codeStorageDelegate: CodeStorageDelegate?
 
   /// Designated initializer for code views with a gutter.
@@ -44,6 +45,10 @@ fileprivate class CodeViewWithGutter: UITextView {
     smartDashesType        = .no
     smartInsertDeleteType  = .no
 
+    // Add the view delegate
+    codeViewDelegate = CodeViewDelegate()
+    delegate         = codeViewDelegate
+
     // Add a text storage delegate that maintains a line map
     self.codeStorageDelegate = CodeStorageDelegate(with: language)
     textStorage.delegate     = self.codeStorageDelegate
@@ -69,6 +74,23 @@ fileprivate class CodeViewWithGutter: UITextView {
   }
 }
 
+fileprivate class CodeViewDelegate: NSObject, UITextViewDelegate {
+
+  // Hooks for events
+  //
+  var textDidChange:      ((UITextView) -> ())?
+  var selectionDidChange: ((UITextView) -> ())?
+
+
+  // MARK: -
+  // MARK: UITextViewDelegate protocol
+
+  func textDidChange(_ textView: UITextView) { textDidChange?(textView) }
+
+  func textViewDidChangeSelection(_ textView: UITextView) { selectionDidChange?(textView) }
+}
+
+
 /// SwiftUI code editor based on TextKit
 ///
 public struct CodeEditor: UIViewRepresentable {
@@ -85,8 +107,11 @@ public struct CodeEditor: UIViewRepresentable {
     let textView = CodeViewWithGutter(frame: CGRect(x: 0, y: 0, width: 100, height: 40),
                                       with: language)
 
-    textView.text     = text
-    textView.delegate = context.coordinator
+    textView.text = text
+    if let delegate = textView.delegate as? CodeViewDelegate {
+      delegate.textDidChange      = context.coordinator.textDidChange
+      delegate.selectionDidChange = selectionDidChange
+    }
     return textView
   }
 
@@ -98,14 +123,14 @@ public struct CodeEditor: UIViewRepresentable {
     return Coordinator($text)
   }
 
-  public final class Coordinator: NSObject, UITextViewDelegate {
+  public final class Coordinator {
     @Binding var text: String
 
     init(_ text: Binding<String>) {
       self._text = text
     }
 
-    public func textViewDidChange(_ textView: UITextView) {
+    func textDidChange(_ textView: UITextView) {
       self.text = textView.text
     }
   }
@@ -192,7 +217,9 @@ fileprivate class CodeViewDelegate: NSObject, NSTextViewDelegate {
 
   // Hooks for events
   //
-  var textDidChange: ((NSTextView) -> ())?
+  var textDidChange:      ((NSTextView) -> ())?
+  var selectionDidChange: ((NSTextView) -> ())?
+
 
   // MARK: -
   // MARK: NSTextViewDelegate protocol
@@ -204,24 +231,9 @@ fileprivate class CodeViewDelegate: NSObject, NSTextViewDelegate {
   }
 
   func textViewDidChangeSelection(_ notification: Notification) {
-    guard let textView = notification.object as? NSTextView,
-          let layoutManager = textView.layoutManager,
-          let textContainer = textView.textContainer
-          else { return }
+    guard let textView = notification.object as? NSTextView else { return }
 
-    let visibleRect = textView.documentVisibleRect,
-        glyphRange  = layoutManager.glyphRange(forBoundingRectWithoutAdditionalLayout: visibleRect,
-                                               in: textContainer),
-        charRange   = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
-
-    if let location             = textView.insertionPoint,
-       location > 0,
-       let matchingBracketRange = textView.textStorage?.matchingBracket(forLocationAt: location - 1, in: charRange)
-    {
-
-      textView.showFindIndicator(for: matchingBracketRange)
-
-    }
+    selectionDidChange?(textView)
   }
 }
 
@@ -261,7 +273,8 @@ public struct CodeEditor: NSViewRepresentable {
 
     textView.string = text
     if let delegate = textView.delegate as? CodeViewDelegate {
-      delegate.textDidChange = context.coordinator.textDidChange
+      delegate.textDidChange      = context.coordinator.textDidChange
+      delegate.selectionDidChange = selectionDidChange
     }
     return scrollView
   }
@@ -277,19 +290,14 @@ public struct CodeEditor: NSViewRepresentable {
     return Coordinator($text)
   }
 
-  public final class Coordinator: NSObject {
+  public final class Coordinator {
     @Binding var text: String
 
     init(_ text: Binding<String>) {
       self._text = text
     }
 
-//    public func textViewDidChangeSelection(_ notification: Notification) {
-//      guard let textView = notification.object as? NSTextView else { return }
-//
-//    }
-
-    public func textDidChange(_ textView: NSTextView) {
+    func textDidChange(_ textView: NSTextView) {
       self.text = textView.string
     }
   }
@@ -327,14 +335,33 @@ class CodeLayoutManager: NSLayoutManager {
   }
 }
 
+/// Common code view actions triggered on a selection change.
+///
+private func selectionDidChange<TV: TextView>(_ textView: TV) {
+  guard let layoutManager = textView.optLayoutManager,
+        let textContainer = textView.optTextContainer,
+        let textStorage   = textView.optTextStorage
+        else { return }
+
+  let visibleRect = textView.documentVisibleRect,
+      glyphRange  = layoutManager.glyphRange(forBoundingRectWithoutAdditionalLayout: visibleRect,
+                                             in: textContainer),
+      charRange   = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+
+  if let location             = textView.insertionPoint,
+     location > 0,
+     let matchingBracketRange = textStorage.matchingBracket(forLocationAt: location - 1, in: charRange)
+  {
+    textView.showFindIndicator(for: matchingBracketRange)
+  }
+}
+
 
 // MARK: -
 // MARK: Previews
 
 struct CodeEditor_Previews: PreviewProvider {
   static var previews: some View {
-    VStack{
-      CodeEditor(text: .constant("-- Hello World!"), with: haskellConfiguration)
-    }
+    CodeEditor(text: .constant("-- Hello World!"), with: haskellConfiguration)
   }
 }
