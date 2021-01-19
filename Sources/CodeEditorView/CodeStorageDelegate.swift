@@ -20,7 +20,7 @@ import AppKit
 // MARK: Visual debugging support
 
 // FIXME: It should be possible to enable this via a defaults setting.
-private let visualDebugging               = true
+private let visualDebugging               = false
 private let visualDebuggingEditedColour   = Color(red: 0.5, green: 1.0, blue: 0.5, alpha: 0.3)
 private let visualDebuggingLinesColour    = Color(red: 0.5, green: 0.5, blue: 1.0, alpha: 0.3)
 private let visualDebuggingTrailingColour = Color(red: 1.0, green: 0.5, blue: 0.5, alpha: 0.3)
@@ -70,15 +70,33 @@ struct LineInfo {
 
 class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
 
-  let language:  LanguageConfiguration
-  let tokeniser: Tokeniser<LanguageConfiguration.Token, LanguageConfiguration.State>?    // cache the tokeniser
+  private let language:  LanguageConfiguration
+  private let tokeniser: Tokeniser<LanguageConfiguration.Token, LanguageConfiguration.State>? // cache the tokeniser
 
   private(set) var lineMap = LineMap<LineInfo>(string: "")
+
+  /// If the last text change was a one-character addition, which completed a token, then that token is remembered here
+  /// together with the position of its *last* character (the completing one) until the next text change.
+  ///
+  private var lastTypedToken: (type: LanguageConfiguration.Token, index: Int)?
+
+  /// Flag that indicates that the current editing round is for a one-character addition to the text. This property
+  /// needs to be determined before attribute fixing and the like.
+  ///
+  private var processingOneCharacterEdit: Bool?
 
   init(with language: LanguageConfiguration) {
     self.language  = language
     self.tokeniser = NSMutableAttributedString.tokeniser(for: language.tokenDictionary, with: .tokenBody)
     super.init()
+  }
+
+  func textStorage(_ textStorage: NSTextStorage,
+                   willProcessEditing editedMask: TextStorageEditActions,
+                   range editedRange: NSRange,
+                   changeInLength delta: Int)
+  {
+    processingOneCharacterEdit = delta == 1 && editedRange.length == 1
   }
 
   // NB: The choice of `didProcessEditing` versus `willProcessEditing` is crucial on macOS. The reason is that
@@ -111,6 +129,12 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
     if visualDebugging {
       textStorage.addAttribute(.backgroundColor, value: visualDebuggingEditedColour, range: editedRange)
     }
+
+    // If a single character was added, process token-level completion steps.
+    if delta == 1 && processingOneCharacterEdit == true {
+      tokenCompletion(for: textStorage, at: editedRange.location)
+    }
+    processingOneCharacterEdit = nil
   }
 }
 
@@ -316,6 +340,148 @@ extension CodeStorageDelegate {
     textStorage.enumerateAttribute(.comment, in: range){ (optionalValue, attrRange, _) in
 
       if optionalValue != nil { textStorage.addAttribute(.foregroundColor, value: Color.darkGray, range: attrRange) }
+    }
+  }
+}
+
+
+// MARK: -
+// MARK: Completion
+
+extension CodeStorageDelegate {
+
+  /// Handle token completion actions after a single character was inserted.
+  ///
+  /// - Parameters:
+  ///   - textStorage: The text storage where the edit action occured.
+  ///   - index: The location within the text storage where the single chracter was inserted.
+  ///
+  /// Any change to the `textStorage` is deferred, so that this function can also be used in the middle of an
+  /// in-progress, but not yet completed edit.
+  ///
+  func tokenCompletion(for textStorage: NSTextStorage, at index: Int) {
+
+    /// If the given token is an opening bracket, return the lexeme of its matching closing bracket.
+    ///
+    func matchingLexemeForOpeningBracket(_ token: LanguageConfiguration.Token) -> String? {
+      if token.isOpenBracket, let matching = token.matchingBracket, let lexeme = language.lexeme(of: matching)
+      {
+        return lexeme
+      } else {
+        return nil
+      }
+    }
+
+    let string             = textStorage.string,
+        char               = string.utf16[string.index(string.startIndex, offsetBy: index)],
+        previousTypedToken = lastTypedToken,
+        currentTypedToken  : (type: LanguageConfiguration.Token, index: Int)?
+
+    // Determine the token (if any) that the right now inserted character belongs to
+    if let token = textStorage.token(at: index) { currentTypedToken = (type: token.type, index: index) }
+    else { currentTypedToken = nil }
+
+    lastTypedToken = currentTypedToken    // this is the default outcome, unless explicitly overridden below
+
+    // The just entered character is right after the previous token
+    if let previousToken = previousTypedToken, previousToken.index + 1 == index {
+
+      let completingString: String?
+
+      // If the previous token was an opening bracket, we may have to autocomplete by inserting a matching closing
+      // bracket
+      if let matchingPreviousLexeme = matchingLexemeForOpeningBracket(previousToken.type)
+      {
+
+        if let currentToken = currentTypedToken {
+
+          if currentToken.type == previousToken.type.matchingBracket {
+
+            // The current token is a matching closing bracket for the opening bracket of the last token => nothing to do
+            completingString = nil
+
+          } else if let matchingCurrentLexeme = matchingLexemeForOpeningBracket(currentToken.type) {
+
+            // The current token is another opening bracket => insert matching closing for the current and previous
+            // opening bracket
+            completingString = matchingCurrentLexeme + matchingPreviousLexeme
+
+          } else {
+
+            // Insertion of a unrelated or non-bracket token => just complete the previous opening bracket
+            completingString = matchingPreviousLexeme
+
+          }
+
+        } else {
+
+          if let unichar = Unicode.Scalar(char),
+             CharacterSet.newlines.contains(unichar),
+             previousToken.type == .curlyBracketOpen
+          {
+
+            // Insertion of a newline after a curly bracket => complete the previous opening bracket prefixed with an extra newline
+            completingString = String(unichar) + matchingPreviousLexeme
+
+          } else {
+
+          // Insertion of a character that doesn't complete a token => just complete the previous opening bracket
+          completingString = matchingPreviousLexeme
+
+          }
+        }
+
+      } else { completingString = nil }
+
+      // Defer inserting the completion
+      if let string = completingString {
+
+        lastTypedToken = nil    // A completion renders the last token void
+        cursorInsert(string: string, at: index + 1, in: textStorage)
+
+      }
+
+    }
+  }
+}
+
+
+// MARK: -
+// MARK: Inserting text
+
+extension CodeStorageDelegate {
+
+  /// Insert the given string, such that it safe in an ongoing insertion cycle and does leaves the cursor (insertion
+  /// point) in place if the insertion is at the location of the insertion point.
+  ///
+  func cursorInsert(string: String, at index: Int, in textStorage: NSTextStorage) {
+
+    Dispatch.DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + DispatchTimeInterval.milliseconds(10)){
+
+      #if os(iOS)
+
+      textStorage.replaceCharacters(in: NSRange(location: index, length: 0), with: string)
+
+      #elseif os(macOS)
+
+      // Collect the text views, where we insert at the insertion point
+      var affectedTextViews: [NSTextView] = []
+      for layoutManager in textStorage.layoutManagers {
+        for textContainer in layoutManager.textContainers {
+
+          if let textView = textContainer.textView, textView.selectedRange() == NSRange(location: index, length: 0) {
+            affectedTextViews.append(textView)
+          }
+        }
+      }
+
+      textStorage.replaceCharacters(in: NSRange(location: index, length: 0), with: string)
+
+      // Reset the insertion point to the original (pre-insertion) position (as it will move after the inserted text on
+      // macOS otherwise)
+      for textView in affectedTextViews { textView.setSelectedRange(NSRange(location: index, length: 0)) }
+
+      #endif
     }
   }
 }

@@ -40,15 +40,15 @@ public struct LanguageConfiguration {
 
     var isOpenBracket: Bool {
       switch self {
-      case .roundBracketOpen, .squareBracketOpen, .curlyBracketOpen: return true
-      default:                                                       return false
+      case .roundBracketOpen, .squareBracketOpen, .curlyBracketOpen, .nestedCommentOpen: return true
+      default:                                                                           return false
       }
     }
 
     var isCloseBracket: Bool {
       switch self {
-      case .roundBracketClose, .squareBracketClose, .curlyBracketClose: return true
-      default:                                                          return false
+      case .roundBracketClose, .squareBracketClose, .curlyBracketClose, .nestedCommentClose: return true
+      default:                                                                               return false
       }
     }
 
@@ -57,10 +57,21 @@ public struct LanguageConfiguration {
       case .roundBracketOpen:   return .roundBracketClose
       case .squareBracketOpen:  return .squareBracketClose
       case .curlyBracketOpen:   return .curlyBracketClose
+      case .nestedCommentOpen:  return .nestedCommentClose
       case .roundBracketClose:  return .roundBracketOpen
       case .squareBracketClose: return .squareBracketOpen
       case .curlyBracketClose:  return .curlyBracketOpen
+      case .nestedCommentClose: return .nestedCommentOpen
       default:                  return nil
+      }
+    }
+
+    var isComment: Bool {
+      switch self {
+      case .singleLineComment:  return true
+      case .nestedCommentOpen:  return true
+      case .nestedCommentClose: return true
+      default:                  return false
       }
     }
 
@@ -106,6 +117,24 @@ public struct LanguageConfiguration {
   /// A pair of lexemes that encloses a nested comment
   ///
   public let nestedComment: BracketPair?
+
+  /// Yields the lexeme of the given token under this language configuration if the token has got a unique lexeme.
+  ///
+  func lexeme(of token: Token) -> String? {
+    switch token {
+    case .roundBracketOpen:   return "("
+    case .roundBracketClose:  return ")"
+    case .squareBracketOpen:  return "["
+    case .squareBracketClose: return "]"
+    case .curlyBracketOpen:   return "{"
+    case .curlyBracketClose:  return "}"
+    case .string:             return nil
+    case .singleLineComment:  return singleLineComment
+    case .nestedCommentOpen:  return nestedComment?.open
+    case .nestedCommentClose: return nestedComment?.close
+    case .tokenBody:          return nil
+    }
+  }
 }
 
 /// Empty language configuration
