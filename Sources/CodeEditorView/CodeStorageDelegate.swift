@@ -76,9 +76,9 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
   private(set) var lineMap = LineMap<LineInfo>(string: "")
 
   /// If the last text change was a one-character addition, which completed a token, then that token is remembered here
-  /// together with the position of its *last* character (the completing one) until the next text change.
+  /// together with its range until the next text change.
   ///
-  private var lastTypedToken: (type: LanguageConfiguration.Token, index: Int)?
+  private var lastTypedToken: (type: LanguageConfiguration.Token, range: NSRange)?
 
   /// Flag that indicates that the current editing round is for a one-character addition to the text. This property
   /// needs to be determined before attribute fixing and the like.
@@ -372,19 +372,31 @@ extension CodeStorageDelegate {
       }
     }
 
+    /// Determine whether the ranges of the two tokens are overlapping.
+    ///
+    func overlapping(_ previousToken: (type: LanguageConfiguration.Token, range: NSRange),
+                     _ currentToken: (type: LanguageConfiguration.Token, range: NSRange)?) -> Bool
+    {
+      if let currentToken = currentToken {
+        return NSIntersectionRange(previousToken.range, currentToken.range).length != 0
+      } else { return false }
+    }
+
+
     let string             = textStorage.string,
         char               = string.utf16[string.index(string.startIndex, offsetBy: index)],
         previousTypedToken = lastTypedToken,
-        currentTypedToken  : (type: LanguageConfiguration.Token, index: Int)?
+        currentTypedToken  : (type: LanguageConfiguration.Token, range: NSRange)?
 
     // Determine the token (if any) that the right now inserted character belongs to
-    if let token = textStorage.token(at: index) { currentTypedToken = (type: token.type, index: index) }
-    else { currentTypedToken = nil }
+    currentTypedToken = textStorage.token(at: index)
 
     lastTypedToken = currentTypedToken    // this is the default outcome, unless explicitly overridden below
 
-    // The just entered character is right after the previous token
-    if let previousToken = previousTypedToken, previousToken.index + 1 == index {
+    // The just entered character is right after the previous token and it doesn't belong to a token overlapping with
+    // the previous token
+    if let previousToken = previousTypedToken, NSMaxRange(previousToken.range) == index,
+       !overlapping(previousToken, currentTypedToken) {
 
       let completingString: String?
 
@@ -415,9 +427,11 @@ extension CodeStorageDelegate {
 
         } else {
 
+          // If a opening curly brace or nested comment bracket is followed by a line break, add another line break
+          // before the matching closing bracket.
           if let unichar = Unicode.Scalar(char),
              CharacterSet.newlines.contains(unichar),
-             previousToken.type == .curlyBracketOpen
+             previousToken.type == .curlyBracketOpen || previousToken.type == .nestedCommentOpen
           {
 
             // Insertion of a newline after a curly bracket => complete the previous opening bracket prefixed with an extra newline
@@ -440,7 +454,6 @@ extension CodeStorageDelegate {
         cursorInsert(string: string, at: index + 1, in: textStorage)
 
       }
-
     }
   }
 }
