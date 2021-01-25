@@ -27,13 +27,14 @@ fileprivate class CodeViewWithGutter: UITextView {
 
     // Use a custom layout manager that is gutter-aware
     let codeLayoutManager = CodeLayoutManager(),
-        textContainer     = NSTextContainer(),
-        textStorage       = NSTextStorage()
-    textStorage.addLayoutManager(codeLayoutManager)
-    textContainer.layoutManager = codeLayoutManager
-    codeLayoutManager.addTextContainer(textContainer)
+        codeContainer     = CodeContainer(),
+        codeStorage       = CodeStorage()
+    codeStorage.addLayoutManager(codeLayoutManager)
+    codeContainer.layoutManager = codeLayoutManager
+    codeLayoutManager.addTextContainer(codeContainer)
 
-    super.init(frame: frame, textContainer: textContainer)
+    super.init(frame: frame, textContainer: codeContainer)
+    codeContainer.textView = self
 
     // Set basic display and input properties
     font = UIFont.monospacedSystemFont(ofSize: UIFont.systemFontSize, weight: .regular)
@@ -51,7 +52,7 @@ fileprivate class CodeViewWithGutter: UITextView {
 
     // Add a text storage delegate that maintains a line map
     self.codeStorageDelegate = CodeStorageDelegate(with: language)
-    textStorage.delegate     = self.codeStorageDelegate
+    codeStorage.delegate     = self.codeStorageDelegate
 
     // Add a gutter view
     let gutterWidth = (font?.pointSize ?? UIFont.systemFontSize) * 3,
@@ -90,6 +91,9 @@ fileprivate class CodeViewDelegate: NSObject, UITextViewDelegate {
   func textViewDidChangeSelection(_ textView: UITextView) { selectionDidChange?(textView) }
 }
 
+class CodeContainer: NSTextContainer {
+  weak var textView: UITextView?
+}
 
 /// SwiftUI code editor based on TextKit
 ///
@@ -156,9 +160,9 @@ fileprivate class CodeViewWithGutter: NSTextView {
 
     // Use a custom layout manager that is gutter-aware
     let codeLayoutManager = CodeLayoutManager(),
-        textContainer     = NSTextContainer(),
-        textStorage       = NSTextStorage()
-    textStorage.addLayoutManager(codeLayoutManager)
+        textContainer     = CodeContainer(),
+        codeStorage       = CodeStorage()
+    codeStorage.addLayoutManager(codeLayoutManager)
     textContainer.layoutManager = codeLayoutManager
     codeLayoutManager.addTextContainer(textContainer)
 
@@ -189,7 +193,7 @@ fileprivate class CodeViewWithGutter: NSTextView {
 
     // Add a text storage delegate that maintains a line map
     codeStorageDelegate  = CodeStorageDelegate(with: language)
-    textStorage.delegate = codeStorageDelegate
+    codeStorage.delegate = codeStorageDelegate
 
     // Add a gutter view
     let gutterWidth = (font?.pointSize ?? NSFont.systemFontSize) * 3,
@@ -235,6 +239,9 @@ fileprivate class CodeViewDelegate: NSObject, NSTextViewDelegate {
 
     selectionDidChange?(textView)
   }
+}
+
+class CodeContainer: NSTextContainer {
 }
 
 /// SwiftUI code editor based on TextKit
@@ -340,7 +347,7 @@ class CodeLayoutManager: NSLayoutManager {
 private func selectionDidChange<TV: TextView>(_ textView: TV) {
   guard let layoutManager = textView.optLayoutManager,
         let textContainer = textView.optTextContainer,
-        let textStorage   = textView.optTextStorage
+        let codeStorage   = textView.optCodeStorage
         else { return }
 
   let visibleRect = textView.documentVisibleRect,
@@ -350,7 +357,7 @@ private func selectionDidChange<TV: TextView>(_ textView: TV) {
 
   if let location             = textView.insertionPoint,
      location > 0,
-     let matchingBracketRange = textStorage.matchingBracket(forLocationAt: location - 1, in: charRange)
+     let matchingBracketRange = codeStorage.matchingBracket(forLocationAt: location - 1, in: charRange)
   {
     textView.showFindIndicator(for: matchingBracketRange)
   }

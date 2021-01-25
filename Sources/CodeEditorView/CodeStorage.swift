@@ -3,7 +3,7 @@
 //
 //  Created by Manuel M T Chakravarty on 09/01/2021.
 //
-//  This file contains code-related extensions to `NSTextStorage`.
+//  This file contains `NSTextStorage` extensions for code editing.
 
 // FIXME: the aliases ought to be moved to some central place for os impedance matching
 #if os(iOS)
@@ -29,7 +29,135 @@ typealias TextStorageEditActions = NSTextStorageEditActions
 #endif
 
 
-extension NSTextStorage {
+// MARK: -
+// MARK: `NSTextStorage` subclass
+
+// `NSTextStorage` is a class cluster; hence, we realise our subclass by decorating an embeded vanilla text storage.
+class CodeStorage: NSTextStorage {
+
+  let textStorage: NSTextStorage = NSTextStorage()
+
+  override var string: String { textStorage.string }
+
+  override func attributes(at location: Int, effectiveRange range: NSRangePointer?) -> [NSAttributedString.Key : Any] {
+    return textStorage.attributes(at: location, effectiveRange: range)
+  }
+
+  // Extended to handle auto-deletion of adjcent matching brackets
+  override func replaceCharacters(in range: NSRange, with str: String) {
+
+    beginEditing()
+
+    // We are deleting one character => check whether it is a one-character bracket and if so also delete its matching
+    // bracket if it is directly adjascent
+    if range.length == 1 && str == "",
+       let token = tokenAttribute(at: range.location),
+       let language = (delegate as? CodeStorageDelegate)?.language
+    {
+
+      let isOpen    = token.isOpenBracket,
+          isBracket = isOpen || token.isCloseBracket,
+          isSafe    = (isOpen && range.location + 1 < string.utf16.count) || range.location > 0,
+          offset    = isOpen ? 1 : -1
+      if isBracket && isSafe && language.lexeme(of: token)?.count == 1 &&
+          tokenAttribute(at: range.location + offset) == token.matchingBracket
+      {
+
+        let extendedRange = NSRange(location: isOpen ? range.location : range.location - 1, length: 2)
+        textStorage.replaceCharacters(in: extendedRange, with: "")
+        edited(.editedCharacters, range: extendedRange, changeInLength: -2)
+        setInsertionPointAfterDeletion(of: extendedRange)
+
+      } else {
+
+        textStorage.replaceCharacters(in: range, with: str)
+        edited(.editedCharacters, range: range, changeInLength: (str as NSString).length - range.length)
+
+      }
+
+    } else {
+
+      textStorage.replaceCharacters(in: range, with: str)
+      edited(.editedCharacters, range: range, changeInLength: (str as NSString).length - range.length)
+
+    }
+    endEditing()
+  }
+
+  override func setAttributes(_ attrs: [NSAttributedString.Key : Any]?, range: NSRange) {
+    beginEditing()
+    textStorage.setAttributes(attrs, range: range)
+    edited(.editedAttributes, range: range, changeInLength: 0)
+    endEditing()
+  }
+}
+
+
+// MARK: -
+// MARK: Custom handling of the insertion point
+
+extension CodeStorage {
+
+  /// Insert the given string, such that it safe in an ongoing insertion cycle and does leave the cursor (insertion
+  /// point) in place if the insertion is at the location of the insertion point.
+  ///
+  func cursorInsert(string: String, at index: Int) {
+
+    Dispatch.DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + DispatchTimeInterval.milliseconds(10)){
+
+      #if os(iOS)
+
+      self.replaceCharacters(in: NSRange(location: index, length: 0), with: string)
+
+      #elseif os(macOS)
+
+      // Collect the text views, where we insert at the insertion point
+      var affectedTextViews: [NSTextView] = []
+      for layoutManager in self.layoutManagers {
+        for textContainer in layoutManager.textContainers {
+
+          if let textView = textContainer.textView, textView.selectedRange() == NSRange(location: index, length: 0) {
+            affectedTextViews.append(textView)
+          }
+        }
+      }
+
+      self.replaceCharacters(in: NSRange(location: index, length: 0), with: string)
+
+      // Reset the insertion point to the original (pre-insertion) position (as it will move after the inserted text on
+      // macOS otherwise)
+      for textView in affectedTextViews { textView.setSelectedRange(NSRange(location: index, length: 0)) }
+
+      #endif
+    }
+  }
+
+  /// Set the insertion point of all attached text views, where the selection intersects the given range, to the start
+  /// of the range. This is safe in an editing cycle, as the selection setting is deferred until completion.
+  ///
+  /// - Parameter range: The deleted chracter range.
+  ///
+  func setInsertionPointAfterDeletion(of range: NSRange) {
+
+    for layoutManager in self.layoutManagers {
+      for textContainer in layoutManager.textContainers {
+
+        if let codeContainer = textContainer as? CodeContainer,
+           let textView      = codeContainer.textView,
+           NSIntersectionRange(textView.selectedRange, range).length != 0
+        {
+          Dispatch.DispatchQueue.main.async{ textView.selectedRange = NSRange(location: range.location, length: 0) }
+        }
+      }
+    }
+  }
+}
+
+
+// MARK: -
+// MARK: Token attributes
+
+extension CodeStorage {
 
   /// Determine the token attribute value at the given character index. This will be `.tokenBody` if the indexed
   /// character is a body character (i.e., second or later) of a token lexeme.

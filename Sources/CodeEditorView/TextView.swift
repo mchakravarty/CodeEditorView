@@ -21,7 +21,7 @@ protocol TextView {
   // This is necessary as these members are optional in AppKit and not optional in UIKit.
   var optLayoutManager: NSLayoutManager? { get }
   var optTextContainer: NSTextContainer? { get }
-  var optTextStorage:   NSTextStorage?   { get }
+  var optCodeStorage:   CodeStorage?   { get }
 
   var textBackgroundColor: Color? { get }
   var textFont:            Font? { get }
@@ -30,6 +30,10 @@ protocol TextView {
   /// If the current selection is an insertion point, return its location.
   ///
   var insertionPoint: Int? { get }
+
+  /// The current (single range) selection of the text view.
+  ///
+  var selectedRange: NSRange { get set }
 
   /// The visible portion of the text view. (This only accounts for portions of the text view that are obscured through
   /// visibility in a scroll view.
@@ -43,7 +47,7 @@ protocol TextView {
 
 extension TextView {
   var optLineMap: LineMap<LineInfo>? {
-    return (optTextStorage?.delegate as? CodeStorageDelegate)?.lineMap
+    return (optCodeStorage?.delegate as? CodeStorageDelegate)?.lineMap
   }
 }
 
@@ -64,7 +68,7 @@ extension UITextView: TextView {
 
   var optLayoutManager: NSLayoutManager? { layoutManager }
   var optTextContainer: NSTextContainer? { textContainer }
-  var optTextStorage:   NSTextStorage?   { textStorage }
+  var optCodeStorage:   CodeStorage?     { textStorage as? CodeStorage }
 
   var textBackgroundColor: Color? { backgroundColor }
   var textFont:            Font? { font }

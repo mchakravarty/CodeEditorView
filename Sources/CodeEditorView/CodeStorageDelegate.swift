@@ -70,7 +70,7 @@ struct LineInfo {
 
 class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
 
-  private let language:  LanguageConfiguration
+  let language:          LanguageConfiguration
   private let tokeniser: Tokeniser<LanguageConfiguration.Token, LanguageConfiguration.State>? // cache the tokeniser
 
   private(set) var lineMap = LineMap<LineInfo>(string: "")
@@ -113,6 +113,8 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
                    range editedRange: NSRange,  // Apple docs are incorrect here: this is the range *after* editing
                    changeInLength delta: Int)
   {
+    guard let codeStorage = textStorage as? CodeStorage else { return }
+
     // If only attributes change, the line map and syntax highlighting remains the same => nothing for us to do
     guard editedMask.contains(.editedCharacters) else { return }
 
@@ -132,7 +134,7 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
 
     // If a single character was added, process token-level completion steps.
     if delta == 1 && processingOneCharacterEdit == true {
-      tokenCompletion(for: textStorage, at: editedRange.location)
+      tokenCompletion(for: codeStorage, at: editedRange.location)
     }
     processingOneCharacterEdit = nil
   }
@@ -154,6 +156,7 @@ extension CodeStorageDelegate {
   /// Tokenisation happens at line granularity. Hence, the range is correspondingly extended.
   ///
   func tokeniseAttributesFor(range originalRange: NSRange, in textStorage: NSTextStorage) {
+    guard let codeStorage = textStorage as? CodeStorage else { return }
 
     func tokeniseAndUpdateInfo(for line: Int, commentDepth: inout Int, lastCommentStart: inout Int?) {
 
@@ -165,7 +168,7 @@ extension CodeStorageDelegate {
         // Collect all tokens on this line.
         // (NB: In the block, we are not supposed to mutate outside the attribute range; hence, we only collect tokens.)
         var tokens = Array<(token: LanguageConfiguration.Token, range: NSRange)>()
-        textStorage.enumerateTokens(in: lineRange){ (tokenValue, range, _) in
+        codeStorage.enumerateTokens(in: lineRange){ (tokenValue, range, _) in
 
           tokens.append((token: tokenValue, range: range))
 
@@ -330,16 +333,17 @@ extension CodeStorageDelegate {
   /// Based on the token attributes, set the highlighting attributes of the characters in the given line range.
   ///
   func fixHighlightingAttributes(range: NSRange, in textStorage: NSTextStorage) {
+    guard let codeStorage = textStorage as? CodeStorage else { return }
 
     // FIXME: colours need to come from a theme
-    textStorage.addAttribute(.foregroundColor, value: labelColor, range: range)
-    textStorage.enumerateTokens(in: range){ (value, attrRange, _) in
+    codeStorage.addAttribute(.foregroundColor, value: labelColor, range: range)
+    codeStorage.enumerateTokens(in: range){ (value, attrRange, _) in
       
-      if value == .string { textStorage.addAttribute(.foregroundColor, value: Color.systemGreen, range: attrRange) }
+      if value == .string { codeStorage.addAttribute(.foregroundColor, value: Color.systemGreen, range: attrRange) }
     }
-    textStorage.enumerateAttribute(.comment, in: range){ (optionalValue, attrRange, _) in
+    codeStorage.enumerateAttribute(.comment, in: range){ (optionalValue, attrRange, _) in
 
-      if optionalValue != nil { textStorage.addAttribute(.foregroundColor, value: Color.darkGray, range: attrRange) }
+      if optionalValue != nil { codeStorage.addAttribute(.foregroundColor, value: Color.darkGray, range: attrRange) }
     }
   }
 }
@@ -359,7 +363,7 @@ extension CodeStorageDelegate {
   /// Any change to the `textStorage` is deferred, so that this function can also be used in the middle of an
   /// in-progress, but not yet completed edit.
   ///
-  func tokenCompletion(for textStorage: NSTextStorage, at index: Int) {
+  func tokenCompletion(for codeStorage: CodeStorage, at index: Int) {
 
     /// If the given token is an opening bracket, return the lexeme of its matching closing bracket.
     ///
@@ -383,13 +387,13 @@ extension CodeStorageDelegate {
     }
 
 
-    let string             = textStorage.string,
+    let string             = codeStorage.string,
         char               = string.utf16[string.index(string.startIndex, offsetBy: index)],
         previousTypedToken = lastTypedToken,
         currentTypedToken  : (type: LanguageConfiguration.Token, range: NSRange)?
 
     // Determine the token (if any) that the right now inserted character belongs to
-    currentTypedToken = textStorage.token(at: index)
+    currentTypedToken = codeStorage.token(at: index)
 
     lastTypedToken = currentTypedToken    // this is the default outcome, unless explicitly overridden below
 
@@ -451,50 +455,9 @@ extension CodeStorageDelegate {
       if let string = completingString {
 
         lastTypedToken = nil    // A completion renders the last token void
-        cursorInsert(string: string, at: index + 1, in: textStorage)
+        codeStorage.cursorInsert(string: string, at: index + 1)
 
       }
-    }
-  }
-}
-
-
-// MARK: -
-// MARK: Inserting text
-
-extension CodeStorageDelegate {
-
-  /// Insert the given string, such that it safe in an ongoing insertion cycle and does leaves the cursor (insertion
-  /// point) in place if the insertion is at the location of the insertion point.
-  ///
-  func cursorInsert(string: String, at index: Int, in textStorage: NSTextStorage) {
-
-    Dispatch.DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + DispatchTimeInterval.milliseconds(10)){
-
-      #if os(iOS)
-
-      textStorage.replaceCharacters(in: NSRange(location: index, length: 0), with: string)
-
-      #elseif os(macOS)
-
-      // Collect the text views, where we insert at the insertion point
-      var affectedTextViews: [NSTextView] = []
-      for layoutManager in textStorage.layoutManagers {
-        for textContainer in layoutManager.textContainers {
-
-          if let textView = textContainer.textView, textView.selectedRange() == NSRange(location: index, length: 0) {
-            affectedTextViews.append(textView)
-          }
-        }
-      }
-
-      textStorage.replaceCharacters(in: NSRange(location: index, length: 0), with: string)
-
-      // Reset the insertion point to the original (pre-insertion) position (as it will move after the inserted text on
-      // macOS otherwise)
-      for textView in affectedTextViews { textView.setSelectedRange(NSRange(location: index, length: 0)) }
-
-      #endif
     }
   }
 }

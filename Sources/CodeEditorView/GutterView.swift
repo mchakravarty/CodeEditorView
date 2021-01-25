@@ -110,7 +110,6 @@ extension GutterView {
 
   var optLayoutManager: NSLayoutManager?   { textView.optLayoutManager }
   var optTextContainer: NSTextContainer?   { textView.optTextContainer }
-  var optTextStorage:   NSTextStorage?     { textView.optTextStorage }
   var optLineMap:       LineMap<LineInfo>? { textView.optLineMap }
 
 
