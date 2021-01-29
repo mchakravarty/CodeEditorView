@@ -21,7 +21,7 @@ protocol TextView {
   // This is necessary as these members are optional in AppKit and not optional in UIKit.
   var optLayoutManager: NSLayoutManager? { get }
   var optTextContainer: NSTextContainer? { get }
-  var optCodeStorage:   CodeStorage?   { get }
+  var optCodeStorage:   CodeStorage?     { get }
 
   var textBackgroundColor: Color? { get }
   var textFont:            Font? { get }
@@ -130,7 +130,7 @@ extension NSTextView: TextView {
 
   var optLayoutManager: NSLayoutManager? { layoutManager }
   var optTextContainer: NSTextContainer? { textContainer }
-  var optTextStorage:   NSTextStorage?   { textStorage }
+  var optCodeStorage:   CodeStorage?     { textStorage as? CodeStorage }
 
   var textBackgroundColor: Color? { backgroundColor }
   var textFont:            Font? { font }

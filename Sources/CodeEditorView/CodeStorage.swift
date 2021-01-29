@@ -10,7 +10,8 @@
 
 import UIKit
 
-typealias Color = UIColor
+typealias Color      = UIColor
+typealias BezierPath = UIBezierPath
 
 let labelColor = UIColor.label
 
@@ -20,7 +21,8 @@ typealias TextStorageEditActions = NSTextStorage.EditActions
 
 import AppKit
 
-typealias Color = NSColor
+typealias Color      = NSColor
+typealias BezierPath = NSBezierPath
 
 let labelColor = NSColor.labelColor
 

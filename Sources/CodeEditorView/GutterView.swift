@@ -19,7 +19,6 @@ private let logger = Logger(subsystem: "org.justtesting.CodeEditor", category: "
 import UIKit
 
 
-private typealias BezierPath     = UIBezierPath
 private typealias Font           = UIFont
 private typealias FontDescriptor = UIFontDescriptor
 
@@ -40,10 +39,9 @@ class GutterView: UIView {
   init(frame: CGRect, textView: UITextView) {
     self.textView = textView
     super.init(frame: frame)
-    let
-      gutterExclusionPath = UIBezierPath(rect: CGRect(origin: frame.origin,
-                                                      size: CGSize(width: frame.width,
-                                                                   height: CGFloat.greatestFiniteMagnitude)))
+    let gutterExclusionPath = UIBezierPath(rect: CGRect(origin: frame.origin,
+                                                        size: CGSize(width: frame.width,
+                                                                     height: CGFloat.greatestFiniteMagnitude)))
     optTextContainer?.exclusionPaths = [gutterExclusionPath]
     contentMode = .redraw
   }
@@ -62,7 +60,6 @@ class GutterView: UIView {
 import AppKit
 
 
-private typealias BezierPath     = NSBezierPath
 private typealias Font           = NSFont
 private typealias FontDescriptor = NSFontDescriptor
 
@@ -77,17 +74,17 @@ class GutterView: NSView {
   ///
   let textView: NSTextView
 
+  /// Determines whether this gutter is for a main code view or for the minimap of a code view.
+  ///
+  let isMinimapGutter: Bool
+
   /// Create and configure a gutter view for the given text view. This will also set the appropiate exclusion path for
   /// text container.
   ///
-  init(frame: CGRect, textView: NSTextView) {
-    self.textView = textView
+  init(frame: CGRect, textView: NSTextView, isMinimapGutter: Bool) {
+    self.textView        = textView
+    self.isMinimapGutter = isMinimapGutter
     super.init(frame: frame)
-    let
-      gutterExclusionPath = NSBezierPath(rect: CGRect(origin: frame.origin,
-                                                      size: CGSize(width: frame.width,
-                                                                   height: CGFloat.greatestFiniteMagnitude)))
-    optTextContainer?.exclusionPaths = [gutterExclusionPath]
     // NB: If were decide to use layer backing, we need to set the `layerContentsRedrawPolicy` to redraw on resizing
   }
 
@@ -173,31 +170,35 @@ extension GutterView {
     let font = Font(descriptor: desc, size: 0) ?? Font.systemFont(ofSize: 0)
     #endif
 
+    // Draw line numbers unless this is a gutter for a minimap
+    if !isMinimapGutter {
 
-    // All visible glyphs and all visible characters that are in the text area to the right of the gutter view
-    let glyphRange = layoutManager.glyphRange(forBoundingRectWithoutAdditionalLayout: textRectFrom(gutterRect: rect),
-                                              in: textContainer),
-        charRange  = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil),
-        lineRange  = lineMap.linesContaining(range: charRange)
+      // All visible glyphs and all visible characters that are in the text area to the right of the gutter view
+      let glyphRange = layoutManager.glyphRange(forBoundingRectWithoutAdditionalLayout: textRectFrom(gutterRect: rect),
+                                                in: textContainer),
+          charRange  = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil),
+          lineRange  = lineMap.linesContaining(range: charRange)
 
-    // Text attributes for the line numbers
-    let lineNumberStyle = NSMutableParagraphStyle()
-    lineNumberStyle.alignment = .right
-    lineNumberStyle.tailIndent = -fontSize / 11
-    let textAttributes = [NSAttributedString.Key.font: font,
-                          .foregroundColor: lineNumberColour,
-                          .paragraphStyle: lineNumberStyle,
-                          .kern: NSNumber(value: Float(-fontSize / 11))]
+      // Text attributes for the line numbers
+      let lineNumberStyle = NSMutableParagraphStyle()
+      lineNumberStyle.alignment = .right
+      lineNumberStyle.tailIndent = -fontSize / 11
+      let textAttributes = [NSAttributedString.Key.font: font,
+                            .foregroundColor: lineNumberColour,
+                            .paragraphStyle: lineNumberStyle,
+                            .kern: NSNumber(value: Float(-fontSize / 11))]
 
-    for line in lineRange {
+      for line in lineRange {
 
-      let lineGlyphRange = layoutManager.glyphRange(forCharacterRange: lineMap.lines[line].range,
-                                                    actualCharacterRange: nil),
-          lineGlyphRect  = layoutManager.boundingRect(forGlyphRange: lineGlyphRange, in: textContainer)
+        let lineGlyphRange = layoutManager.glyphRange(forCharacterRange: lineMap.lines[line].range,
+                                                      actualCharacterRange: nil),
+            lineGlyphRect  = layoutManager.boundingRect(forGlyphRange: lineGlyphRange, in: textContainer)
 
-      ("\(line)" as NSString).draw(in: gutterRectForLineNumbersFrom(textRect: lineGlyphRect),
-                                   withAttributes: textAttributes)
+        ("\(line)" as NSString).draw(in: gutterRectForLineNumbersFrom(textRect: lineGlyphRect),
+                                     withAttributes: textAttributes)
+      }
     }
+
   }
 }
 

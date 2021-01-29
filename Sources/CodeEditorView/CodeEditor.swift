@@ -15,7 +15,7 @@ import SwiftUI
 
 /// `UITextView` with a gutter
 ///
-fileprivate class CodeViewWithGutter: UITextView {
+fileprivate class CodeView: UITextView {
 
   private var gutterView:          GutterView?
   private var codeViewDelegate:    CodeViewDelegate?
@@ -25,7 +25,7 @@ fileprivate class CodeViewWithGutter: UITextView {
   ///
   init(frame: CGRect, with language: LanguageConfiguration) {
 
-    // Use a custom layout manager that is gutter-aware
+    // Use custom components that are gutter-aware and support code-specific editing actions and highlighting.
     let codeLayoutManager = CodeLayoutManager(),
         codeContainer     = CodeContainer(),
         codeStorage       = CodeStorage()
@@ -108,7 +108,7 @@ public struct CodeEditor: UIViewRepresentable {
   }
 
   public func makeUIView(context: Context) -> UITextView {
-    let textView = CodeViewWithGutter(frame: CGRect(x: 0, y: 0, width: 100, height: 40),
+    let textView = CodeView(frame: CGRect(x: 0, y: 0, width: 100, height: 40),
                                       with: language)
 
     textView.text = text
@@ -148,25 +148,30 @@ public struct CodeEditor: UIViewRepresentable {
 
 /// `NSTextView` with a gutter
 ///
-fileprivate class CodeViewWithGutter: NSTextView {
+fileprivate class CodeView: NSTextView {
 
-  private var gutterView:          GutterView?
+  // Delegates
   private var codeViewDelegate:    CodeViewDelegate?
   private var codeStorageDelegate: CodeStorageDelegate?
+
+  // Subviews
+  private var gutterView:        GutterView?
+  private var minimapView:       NSTextView?
+  private var minimapGutterView: GutterView?
 
   /// Designated initializer for code views with a gutter.
   ///
   init(frame: CGRect, with language: LanguageConfiguration) {
 
-    // Use a custom layout manager that is gutter-aware
+    // Use custom components that are gutter-aware and support code-specific editing actions and highlighting.
     let codeLayoutManager = CodeLayoutManager(),
-        textContainer     = CodeContainer(),
+        codeContainer     = CodeContainer(),
         codeStorage       = CodeStorage()
     codeStorage.addLayoutManager(codeLayoutManager)
-    textContainer.layoutManager = codeLayoutManager
-    codeLayoutManager.addTextContainer(textContainer)
+    codeContainer.layoutManager = codeLayoutManager
+    codeLayoutManager.addTextContainer(codeContainer)
 
-    super.init(frame: frame, textContainer: textContainer)
+    super.init(frame: frame, textContainer: codeContainer)
 
     // Set basic display and input properties
     font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
@@ -196,15 +201,29 @@ fileprivate class CodeViewWithGutter: NSTextView {
     codeStorage.delegate = codeStorageDelegate
 
     // Add a gutter view
-    let gutterWidth = (font?.pointSize ?? NSFont.systemFontSize) * 3,
-        gutterView  = GutterView(frame: CGRect(x: 0,
-                                               y: 0,
-                                               width: gutterWidth,
-                                               height:  CGFloat.greatestFiniteMagnitude),
-                                 textView: self)
+    let gutterView = GutterView(frame: CGRect.zero, textView: self, isMinimapGutter: false)
+    gutterView.autoresizingMask = .none
     addSubview(gutterView)
     self.gutterView              = gutterView
     codeLayoutManager.gutterView = gutterView
+
+    // Add the minimap with its own gutter, but sharing the code storage with the code view
+    //
+    let minimapView       = NSTextView(),
+        minimapGutterView = GutterView(frame: CGRect.zero, textView: minimapView, isMinimapGutter: true)
+
+    minimapView.layoutManager?.replaceTextStorage(codeStorage)
+    minimapView.autoresizingMask = .none
+    minimapView.isEditable       = false
+    minimapView.isSelectable     = false
+    addSubview(minimapView)
+    self.minimapView = minimapView
+    minimapView.addSubview(minimapGutterView)
+    self.minimapGutterView = minimapGutterView
+
+    doLayout()
+    
+    minimapView.backgroundColor = .darkGray
   }
 
   required init?(coder: NSCoder) {
@@ -213,7 +232,37 @@ fileprivate class CodeViewWithGutter: NSTextView {
 
   override func layout() {
     super.layout()
-    gutterView?.frame.size.height = frame.size.height
+    doLayout()
+  }
+
+  /// Position and size the gutter and minimap and set the exclusion paths.
+  ///
+  private func doLayout() {
+
+    // Configure the main view gutter
+    //
+    let fontSize            = font?.pointSize ?? NSFont.systemFontSize,
+        gutterWidth         = fontSize * 3,
+        gutterRect          = CGRect(origin: CGPoint.zero, size: CGSize(width: gutterWidth, height: frame.height)),
+        gutterExclusionPath = NSBezierPath(rect: gutterRect)
+    gutterView?.frame = gutterRect
+
+    // Configure the minimap text view and gutter
+    //
+    let currentMinimapWidth  = minimapWidth(from: frame.width, at: fontSize),
+        codeViewWidth        = frame.width - currentMinimapWidth,
+        minimapGutterWidth   = minimapFontSize(for: fontSize) * 3,
+        minimapRect          = CGRect(x: codeViewWidth, y: 0, width: currentMinimapWidth, height: frame.height),
+        minimapGutterRect    = CGRect(origin: CGPoint.zero,
+                                      size: CGSize(width: minimapGutterWidth, height: frame.height)),
+        minimapExclusionPath = NSBezierPath(rect: minimapRect),
+        minimapGutterExclusionPath = NSBezierPath(rect: minimapGutterRect)
+
+    minimapView?.frame       = minimapRect
+    minimapGutterView?.frame = minimapGutterRect
+
+    optTextContainer?.exclusionPaths              = [gutterExclusionPath, minimapExclusionPath]
+    minimapView?.optTextContainer?.exclusionPaths = [minimapGutterExclusionPath]
   }
 }
 
@@ -266,7 +315,7 @@ public struct CodeEditor: NSViewRepresentable {
     scrollView.autoresizingMask    = [.width, .height]
 
     // Set up text view with gutter
-    let textView = CodeViewWithGutter(frame: CGRect(x: 0, y: 0, width: 100, height: 40),
+    let textView = CodeView(frame: CGRect(x: 0, y: 0, width: 100, height: 40),
                                       with: language)
     textView.minSize                 = CGSize(width: 0, height: scrollView.contentSize.height)
     textView.maxSize                 = CGSize(width: CGFloat.greatestFiniteMagnitude,
@@ -363,6 +412,29 @@ private func selectionDidChange<TV: TextView>(_ textView: TV) {
   }
 }
 
+/// Compute the size of the minimap view from the overall size available.
+///
+/// - Parameters:
+///   - width: This is the overall available width of the main text view together with the minimap and including
+///            gutters.
+///   - fontSize: The font size of the main text view.
+/// - Returns: The width of the minimap including the minimap gutter.
+///
+private func minimapWidth(from width: CGFloat, at fontSize: CGFloat) -> CGFloat {
+  return ceil(width / (minimapFontSize(for: fontSize) / 2 * 10 + 1))
+}
+
+/// Compute the font size for the minimap from the font size of the main text view.
+///
+/// - Parameter fontSize: The font size of the main text view
+/// - Returns: The font size for the minimap
+///
+/// The result is always divisible by two, to enable the use of full pixels for the font width while avoiding aspect
+/// ratios that are too unbalanced.
+///
+private func minimapFontSize(for fontSize: CGFloat) -> CGFloat {
+  return max(1, ceil(fontSize / 20)) * 2
+}
 
 // MARK: -
 // MARK: Previews
