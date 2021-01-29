@@ -155,9 +155,10 @@ fileprivate class CodeView: NSTextView {
   private var codeStorageDelegate: CodeStorageDelegate?
 
   // Subviews
-  private var gutterView:        GutterView?
-  private var minimapView:       NSTextView?
-  private var minimapGutterView: GutterView?
+  private var gutterView:         GutterView?
+  private var minimapView:        NSTextView?
+  private var minimapGutterView:  GutterView?
+  private var minimapDividerView: NSBox?
 
   /// Designated initializer for code views with a gutter.
   ///
@@ -209,8 +210,13 @@ fileprivate class CodeView: NSTextView {
 
     // Add the minimap with its own gutter, but sharing the code storage with the code view
     //
-    let minimapView       = NSTextView(),
-        minimapGutterView = GutterView(frame: CGRect.zero, textView: minimapView, isMinimapGutter: true)
+    let minimapView        = NSTextView(),
+        minimapGutterView  = GutterView(frame: CGRect.zero, textView: minimapView, isMinimapGutter: true),
+        minimapDividerView = NSBox()
+
+    minimapDividerView.boxType = .separator
+    addSubview(minimapDividerView)
+    self.minimapDividerView = minimapDividerView
 
     minimapView.layoutManager?.replaceTextStorage(codeStorage)
     minimapView.autoresizingMask = .none
@@ -218,12 +224,11 @@ fileprivate class CodeView: NSTextView {
     minimapView.isSelectable     = false
     addSubview(minimapView)
     self.minimapView = minimapView
+
     minimapView.addSubview(minimapGutterView)
     self.minimapGutterView = minimapGutterView
 
     doLayout()
-    
-    minimapView.backgroundColor = .darkGray
   }
 
   required init?(coder: NSCoder) {
@@ -250,16 +255,18 @@ fileprivate class CodeView: NSTextView {
     // Configure the minimap text view and gutter
     //
     let currentMinimapWidth  = minimapWidth(from: frame.width, at: fontSize),
-        codeViewWidth        = frame.width - currentMinimapWidth,
+        codeViewWidth        = frame.width - currentMinimapWidth - 1,
         minimapGutterWidth   = minimapFontSize(for: fontSize) * 3,
-        minimapRect          = CGRect(x: codeViewWidth, y: 0, width: currentMinimapWidth, height: frame.height),
+        minimapRect          = CGRect(x: codeViewWidth + 1, y: 0, width: currentMinimapWidth, height: frame.height),
         minimapGutterRect    = CGRect(origin: CGPoint.zero,
                                       size: CGSize(width: minimapGutterWidth, height: frame.height)),
+        minimapDividerRect   = CGRect(x: codeViewWidth, y: 0, width: 1, height: frame.height),
         minimapExclusionPath = NSBezierPath(rect: minimapRect),
         minimapGutterExclusionPath = NSBezierPath(rect: minimapGutterRect)
 
-    minimapView?.frame       = minimapRect
-    minimapGutterView?.frame = minimapGutterRect
+    minimapDividerView?.frame = minimapDividerRect
+    minimapView?.frame        = minimapRect
+    minimapGutterView?.frame  = minimapGutterRect
 
     optTextContainer?.exclusionPaths              = [gutterExclusionPath, minimapExclusionPath]
     minimapView?.optTextContainer?.exclusionPaths = [minimapGutterExclusionPath]
