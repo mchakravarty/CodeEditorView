@@ -195,7 +195,7 @@ fileprivate class CodeView: NSTextView {
     textContainerInset                  = CGSize(width: 0, height: 0)
     textContainer?.widthTracksTextView  = false   // we need to be able to control the size (see `performLayout()`)
     textContainer?.heightTracksTextView = false
-    textContainer?.lineBreakMode        = .byTruncatingMiddle
+    textContainer?.lineBreakMode        = .byWordWrapping
 
     // FIXME: properties that ought to be configurable
     usesFindBar                   = true
@@ -237,7 +237,7 @@ fileprivate class CodeView: NSTextView {
     minimapView.textContainerInset                  = CGSize(width: 0, height: 0)
     minimapView.textContainer?.widthTracksTextView  = true
     minimapView.textContainer?.heightTracksTextView = false
-    minimapView.textContainer?.lineBreakMode        = .byCharWrapping
+    minimapView.textContainer?.lineBreakMode        = .byWordWrapping
     addSubview(minimapView)
     self.minimapView = minimapView
 
@@ -255,7 +255,12 @@ fileprivate class CodeView: NSTextView {
 
   override func layout() {
     super.layout()
+
+    // Lay out the various subviews and text containers
     performLayout()
+
+    // Redraw the visible part of the gutter
+    gutterView?.setNeedsDisplay(documentVisibleRect)
   }
 
   /// Position and size the gutter and minimap and set the text container sizes and exclusion paths.
@@ -265,6 +270,8 @@ fileprivate class CodeView: NSTextView {
   /// * Both the main text view and the minimap text view (or rather their text container) uses an exclusion path to
   ///   keep text out of the gutter view. The main text view is sized to avoid overlap with the minimap even without an
   ///   exclusion path.
+  /// * The main text view and the minimap text view need to be able to accomodate exactly the same number of
+  ///   characters, so that line breaking procceds in the exact same way.
   ///
   /// NB: We don't use a ruler view for the gutter on macOS to be able to use the same setup on macOS and iOS.
   ///
@@ -273,26 +280,31 @@ fileprivate class CodeView: NSTextView {
     // Compute size of the main view gutter
     //
     let theFont                = font ?? NSFont.systemFont(ofSize: 0),
-        gutterWithInCharacters = CGFloat(6),
         fontSize               = theFont.pointSize,
         fontWidth              = theFont.maximumAdvancement.width,  // NB: we deal only with fixed width fonts
+        gutterWithInCharacters = CGFloat(6),
         gutterWidth            = fontWidth * gutterWithInCharacters,
         gutterRect             = CGRect(origin: CGPoint.zero, size: CGSize(width: gutterWidth, height: frame.height)),
-        gutterExclusionPath    = BezierPath(rect: gutterRect)
+        gutterExclusionPath    = BezierPath(rect: gutterRect),
+        lineFragmentPadding    = textContainer?.lineFragmentPadding ?? 6
 
     gutterView?.frame = gutterRect
 
     // Compute sizes of the minimap text view and gutter
     //
-    let currentMinimapWidth  = minimapWidth(for: frame.width, with: theFont),
-        codeViewWidth        = frame.width - currentMinimapWidth,
-        minimapFontWidth     = minimapFontSize(for: fontSize) / 2,
+    let minimapFontWidth     = minimapFontSize(for: fontSize) / 2,
         minimapGutterWidth   = minimapFontWidth * gutterWithInCharacters,
-        minimapRect          = CGRect(x: codeViewWidth, y: 0, width: currentMinimapWidth, height: frame.height),
         minimapGutterRect    = CGRect(origin: CGPoint.zero,
                                       size: CGSize(width: minimapGutterWidth, height: frame.height)),
+        widthWithoutGutters  = frame.width - gutterWidth - minimapGutterWidth
+                                           - lineFragmentPadding * 2 + minimapFontWidth * 2,
+        numberOfCharacters   = codeWidthInCharacters(for: widthWithoutGutters , with: theFont),
+        minimapWidth         = minimapGutterWidth + minimapFontWidth * 2 + numberOfCharacters * minimapFontWidth,
+        codeViewWidth        = gutterWidth + lineFragmentPadding * 2 + ceil(numberOfCharacters * fontWidth),
+        minimapX             = frame.width - minimapWidth,
+        minimapRect          = CGRect(x: minimapX, y: 0, width: minimapWidth, height: frame.height),
         minimapExclusionPath = BezierPath(rect: minimapGutterRect),
-        minimapDividerRect   = CGRect(x: codeViewWidth - 1, y: 0, width: 1, height: frame.height)
+        minimapDividerRect   = CGRect(x: minimapX - 1, y: 0, width: 1, height: frame.height)
 
     minimapDividerView?.frame = minimapDividerRect
     minimapView?.frame        = minimapRect
@@ -302,13 +314,12 @@ fileprivate class CodeView: NSTextView {
 
     // Set the text container area of the main text view to reach up to the minimap
     textContainerInset            = NSSize(width: 0, height: 0)
-    textContainer?.size           = NSSize(width: frame.width - currentMinimapWidth,
-                                           height: CGFloat.greatestFiniteMagnitude)
+    textContainer?.size           = NSSize(width: codeViewWidth, height: CGFloat.greatestFiniteMagnitude)
     textContainer?.exclusionPaths = [gutterExclusionPath]
 
     // Set the text container area of the minimap text view
     minimapView?.textContainer?.exclusionPaths      = [minimapExclusionPath]
-    minimapView?.textContainer?.size                = CGSize(width: currentMinimapWidth,
+    minimapView?.textContainer?.size                = CGSize(width: minimapWidth,
                                                              height: CGFloat.greatestFiniteMagnitude)
     minimapView?.textContainer?.lineFragmentPadding = minimapFontWidth
   }
@@ -532,16 +543,59 @@ class MinimapTypeSetter: NSATSTypesetter {
         lineFragmentRect.origin.x   += padding
         lineFragmentRect.size.width  = max(lineFragmentRect.size.width - 2 * padding, 0)
 
-        // Determine how many glyphs we can fit into the `lineFragementRect`
-        let numberOfGlyphs        = max(min(Int(floor(lineFragmentRect.width / fontWidth)), remainingGlyphRange.length), 1),
-            lineFragementUsedRect = NSRect(origin: lineFragmentRect.origin,
+        // Determine how many glyphs we can fit into the `lineFragementRect`; must be at least one to make progress
+        var numberOfGlyphs:       Int,
+            lineGlyphRangeLength: Int
+        var numberOfGlyphsThatFit = max(Int(floor(lineFragmentRect.width / fontWidth)), 1)
+
+        // Add any elastic glyphs that follow (they can be compacted)
+        while numberOfGlyphsThatFit < remainingGlyphRange.length
+                && layoutManager?.propertyForGlyph(at: remainingGlyphRange.location + numberOfGlyphsThatFit) == .elastic
+        {
+          numberOfGlyphsThatFit += 1
+        }
+
+        if numberOfGlyphsThatFit < remainingGlyphRange.length { // we need a line break
+
+          // Try to find a break point at a word boundary, by looking back. If we don't find one, take the largest
+          // possible number of glyphs.
+          //
+          numberOfGlyphs = numberOfGlyphsThatFit
+          glyphLoop: for glyphs in stride(from: numberOfGlyphsThatFit, to: 0, by: -1) {
+
+            let glyphIndex = remainingGlyphRange.location + glyphs - 1
+
+            var actualGlyphRange = NSRange(location: 0, length: 0)
+            let charIndex = characterRange(forGlyphRange: NSRange(location: glyphIndex, length: 1),
+                                           actualGlyphRange: &actualGlyphRange)
+            if actualGlyphRange.location < glyphIndex { continue }  // we are not yet at a character boundary
+
+            if layoutManager?.propertyForGlyph(at: glyphIndex) == .elastic
+                && shouldBreakLine(byWordBeforeCharacterAt: charIndex.location)
+            {
+
+              // Found a valid break point
+              numberOfGlyphs = glyphs
+              break glyphLoop
+
+            }
+          }
+
+          lineGlyphRangeLength = numberOfGlyphs
+
+        } else {
+
+          numberOfGlyphs       = remainingGlyphRange.length
+          lineGlyphRangeLength = numberOfGlyphs + paragraphSeparatorGlyphRange.length
+
+        }
+
+        let lineFragementUsedRect = NSRect(origin: lineFragmentRect.origin,
                                            size: CGSize(width: CGFloat(numberOfGlyphs), height: fontHeight))
 
         // The glyph range covered by this line fragement — this may include the paragraph separator glyphs
         let remainingLength = remainingGlyphRange.length - numberOfGlyphs,
-            lineGlyphRange  = NSRange(location: remainingGlyphRange.location,
-                                     length: remainingLength > 0 ? numberOfGlyphs
-                                                                 : numberOfGlyphs + paragraphSeparatorGlyphRange.length)
+            lineGlyphRange  = NSRange(location: remainingGlyphRange.location, length: lineGlyphRangeLength)
 
         // The rest of what remains of this paragraph
         remainingGlyphRange = NSRange(location: remainingGlyphRange.location + numberOfGlyphs, length: remainingLength)
@@ -598,6 +652,36 @@ class MinimapTypeSetter: NSATSTypesetter {
 
     return NSMaxRange(paragraphSeparatorGlyphRange)
   }
+
+  // Adjust the height of the fragment rectangles for empty lines.
+  //
+  override func getLineFragmentRect(_ lineFragmentRect: UnsafeMutablePointer<NSRect>,
+                                    usedRect lineFragmentUsedRect: UnsafeMutablePointer<NSRect>,
+                                    forParagraphSeparatorGlyphRange paragraphSeparatorGlyphRange: NSRange,
+                                    atProposedOrigin lineOrigin: NSPoint)
+  {
+    // Determine the size of the rectangles to layout. (They are always twice as high as wide.)
+    var fontHeight: CGFloat
+    if let glyphIndex = (paragraphSeparatorGlyphRange.length > 0   ? paragraphSeparatorGlyphRange.location : nil) ??
+                        (paragraphSeparatorGlyphRange.location > 0 ? paragraphSeparatorGlyphRange.location - 1 : nil),
+       let charIndex = layoutManager?.characterIndexForGlyph(at: glyphIndex),
+       let font      = layoutManager?.textStorage?.attribute(.font, at: charIndex, effectiveRange: nil) as? NSFont
+    {
+
+      fontHeight = minimapFontSize(for: font.pointSize)
+
+    } else { fontHeight = 2 }
+
+    // We always leave one point of space between lines
+    let lineHeight = fontHeight + 1
+
+    super.getLineFragmentRect(lineFragmentRect,
+                              usedRect: lineFragmentUsedRect,
+                              forParagraphSeparatorGlyphRange: paragraphSeparatorGlyphRange,
+                              atProposedOrigin: lineOrigin)
+    lineFragmentRect.pointee.size.height     = lineHeight
+    lineFragmentUsedRect.pointee.size.height = fontHeight
+  }
 }
 
 /// Common code view actions triggered on a selection change.
@@ -621,17 +705,16 @@ private func selectionDidChange<TV: TextView>(_ textView: TV) {
   }
 }
 
-/// Compute the size of the minimap view from the overall size available.
+/// Compute the size of the code view in number of characters such that we can still accommodate the minimap.
 ///
 /// - Parameters:
-///   - width: This is the overall available width of the main text view together with the minimap and including
-///            gutters.
+///   - width: Overall width available for main and minimap code view *without* gutter and padding.
 ///   - font: The fixed pitch font of the main text view.
-/// - Returns: The width of the minimap including the minimap gutter.
+/// - Returns: The width of the code view in number of characters.
 ///
-private func minimapWidth(for width: CGFloat, with font: NSFont) -> CGFloat {
+private func codeWidthInCharacters(for width: CGFloat, with font: NSFont) -> CGFloat {
   let minimapCharWidth = minimapFontSize(for: font.pointSize) / 2
-  return ceil(width / (font.maximumAdvancement.width + minimapCharWidth) * minimapCharWidth)
+  return floor(width / (font.maximumAdvancement.width + minimapCharWidth))
 }
 
 /// Compute the font size for the minimap from the font size of the main text view.

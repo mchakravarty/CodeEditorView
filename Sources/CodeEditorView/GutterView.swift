@@ -128,7 +128,7 @@ extension GutterView {
         glyphRange          = layoutManager.glyphRange(forCharacterRange: charRange, actualCharacterRange: nil),
         gutterRect          = gutterRectFrom(textRect: layoutManager.boundingRect(forGlyphRange: glyphRange,
                                                                                  in: textContainer)),
-        extendedGutterRect  = CGRect(origin: gutterRect.origin,
+        extendedGutterRect  = CGRect(origin: gutterRect.origin,   // everything below the change may need to be redrawn
                                      size: CGSize(width: gutterRect.size.width, height: CGFloat.greatestFiniteMagnitude))
     setNeedsDisplay(extendedGutterRect.intersection(documentVisibleRect))
   }
