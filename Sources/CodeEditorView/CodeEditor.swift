@@ -193,7 +193,7 @@ fileprivate class CodeView: NSTextView {
     isHorizontallyResizable             = false
     isVerticallyResizable               = true
     textContainerInset                  = CGSize(width: 0, height: 0)
-    textContainer?.widthTracksTextView  = false   // we need to be able to control the size (see `performLayout()`)
+    textContainer?.widthTracksTextView  = false   // we need to be able to control the size (see `tile()`)
     textContainer?.heightTracksTextView = false
     textContainer?.lineBreakMode        = .byWordWrapping
 
@@ -246,7 +246,7 @@ fileprivate class CodeView: NSTextView {
 
     minimapView.layoutManager?.typesetter = MinimapTypeSetter()
 
-    performLayout()
+    tile()
   }
 
   required init?(coder: NSCoder) {
@@ -257,7 +257,7 @@ fileprivate class CodeView: NSTextView {
     super.layout()
 
     // Lay out the various subviews and text containers
-    performLayout()
+    tile()
 
     // Redraw the visible part of the gutter
     gutterView?.setNeedsDisplay(documentVisibleRect)
@@ -275,7 +275,7 @@ fileprivate class CodeView: NSTextView {
   ///
   /// NB: We don't use a ruler view for the gutter on macOS to be able to use the same setup on macOS and iOS.
   ///
-  private func performLayout() {
+  private func tile() {
 
     // Compute size of the main view gutter
     //
@@ -310,7 +310,8 @@ fileprivate class CodeView: NSTextView {
     minimapView?.frame        = minimapRect
     minimapGutterView?.frame  = minimapGutterRect
 
-    minSize = CGSize(width: 0, height: enclosingScrollView?.contentSize.height ?? 0)
+    minSize = CGSize(width: 0, height: documentVisibleRect.height)
+    maxSize = CGSize(width: codeViewWidth, height: CGFloat.greatestFiniteMagnitude)
 
     // Set the text container area of the main text view to reach up to the minimap
     textContainerInset            = NSSize(width: 0, height: 0)
@@ -322,6 +323,23 @@ fileprivate class CodeView: NSTextView {
     minimapView?.textContainer?.size                = CGSize(width: minimapWidth,
                                                              height: CGFloat.greatestFiniteMagnitude)
     minimapView?.textContainer?.lineFragmentPadding = minimapFontWidth
+  }
+
+  /// Sets the scrolling position of the minimap in dependence of the scroll position of the main code view.
+  ///
+  func adjustScrollPositionOfMinimap() {
+    let codeViewHeight = frame.size.height,
+        minimapHeight  = minimapView?.frame.size.height ?? 0,
+        visibleHeight  = documentVisibleRect.size.height
+
+    let scrollFactor: CGFloat
+    if minimapHeight < visibleHeight { scrollFactor = 1 } else {
+
+      scrollFactor   = 1 - (minimapHeight - visibleHeight) / (codeViewHeight - visibleHeight)
+
+    }
+    minimapView?.frame.origin.y = min(max(documentVisibleRect.origin.y * scrollFactor, 0),
+                                      frame.size.height - (minimapView?.frame.size.height ?? 0))
   }
 }
 
@@ -388,6 +406,13 @@ public struct CodeEditor: NSViewRepresentable {
       delegate.textDidChange      = context.coordinator.textDidChange
       delegate.selectionDidChange = selectionDidChange
     }
+
+    // The minimap needs to be vertically positioned in dependence on the scroll position of the main code view.
+    context.coordinator.liveScrollNotificationObserver
+      = NotificationCenter.default.addObserver(forName: NSScrollView.didLiveScrollNotification,
+                                               object: scrollView,
+                                               queue: .main){ _ in textView.adjustScrollPositionOfMinimap() }
+
     return scrollView
   }
 
@@ -405,8 +430,14 @@ public struct CodeEditor: NSViewRepresentable {
   public final class Coordinator {
     @Binding var text: String
 
+    var liveScrollNotificationObserver: NSObjectProtocol?
+
     init(_ text: Binding<String>) {
       self._text = text
+    }
+
+    deinit {
+      if let oberver = liveScrollNotificationObserver { NotificationCenter.default.removeObserver(oberver) }
     }
 
     func textDidChange(_ textView: NSTextView) {
