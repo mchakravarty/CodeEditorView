@@ -446,44 +446,14 @@ public struct CodeEditor: NSViewRepresentable {
   }
 }
 
-#endif
-
-
-// MARK: -
-// MARK: Shared code
-
-/// Customised layout manager for code layout.
+/// Customised layout manager for the minimap.
 ///
-class CodeLayoutManager: NSLayoutManager {
-
-  weak var gutterView: GutterView?
-
-  override func processEditing(for textStorage: NSTextStorage,
-                               edited editMask: TextStorageEditActions,
-                               range newCharRange: NSRange,
-                               changeInLength delta: Int,
-                               invalidatedRange invalidatedCharRange: NSRange) {
-    super.processEditing(for: textStorage,
-                         edited: editMask,
-                         range: newCharRange,
-                         changeInLength: delta,
-                         invalidatedRange: invalidatedCharRange)
-
-    // NB: Gutter drawing must be asynchronous, as the glyph generation that may be triggered in that process,
-    //     is not permitted until the enclosing editing block has completed; otherwise, we run into an internal
-    //     error in the layout manager.
-    if let gutterView = gutterView {
-      Dispatch.DispatchQueue.main.async { gutterView.invalidateGutter(forCharRange: invalidatedCharRange) }
-    }
-  }
-}
-
 class MinimapLayoutManager: NSLayoutManager {
 
   // In place of drawing the actual glyphs, we draw small rectangles in the glyph's foreground colour. We ignore the
   // actual glyph metrics and draw all glyphs as a fixed-sized rectangle whose height is determined by the "used
   // rectangle" and whose width is a fraction of the actual (monospaced) font of the glyph (rounded to full points).
-  override func drawGlyphs(forGlyphRange glyphsToShow: NSRange, at origin: NSPoint) {
+  override func drawGlyphs(forGlyphRange glyphsToShow: NSRange, at origin: CGPoint) {
     guard let textStorage = self.textStorage else { return }
 
     // Compute the width of a single rectangle representing one character in the original text display.
@@ -715,27 +685,6 @@ class MinimapTypeSetter: NSATSTypesetter {
   }
 }
 
-/// Common code view actions triggered on a selection change.
-///
-private func selectionDidChange<TV: TextView>(_ textView: TV) {
-  guard let layoutManager = textView.optLayoutManager,
-        let textContainer = textView.optTextContainer,
-        let codeStorage   = textView.optCodeStorage
-        else { return }
-
-  let visibleRect = textView.documentVisibleRect,
-      glyphRange  = layoutManager.glyphRange(forBoundingRectWithoutAdditionalLayout: visibleRect,
-                                             in: textContainer),
-      charRange   = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
-
-  if let location             = textView.insertionPoint,
-     location > 0,
-     let matchingBracketRange = codeStorage.matchingBracket(forLocationAt: location - 1, in: charRange)
-  {
-    textView.showFindIndicator(for: matchingBracketRange)
-  }
-}
-
 /// Compute the size of the code view in number of characters such that we can still accommodate the minimap.
 ///
 /// - Parameters:
@@ -758,6 +707,59 @@ private func codeWidthInCharacters(for width: CGFloat, with font: NSFont) -> CGF
 ///
 private func minimapFontSize(for fontSize: CGFloat) -> CGFloat {
   return max(1, ceil(fontSize / 20)) * 2
+}
+
+#endif
+
+
+// MARK: -
+// MARK: Shared code
+
+/// Customised layout manager for code layout.
+///
+class CodeLayoutManager: NSLayoutManager {
+
+  weak var gutterView: GutterView?
+
+  override func processEditing(for textStorage: NSTextStorage,
+                               edited editMask: TextStorageEditActions,
+                               range newCharRange: NSRange,
+                               changeInLength delta: Int,
+                               invalidatedRange invalidatedCharRange: NSRange) {
+    super.processEditing(for: textStorage,
+                         edited: editMask,
+                         range: newCharRange,
+                         changeInLength: delta,
+                         invalidatedRange: invalidatedCharRange)
+
+    // NB: Gutter drawing must be asynchronous, as the glyph generation that may be triggered in that process,
+    //     is not permitted until the enclosing editing block has completed; otherwise, we run into an internal
+    //     error in the layout manager.
+    if let gutterView = gutterView {
+      Dispatch.DispatchQueue.main.async { gutterView.invalidateGutter(forCharRange: invalidatedCharRange) }
+    }
+  }
+}
+
+/// Common code view actions triggered on a selection change.
+///
+private func selectionDidChange<TV: TextView>(_ textView: TV) {
+  guard let layoutManager = textView.optLayoutManager,
+        let textContainer = textView.optTextContainer,
+        let codeStorage   = textView.optCodeStorage
+        else { return }
+
+  let visibleRect = textView.documentVisibleRect,
+      glyphRange  = layoutManager.glyphRange(forBoundingRectWithoutAdditionalLayout: visibleRect,
+                                             in: textContainer),
+      charRange   = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+
+  if let location             = textView.insertionPoint,
+     location > 0,
+     let matchingBracketRange = codeStorage.matchingBracket(forLocationAt: location - 1, in: charRange)
+  {
+    textView.showFindIndicator(for: matchingBracketRange)
+  }
 }
 
 

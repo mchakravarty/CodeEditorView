@@ -5,11 +5,14 @@
 //
 //  This file contains `NSTextStorage` extensions for code editing.
 
-// FIXME: the aliases ought to be moved to some central place for os impedance matching
+// FIXME: the aliases ought to be moved to some central place for os impedance matching; they also should be wrapped
+//        in a struct to be in a local namespace (and not clash with SwiftUI definitions) and maybe get some impedance
+//        matching acessor functions
 #if os(iOS)
 
 import UIKit
 
+typealias Font       = UIFont
 typealias Color      = UIColor
 typealias BezierPath = UIBezierPath
 
@@ -21,6 +24,7 @@ typealias TextStorageEditActions = NSTextStorage.EditActions
 
 import AppKit
 
+typealias Font       = NSFont
 typealias Color      = NSColor
 typealias BezierPath = NSBezierPath
 

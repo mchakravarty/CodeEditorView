@@ -19,7 +19,6 @@ private let logger = Logger(subsystem: "org.justtesting.CodeEditor", category: "
 import UIKit
 
 
-private typealias Font           = UIFont
 private typealias FontDescriptor = UIFontDescriptor
 
 private let fontDescriptorFeatureIdentifier = FontDescriptor.FeatureKey.featureIdentifier
@@ -32,6 +31,10 @@ class GutterView: UIView {
   /// The text view that this gutter belongs to.
   ///
   let textView: UITextView
+
+  /// Determines whether this gutter is for a main code view or for the minimap of a code view.
+  ///
+  let isMinimapGutter: Bool = false
 
   /// Create and configure a gutter view for the given text view. This will also set the appropiate exclusion path for
   /// text container.
@@ -60,7 +63,6 @@ class GutterView: UIView {
 import AppKit
 
 
-private typealias Font           = NSFont
 private typealias FontDescriptor = NSFontDescriptor
 
 private let fontDescriptorFeatureIdentifier = FontDescriptor.FeatureKey.typeIdentifier
