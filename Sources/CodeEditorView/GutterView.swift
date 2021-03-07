@@ -115,11 +115,13 @@ extension GutterView {
   // MARK: -
   // MARK: Gutter notifications
 
-  /// Notifies the gutter view that a range of characters will be redrawn by the layout manager; thus, the corresponding
-  /// gutter area might require redrawing, too.
+  /// Notifies the gutter view that a range of characters will be redrawn by the layout manager or that there selection
+  /// status changes; thus, the corresponding gutter area might require redrawing, too.
   ///
   /// - Parameters:
   ///   - charRange: The invalidated range of characters.
+  ///
+  /// We invalidate the area corresponding to entire lines. This makes a difference in the presence of lines breaks.
   ///
   func invalidateGutter(forCharRange charRange: NSRange) {
     guard let layoutManager = optLayoutManager,
@@ -127,7 +129,8 @@ extension GutterView {
     else { return }
 
     let documentVisibleRect = textView.documentVisibleRect,
-        glyphRange          = layoutManager.glyphRange(forCharacterRange: charRange, actualCharacterRange: nil),
+        extendedCharRange   = (textView.text as NSString).paragraphRange(for: charRange),
+        glyphRange          = layoutManager.glyphRange(forCharacterRange: extendedCharRange, actualCharacterRange: nil),
         gutterRect          = gutterRectFrom(textRect: layoutManager.boundingRect(forGlyphRange: glyphRange,
                                                                                  in: textContainer)),
         extendedGutterRect  = CGRect(origin: gutterRect.origin,   // everything below the change may need to be redrawn
@@ -172,6 +175,8 @@ extension GutterView {
     let font = Font(descriptor: desc, size: 0) ?? Font.systemFont(ofSize: 0)
     #endif
 
+    let selectedLines = textView.selectedLines
+
     // Draw line numbers unless this is a gutter for a minimap
     if !isMinimapGutter {
 
@@ -179,16 +184,20 @@ extension GutterView {
       let glyphRange = layoutManager.glyphRange(forBoundingRectWithoutAdditionalLayout: textRectFrom(gutterRect: rect),
                                                 in: textContainer),
           charRange  = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil),
-          lineRange  = lineMap.linesContaining(range: charRange)
+          lineRange  = lineMap.linesOf(range: charRange)
 
       // Text attributes for the line numbers
       let lineNumberStyle = NSMutableParagraphStyle()
       lineNumberStyle.alignment = .right
       lineNumberStyle.tailIndent = -fontSize / 11
-      let textAttributes = [NSAttributedString.Key.font: font,
-                            .foregroundColor: lineNumberColour,
-                            .paragraphStyle: lineNumberStyle,
-                            .kern: NSNumber(value: Float(-fontSize / 11))]
+      let textAttributesDefault  = [NSAttributedString.Key.font: font,
+                                    .foregroundColor: lineNumberColour,
+                                    .paragraphStyle: lineNumberStyle,
+                                    .kern: NSNumber(value: Float(-fontSize / 11))],
+          textAttributesSelected = [NSAttributedString.Key.font: font,
+                                    .foregroundColor: labelColor,
+                                    .paragraphStyle: lineNumberStyle,
+                                    .kern: NSNumber(value: Float(-fontSize / 11))]
 
       for line in lineRange {
 
@@ -196,8 +205,9 @@ extension GutterView {
                                                       actualCharacterRange: nil),
             lineGlyphRect  = layoutManager.boundingRect(forGlyphRange: lineGlyphRange, in: textContainer)
 
+        let attributes = selectedLines.contains(line) ? textAttributesSelected : textAttributesDefault
         ("\(line)" as NSString).draw(in: gutterRectForLineNumbersFrom(textRect: lineGlyphRect),
-                                     withAttributes: textAttributes)
+                                     withAttributes: attributes)
       }
     }
 

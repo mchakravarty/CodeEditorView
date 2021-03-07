@@ -27,6 +27,10 @@ protocol TextView {
   var textFont:            Font? { get }
   var textContainerOrigin: CGPoint { get }
 
+  /// The text displayed by the text view.
+  ///
+  var text: String! { get set }
+
   /// If the current selection is an insertion point, return its location.
   ///
   var insertionPoint: Int? { get }
@@ -34,6 +38,11 @@ protocol TextView {
   /// The current (single range) selection of the text view.
   ///
   var selectedRange: NSRange { get set }
+
+  /// The set of lines that have characters that are included in the current selection. (This may be a multi-selection,
+  /// and hence, a non-contiguous range.)
+  ///
+  var selectedLines: Set<Int> { get }
 
   /// The visible portion of the text view. (This only accounts for portions of the text view that are obscured through
   /// visibility in a scroll view.
@@ -75,6 +84,12 @@ extension UITextView: TextView {
   var textContainerOrigin: CGPoint { return CGPoint(x: textContainerInset.left, y: textContainerInset.top) }
 
   var insertionPoint: Int? { selectedRange.length == 0 ? selectedRange.location : nil }
+
+  var selectedLines: Set<Int> {
+    guard let codeStorageDelegate = optCodeStorage?.delegate as? CodeStorageDelegate else { return Set() }
+
+    return Set(codeStorageDelegate.lineMap.linesContaining(range: selectedRange))
+  }
 
   var documentVisibleRect: CGRect { return bounds }
 
@@ -136,9 +151,24 @@ extension NSTextView: TextView {
   var textFont:            Font? { font }
   var textContainerOrigin: CGPoint { return CGPoint(x: textContainerInset.width, y: textContainerInset.height) }
 
+  var text: String! {
+    get { string }
+    set { string = newValue }
+  }
+
   var insertionPoint: Int? {
     if let selection = selectedRanges.first as? NSRange, selection.length == 0 { return selection.location }
     else { return nil }
+  }
+
+  var selectedLines: Set<Int> {
+    guard let codeStorageDelegate = optCodeStorage?.delegate as? CodeStorageDelegate else { return Set() }
+
+    let lineRanges: [Range<Int>] = selectedRanges.map{ range in
+      if let range = range as? NSRange { return codeStorageDelegate.lineMap.linesContaining(range: range) }
+      else { return 0..<0 }
+    }
+    return lineRanges.reduce(Set<Int>()){ $0.union($1) }
   }
 
   var documentVisibleRect: CGRect { enclosingScrollView?.documentVisibleRect ?? bounds }

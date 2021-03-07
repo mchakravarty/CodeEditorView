@@ -17,9 +17,9 @@ import SwiftUI
 ///
 fileprivate class CodeView: UITextView {
 
-  private var gutterView:          GutterView?
-  private var codeViewDelegate:    CodeViewDelegate?
-  private var codeStorageDelegate: CodeStorageDelegate?
+  fileprivate var gutterView:          GutterView?
+  fileprivate var codeViewDelegate:    CodeViewDelegate?
+  fileprivate var codeStorageDelegate: CodeStorageDelegate?
 
   /// Designated initializer for code views with a gutter.
   ///
@@ -47,7 +47,7 @@ fileprivate class CodeView: UITextView {
     smartInsertDeleteType  = .no
 
     // Add the view delegate
-    codeViewDelegate = CodeViewDelegate()
+    codeViewDelegate = CodeViewDelegate(codeView: self)
     delegate         = codeViewDelegate
 
     // Add a text storage delegate that maintains a line map
@@ -82,13 +82,27 @@ fileprivate class CodeViewDelegate: NSObject, UITextViewDelegate {
   var textDidChange:      ((UITextView) -> ())?
   var selectionDidChange: ((UITextView) -> ())?
 
+  /// Caching the last set selected range.
+  ///
+  var oldSelectedRange: NSRange
+
+  init(codeView: CodeView) {
+    oldSelectedRange = codeView.selectedRange
+  }
 
   // MARK: -
   // MARK: UITextViewDelegate protocol
 
   func textDidChange(_ textView: UITextView) { textDidChange?(textView) }
 
-  func textViewDidChangeSelection(_ textView: UITextView) { selectionDidChange?(textView) }
+  func textViewDidChangeSelection(_ textView: UITextView) {
+    guard let codeView = textView as? CodeView else { return }
+
+    selectionDidChange?(textView)
+
+    codeView.gutterView?.invalidateGutter(forCharRange: NSUnionRange(codeView.selectedRange, oldSelectedRange))
+    oldSelectedRange = textView.selectedRange
+  }
 }
 
 class CodeContainer: NSTextContainer {
@@ -151,14 +165,14 @@ public struct CodeEditor: UIViewRepresentable {
 fileprivate class CodeView: NSTextView {
 
   // Delegates
-  private var codeViewDelegate:      CodeViewDelegate?
-  private var codeStorageDelegate:   CodeStorageDelegate?
+  fileprivate var codeViewDelegate:      CodeViewDelegate?
+  fileprivate var codeStorageDelegate:   CodeStorageDelegate?
 
   // Subviews
-  private var gutterView:         GutterView?
-  private var minimapView:        NSTextView?
-  private var minimapGutterView:  GutterView?
-  private var minimapDividerView: NSBox?
+  fileprivate var gutterView:         GutterView?
+  fileprivate var minimapView:        NSTextView?
+  fileprivate var minimapGutterView:  GutterView?
+  fileprivate var minimapDividerView: NSBox?
 
   /// Designated initializer for code views with a gutter.
   ///
@@ -261,6 +275,17 @@ fileprivate class CodeView: NSTextView {
 
     // Redraw the visible part of the gutter
     gutterView?.setNeedsDisplay(documentVisibleRect)
+  }
+
+  override func setSelectedRanges(_ ranges: [NSValue],
+                                  affinity: NSSelectionAffinity,
+                                  stillSelecting stillSelectingFlag: Bool)
+  {
+    let oldSelectedRanges = selectedRanges
+    super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelectingFlag)
+
+    // NB: This needs to happen after calling `super`, as it depends on the correctly set new set of ranges.
+    gutterView?.invalidateGutter(forCharRange: combinedRanges(ranges: oldSelectedRanges + ranges))
   }
 
   /// Position and size the gutter and minimap and set the text container sizes and exclusion paths.
@@ -759,6 +784,15 @@ private func selectionDidChange<TV: TextView>(_ textView: TV) {
      let matchingBracketRange = codeStorage.matchingBracket(forLocationAt: location - 1, in: charRange)
   {
     textView.showFindIndicator(for: matchingBracketRange)
+  }
+}
+
+/// Combine selection ranges into the smallest ranges encompassing them all.
+///
+private func combinedRanges(ranges: [NSValue]) -> NSRange {
+  let actualranges = ranges.compactMap{ $0 as? NSRange }
+  return actualranges.dropFirst().reduce(actualranges.first ?? NSRange(location: 0, length: 0)) {
+    NSUnionRange($0, $1)
   }
 }
 

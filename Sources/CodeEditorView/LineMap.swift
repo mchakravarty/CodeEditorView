@@ -103,6 +103,41 @@ struct LineMap<LineInfo> {
     else { return lineContaining(index: index) }
   }
 
+  /// Given a character range, return the smallest line range that includes the characters. Deal with out of bounds
+  /// conditions by clipping to the front and end of the line range, respectively.
+  ///
+  /// - Parameter range: The character range for which we want to know the line range.
+  /// - Returns: The smallest range of lines that includes all characters in the given character range. The start value
+  ///     of that range is greater or equal 1.
+  ///
+  /// There are two special cases:
+  /// - If (1) the range is empty, (2) its location (= insertion) at the end of the string, and (3) the text ends on a
+  ///   trailing empty line, the result is the trailing line on its own.
+  /// - If the character range is of length zero, we return the line of the start location. We do that also if the start
+  ///   location is just behind the last character of the text.
+  ///
+  func linesContaining(range: NSRange) -> Range<Int> {
+    let
+      start         = range.location < 0 ? 0 : range.location,
+      end           = range.length <= 0 ? start : NSMaxRange(range) - 1,
+      startLine     = lineOf(index: start),
+      endLine       = lineContaining(index: end),
+      lastLine      = lines.count - 1,
+      lastLineRange = lines[lastLine].range
+
+    if let startLine = startLine {
+
+      if range.length < 0 { return startLine..<startLine }
+      else if range == lastLineRange { return Range<Int>(lastLine...lastLine) }
+      else { return Range<Int>(startLine...(endLine ?? lastLine)) }
+
+    } else {
+
+      if range.location < 0 { return 0..<0 } else { return lastLine..<lastLine }
+
+    }
+  }
+
   /// Given a character range, return the smallest line range that includes the characters plus maybe a trailing empty
   /// line. Deal with out of bounds conditions by clipping to the front and end of the line range, respectively.
   ///
@@ -111,39 +146,28 @@ struct LineMap<LineInfo> {
   ///     of that range is greater or equal 1.
   ///
   /// There are two special cases:
-  /// - If the resulting line range is being followed by a trailing empty line, that trailing empty line is also
-  ///   included in the result.
+  /// - If the character range extends until the end of the text and the last line is a trailing empty line, that
+  ///   trailing empty line is also included in the result. This behaviour distinguished the present function from
+  ///   `linesContaining(range:)`, on which it is based.
   /// - If the character range is of length zero, we return the line of the start location. We do that also if the start
   ///   location is just behind the last character of the text.
   ///
-  func linesContaining(range: NSRange) -> Range<Int> {
-    let
-      start       = range.location < 0 ? 0 : range.location,
-      end         = range.length <= 0 ? start : NSMaxRange(range) - 1,
-      startLine   = lineOf(index: start),
-      endLine     = lineContaining(index: end),
-      lastLine    = lines.count - 1,
-      realEndLine : Int?
+  func linesOf(range: NSRange) -> Range<Int> {
+    let lastLine      = lines.count - 1,
+        lastLineRange = lines[lastLine].range
 
-    if let endLine = endLine,
-       endLine + 1 == lastLine,                                 // 'endLine' is right before the 'lastLine'
-       lines[lastLine].range.length == 0                        // 'lastLine' is an empty line
-    {
+    if NSMaxRange(range) == lastLineRange.location && lastLineRange.length == 0 {
 
-      realEndLine = lastLine                                    // extend 'endLine' to 'lastLine'
-
-    } else { realEndLine = endLine }
-
-    if let startLine = startLine {
-
-      if range.length < 0 { return startLine..<startLine } else { return Range<Int>(startLine...(realEndLine ?? lastLine)) }
+      // Range reaches to the end of text => extend 'endLine' to 'lastLine'
+      return Range<Int>(linesContaining(range: range).startIndex...lastLine)
 
     } else {
 
-      if range.location < 0 { return 0..<0 } else { return lastLine..<lastLine }
+      return linesContaining(range: range)
 
     }
   }
+
 
   // MARK: -
   // MARK: Editing
@@ -188,8 +212,8 @@ struct LineMap<LineInfo> {
     let oldStringRange = NSRange(location: 0, length: NSMaxRange(lines.last?.range ?? NSRange(location: 0, length: 0))),
         newStringRange = NSRange(location: 0, length: string.count),
         nsString       = string as NSString,
-        oldLinesRange  = linesContaining(range: extend(range: NSRange(location: editedRange.location,
-                                                                      length: editedRange.length - delta), clippingTo: oldStringRange)),
+        oldLinesRange  = linesOf(range: extend(range: NSRange(location: editedRange.location,
+                                                              length: editedRange.length - delta), clippingTo: oldStringRange)),
         newLinesRange  = nsString.lineRange(for: extend(range: editedRange,
                                                         clippingTo: newStringRange)),
         newLinesString = nsString.substring(with: newLinesRange),
