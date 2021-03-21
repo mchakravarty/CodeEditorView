@@ -343,7 +343,7 @@ extension CodeStorageDelegate {
     }
     codeStorage.enumerateAttribute(.comment, in: range){ (optionalValue, attrRange, _) in
 
-      if optionalValue != nil { codeStorage.addAttribute(.foregroundColor, value: Color.darkGray, range: attrRange) }
+      if optionalValue != nil { codeStorage.addAttribute(.foregroundColor, value: Color.gray, range: attrRange) }
     }
   }
 }

@@ -147,8 +147,11 @@ extension GutterView {
           let lineMap       = optLineMap
     else { return }
 
-    // Inherit background colour and line number font size from the text view.
-    textView.textBackgroundColor?.setFill()
+    // TODO: Inherit background colour and line number font size from the text view.
+    let backgroundColour = textView.textBackgroundColor,
+        insertionPoint   = textView.insertionPoint
+
+    backgroundColour?.setFill()
     BezierPath(rect: rect).fill()
     let fontSize = textView.textFont?.pointSize ?? Font.systemFontSize,
         desc     = Font.systemFont(ofSize: fontSize).fontDescriptor.addingAttributes(
@@ -177,6 +180,22 @@ extension GutterView {
 
     let selectedLines = textView.selectedLines
 
+    // Currently only supported on macOS as `UITextView` is less configurable
+    #if os(macOS)
+
+    // Highlight the current line in the main code view and in the gutter
+    if let location = insertionPoint {
+
+      backgroundColour?.highlight(withLevel: 0.1)?.setFill()
+      layoutManager.enumerateFragmentRects(forLineContaining: location){ fragmentRect in
+        let intersectionRect = rect.intersection(self.gutterRectFrom(textRect: fragmentRect))
+        if !intersectionRect.isEmpty { NSBezierPath(rect: intersectionRect).fill() }
+      }
+
+    }
+
+    #endif
+
     // Draw line numbers unless this is a gutter for a minimap
     if !isMinimapGutter {
 
@@ -201,13 +220,19 @@ extension GutterView {
 
       for line in lineRange {
 
-        let lineGlyphRange = layoutManager.glyphRange(forCharacterRange: lineMap.lines[line].range,
-                                                      actualCharacterRange: nil),
-            lineGlyphRect  = layoutManager.boundingRect(forGlyphRange: lineGlyphRange, in: textContainer)
+        // NB: We adjust the range, so that in case of a trailing empty line that last line break is not included in
+        //     the second to last line (as otherwise, the bounding rect will contain both the second to last and last
+        //     line together).
+        let lineRange         = lineMap.lines[line].range,
+            adjustedLineRange = line < lineMap.lines.count - 1 ? NSRange(location: lineRange.location,
+                                                                         length: lineRange.length - 1)
+                                                               : lineRange,
+            lineGlyphRange    = layoutManager.glyphRange(forCharacterRange: adjustedLineRange, actualCharacterRange: nil),
+            lineGlyphRect     = layoutManager.boundingRect(forGlyphRange: lineGlyphRange, in: textContainer),
+            gutterRect        = gutterRectForLineNumbersFrom(textRect: lineGlyphRect)
 
         let attributes = selectedLines.contains(line) ? textAttributesSelected : textAttributesDefault
-        ("\(line)" as NSString).draw(in: gutterRectForLineNumbersFrom(textRect: lineGlyphRect),
-                                     withAttributes: attributes)
+        ("\(line)" as NSString).draw(in: gutterRect, withAttributes: attributes)
       }
     }
 

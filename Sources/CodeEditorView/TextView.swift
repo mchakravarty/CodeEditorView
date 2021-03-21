@@ -31,7 +31,7 @@ protocol TextView {
   ///
   var text: String! { get set }
 
-  /// If the current selection is an insertion point, return its location.
+  /// If the current selection is an insertion point (i.e., the selection length is 0), return its location.
   ///
   var insertionPoint: Int? { get }
 
@@ -55,6 +55,9 @@ protocol TextView {
 }
 
 extension TextView {
+
+  /// The text view's line map.
+  ///
   var optLineMap: LineMap<LineInfo>? {
     return (optCodeStorage?.delegate as? CodeStorageDelegate)?.lineMap
   }

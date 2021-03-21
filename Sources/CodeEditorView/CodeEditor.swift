@@ -55,11 +55,11 @@ fileprivate class CodeView: UITextView {
     codeStorage.delegate     = self.codeStorageDelegate
 
     // Add a gutter view
-    let gutterWidth = (font?.pointSize ?? UIFont.systemFontSize) * 3,
+    let gutterWidth = ceil(font?.pointSize ?? UIFont.systemFontSize) * 3,
         gutterView  = GutterView(frame: CGRect(x: 0,
                                                y: 0,
                                                width: gutterWidth,
-                                               height:  CGFloat.greatestFiniteMagnitude),
+                                               height: CGFloat.greatestFiniteMagnitude),
                                  textView: self)
     addSubview(gutterView)
     self.gutterView              = gutterView
@@ -172,6 +172,7 @@ fileprivate class CodeView: NSTextView {
   fileprivate var gutterView:         GutterView?
   fileprivate var minimapView:        NSTextView?
   fileprivate var minimapGutterView:  GutterView?
+  fileprivate var documentVisibleBox: NSBox?
   fileprivate var minimapDividerView: NSBox?
 
   /// Designated initializer for code views with a gutter.
@@ -233,9 +234,10 @@ fileprivate class CodeView: NSTextView {
     // Add the minimap with its own gutter, but sharing the code storage with the code view
     //
     let minimapLayoutManager = MinimapLayoutManager(),
-        minimapView          = NSTextView(),
+        minimapView          = MinimapView(),
         minimapGutterView    = GutterView(frame: CGRect.zero, textView: minimapView, isMinimapGutter: true),
         minimapDividerView   = NSBox()
+    minimapView.codeView = self
 
     minimapDividerView.boxType = .separator
     addSubview(minimapDividerView)
@@ -260,6 +262,13 @@ fileprivate class CodeView: NSTextView {
 
     minimapView.layoutManager?.typesetter = MinimapTypeSetter()
 
+    let documentVisibleBox = NSBox()
+    documentVisibleBox.boxType     = .custom
+    documentVisibleBox.fillColor   = NSColor(white: 1, alpha: 0.1)
+    documentVisibleBox.borderWidth = 0
+    minimapView.addSubview(documentVisibleBox)
+    self.documentVisibleBox = documentVisibleBox
+
     tile()
   }
 
@@ -281,17 +290,63 @@ fileprivate class CodeView: NSTextView {
                                   affinity: NSSelectionAffinity,
                                   stillSelecting stillSelectingFlag: Bool)
   {
-    let oldSelectedRanges = selectedRanges
+    let oldInsertionPoint = insertionPoint,
+        oldSelectedRanges = selectedRanges
     super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelectingFlag)
+    minimapView?.selectedRanges = selectedRanges    // minimap mirrors the selection of the main code view
+
+    // To get the correct background colour for the (old and/or new) current line, we need to invalidate the line
+    // region.
+    let oldLineRange = oldInsertionPoint.flatMap{ (
+      textStorage?.string as NSString?)?.lineRange(for: NSRange(location: $0, length: 0))
+    }
+    let newLineRange = insertionPoint.flatMap{ (
+      textStorage?.string as NSString?)?.lineRange(for: NSRange(location: $0, length: 0))
+    }
+    if oldLineRange != newLineRange {
+
+      if let range = oldLineRange {
+        layoutManager?.invalidateDisplay(forCharacterRange: range)
+        minimapGutterView?.optLayoutManager?.invalidateDisplay(forCharacterRange: range)
+      }
+      if let range = newLineRange {
+        layoutManager?.invalidateDisplay(forCharacterRange: range)
+        minimapGutterView?.optLayoutManager?.invalidateDisplay(forCharacterRange: range)
+      }
+
+    }
 
     // NB: This needs to happen after calling `super`, as it depends on the correctly set new set of ranges.
-    gutterView?.invalidateGutter(forCharRange: combinedRanges(ranges: oldSelectedRanges + ranges))
+    DispatchQueue.main.async {
+      self.gutterView?.invalidateGutter(forCharRange: combinedRanges(ranges: oldSelectedRanges + ranges))
+      self.minimapGutterView?.invalidateGutter(forCharRange: combinedRanges(ranges: oldSelectedRanges + ranges))
+    }
+  }
+
+  override func drawBackground(in rect: NSRect) {
+    super.drawBackground(in: rect)
+
+    guard let layoutManager = layoutManager
+    else { return }
+
+    // FIXME: this must come from the theme
+    let currentLineColour = backgroundColor.highlight(withLevel: 0.1)
+    currentLineColour?.setFill()
+
+    if let location = insertionPoint {
+
+      layoutManager.enumerateFragmentRects(forLineContaining: location){ rect in
+        NSBezierPath(rect: rect).fill()
+
+      }
+
+    }
   }
 
   /// Position and size the gutter and minimap and set the text container sizes and exclusion paths.
   ///
   /// * The main text view contains three subviews: (1) the main gutter on its left side, (2) the minimap on its right
-  ///   side, and (3) a divide overlayed over the text view just left of the minimap.
+  ///   side, and (3) a divide in between the code view and the minimap gutter.
   /// * Both the main text view and the minimap text view (or rather their text container) uses an exclusion path to
   ///   keep text out of the gutter view. The main text view is sized to avoid overlap with the minimap even without an
   ///   exclusion path.
@@ -308,10 +363,10 @@ fileprivate class CodeView: NSTextView {
         fontSize               = theFont.pointSize,
         fontWidth              = theFont.maximumAdvancement.width,  // NB: we deal only with fixed width fonts
         gutterWithInCharacters = CGFloat(6),
-        gutterWidth            = fontWidth * gutterWithInCharacters,
+        gutterWidth            = ceil(fontWidth * gutterWithInCharacters),
         gutterRect             = CGRect(origin: CGPoint.zero, size: CGSize(width: gutterWidth, height: frame.height)),
         gutterExclusionPath    = BezierPath(rect: gutterRect),
-        lineFragmentPadding    = textContainer?.lineFragmentPadding ?? 6
+        minLineFragmentPadding = CGFloat(6)
 
     gutterView?.frame = gutterRect
 
@@ -319,17 +374,19 @@ fileprivate class CodeView: NSTextView {
     //
     let minimapFontWidth     = minimapFontSize(for: fontSize) / 2,
         minimapGutterWidth   = minimapFontWidth * gutterWithInCharacters,
+        dividerWidth         = CGFloat(1),
         minimapGutterRect    = CGRect(origin: CGPoint.zero,
                                       size: CGSize(width: minimapGutterWidth, height: frame.height)),
         widthWithoutGutters  = frame.width - gutterWidth - minimapGutterWidth
-                                           - lineFragmentPadding * 2 + minimapFontWidth * 2,
+                                           - minLineFragmentPadding * 2 + minimapFontWidth * 2 - dividerWidth,
         numberOfCharacters   = codeWidthInCharacters(for: widthWithoutGutters , with: theFont),
         minimapWidth         = minimapGutterWidth + minimapFontWidth * 2 + numberOfCharacters * minimapFontWidth,
-        codeViewWidth        = gutterWidth + lineFragmentPadding * 2 + ceil(numberOfCharacters * fontWidth),
-        minimapX             = frame.width - minimapWidth,
+        codeViewWidth        = frame.width - minimapWidth - dividerWidth,
+        padding              = codeViewWidth - (gutterWidth + ceil(numberOfCharacters * fontWidth)),
+        minimapX             = floor(frame.width - minimapWidth),
         minimapRect          = CGRect(x: minimapX, y: 0, width: minimapWidth, height: frame.height),
         minimapExclusionPath = BezierPath(rect: minimapGutterRect),
-        minimapDividerRect   = CGRect(x: minimapX - 1, y: 0, width: 1, height: frame.height)
+        minimapDividerRect   = CGRect(x: minimapX - dividerWidth, y: 0, width: dividerWidth, height: frame.height)
 
     minimapDividerView?.frame = minimapDividerRect
     minimapView?.frame        = minimapRect
@@ -339,20 +396,28 @@ fileprivate class CodeView: NSTextView {
     maxSize = CGSize(width: codeViewWidth, height: CGFloat.greatestFiniteMagnitude)
 
     // Set the text container area of the main text view to reach up to the minimap
-    textContainerInset            = NSSize(width: 0, height: 0)
-    textContainer?.size           = NSSize(width: codeViewWidth, height: CGFloat.greatestFiniteMagnitude)
-    textContainer?.exclusionPaths = [gutterExclusionPath]
+    // NB: We use the `lineFragmentPadding` to capture the slack that arises when the window width admits a fractional
+    //     number of characters. Adding the slack to the code view's text container doesn't work as the line breaks
+    //     of the minimap and main code view are then sometimes not entirely in sync.
+    textContainerInset                 = NSSize(width: 0, height: 0)
+    textContainer?.size                = NSSize(width: codeViewWidth, height: CGFloat.greatestFiniteMagnitude)
+    textContainer?.lineFragmentPadding = padding / 2
+    textContainer?.exclusionPaths      = [gutterExclusionPath]
 
     // Set the text container area of the minimap text view
     minimapView?.textContainer?.exclusionPaths      = [minimapExclusionPath]
     minimapView?.textContainer?.size                = CGSize(width: minimapWidth,
                                                              height: CGFloat.greatestFiniteMagnitude)
     minimapView?.textContainer?.lineFragmentPadding = minimapFontWidth
+
+    // NB: We can't set the height of the box highlighting the document visible area here as it depends on the document
+    //     and minimap height, which requires document layout to be completed. Hence, we delay that.
+    DispatchQueue.main.async { self.adjustScrollPositionOfMinimap() }
   }
 
   /// Sets the scrolling position of the minimap in dependence of the scroll position of the main code view.
   ///
-  func adjustScrollPositionOfMinimap() {
+  fileprivate func adjustScrollPositionOfMinimap() {
     let codeViewHeight = frame.size.height,
         minimapHeight  = minimapView?.frame.size.height ?? 0,
         visibleHeight  = documentVisibleRect.size.height
@@ -360,11 +425,23 @@ fileprivate class CodeView: NSTextView {
     let scrollFactor: CGFloat
     if minimapHeight < visibleHeight { scrollFactor = 1 } else {
 
-      scrollFactor   = 1 - (minimapHeight - visibleHeight) / (codeViewHeight - visibleHeight)
+      scrollFactor = 1 - (minimapHeight - visibleHeight) / (codeViewHeight - visibleHeight)
 
     }
+
+    // We box the positioning of the minimap at the top and the bottom of the code view (with the `max` and `min`
+    // expessions. This is necessary as the minimap will otherwise be partially cut off by the enclosing clip view.
+    // If we want an Xcode-like behaviour, where the minimap sticks to the top, it probably would need to be a floating
+    // view outside of the clip view.
     minimapView?.frame.origin.y = min(max(documentVisibleRect.origin.y * scrollFactor, 0),
                                       frame.size.height - (minimapView?.frame.size.height ?? 0))
+
+    let minimapVisibleY      = (visibleRect.origin.y / frame.size.height) * minimapHeight,
+        minimapVisibleHeight = documentVisibleRect.size.height * minimapHeight / frame.size.height
+    documentVisibleBox?.frame = CGRect(x: 0,
+                                       y: minimapVisibleY,
+                                       width: minimapView?.bounds.size.width ?? 0,
+                                       height: minimapVisibleHeight)
   }
 }
 
@@ -431,11 +508,12 @@ public struct CodeEditor: NSViewRepresentable {
       delegate.textDidChange      = context.coordinator.textDidChange
       delegate.selectionDidChange = selectionDidChange
     }
+    textView.setSelectedRange(NSRange(location: 0, length: 0))
 
     // The minimap needs to be vertically positioned in dependence on the scroll position of the main code view.
     context.coordinator.liveScrollNotificationObserver
-      = NotificationCenter.default.addObserver(forName: NSScrollView.didLiveScrollNotification,
-                                               object: scrollView,
+      = NotificationCenter.default.addObserver(forName: NSView.boundsDidChangeNotification,
+                                               object: scrollView.contentView,
                                                queue: .main){ _ in textView.adjustScrollPositionOfMinimap() }
 
     return scrollView
@@ -471,9 +549,35 @@ public struct CodeEditor: NSViewRepresentable {
   }
 }
 
+/// Customised text view for the minimap.
+///
+fileprivate class MinimapView: NSTextView {
+  weak var codeView: CodeView?
+
+  // Highlight the current line.
+  //
+  override func drawBackground(in rect: NSRect) {
+    super.drawBackground(in: rect)
+
+    guard let layoutManager = layoutManager
+    else { return }
+
+    // FIXME: this must come from the theme
+    let currentLineColour = backgroundColor.highlight(withLevel: 0.1) ?? backgroundColor
+
+    // Highlight the current line
+    currentLineColour.setFill()
+    if let location = insertionPoint {
+
+      layoutManager.enumerateFragmentRects(forLineContaining: location){ rect in NSBezierPath(rect: rect).fill() }
+
+    }
+  }
+}
+
 /// Customised layout manager for the minimap.
 ///
-class MinimapLayoutManager: NSLayoutManager {
+fileprivate class MinimapLayoutManager: NSLayoutManager {
 
   // In place of drawing the actual glyphs, we draw small rectangles in the glyph's foreground colour. We ignore the
   // actual glyph metrics and draw all glyphs as a fixed-sized rectangle whose height is determined by the "used
@@ -503,7 +607,7 @@ class MinimapLayoutManager: NSLayoutManager {
           // TODO: could try to optimise by using the `effectiveRange` of the attribute lookup to compute an entire glyph run to draw as one rectangle
           let charIndex = self.characterIndexForGlyph(at: glyphRange.location + index)
           if let colour = textStorage.attribute(.foregroundColor, at: charIndex, effectiveRange: nil) as? NSColor {
-            colour.setFill()
+            colour.shadow(withLevel: 0.5)?.setFill()
           }
           NSBezierPath(rect: CGRect(x: origin.x + CGFloat(index),
                                     y: origin.y,
@@ -566,13 +670,12 @@ class MinimapTypeSetter: NSATSTypesetter {
                             paragraphSpacingBefore: 0,
                             paragraphSpacingAfter: 0)
 
-        lineFragmentRect.origin.x   += padding
-        lineFragmentRect.size.width  = max(lineFragmentRect.size.width - 2 * padding, 0)
+        let lineFragementRectEffectiveWidth = max(lineFragmentRect.size.width - 2 * padding, 0)
 
         // Determine how many glyphs we can fit into the `lineFragementRect`; must be at least one to make progress
         var numberOfGlyphs:       Int,
             lineGlyphRangeLength: Int
-        var numberOfGlyphsThatFit = max(Int(floor(lineFragmentRect.width / fontWidth)), 1)
+        var numberOfGlyphsThatFit = max(Int(floor(lineFragementRectEffectiveWidth / fontWidth)), 1)
 
         // Add any elastic glyphs that follow (they can be compacted)
         while numberOfGlyphsThatFit < remainingGlyphRange.length
@@ -616,7 +719,8 @@ class MinimapTypeSetter: NSATSTypesetter {
 
         }
 
-        let lineFragementUsedRect = NSRect(origin: lineFragmentRect.origin,
+        let lineFragementUsedRect = NSRect(origin: CGPoint(x: lineFragmentRect.origin.x + padding,
+                                                           y: lineFragmentRect.origin.y),
                                            size: CGSize(width: CGFloat(numberOfGlyphs), height: fontHeight))
 
         // The glyph range covered by this line fragement — this may include the paragraph separator glyphs
@@ -630,7 +734,7 @@ class MinimapTypeSetter: NSATSTypesetter {
                             forGlyphRange: lineGlyphRange,
                             usedRect: lineFragementUsedRect,
                             baselineOffset: 0)
-        setLocation(NSPoint(x: 0, y: 0),
+        setLocation(NSPoint(x: padding, y: 0),
                     withAdvancements: nil, //Array(repeating: 1, count: numberOfGlyphs),
                     forStartOfGlyphRange: NSRange(location: lineGlyphRange.location, length: numberOfGlyphs))
 
@@ -784,6 +888,32 @@ private func selectionDidChange<TV: TextView>(_ textView: TV) {
      let matchingBracketRange = codeStorage.matchingBracket(forLocationAt: location - 1, in: charRange)
   {
     textView.showFindIndicator(for: matchingBracketRange)
+  }
+}
+
+extension NSLayoutManager {
+
+  /// Enumerate the fragment rectangles covering the characters located on the line with the given character index.
+  ///
+  /// - Parameters:
+  ///   - charIndex: The character index determining the line whose rectangles we want to enumerate.
+  ///   - block: Block that gets invoked once for every fragement rectangles on that line.
+  ///
+  func enumerateFragmentRects(forLineContaining charIndex: Int, using block: @escaping (CGRect) -> Void) {
+    guard let text = textStorage?.string as NSString? else { return }
+
+    let currentLineCharRange  = text.lineRange(for: NSRange(location: charIndex, length: 0))
+
+    if currentLineCharRange.length > 0 {  // all, but the last line if it is empty
+
+      let currentLineGlyphRange = glyphRange(forCharacterRange: currentLineCharRange, actualCharacterRange: nil)
+      enumerateLineFragments(forGlyphRange: currentLineGlyphRange){ (rect, _, _, _, _) in block(rect) }
+
+    } else {                              // the last line if it is empty
+
+      block(extraLineFragmentRect)
+
+    }
   }
 }
 
