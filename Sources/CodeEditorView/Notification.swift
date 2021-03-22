@@ -81,6 +81,10 @@ public struct Notification: Identifiable {
   ///
   public let line: Int
 
+  /// The column whose character ought to be underlined.
+  ///
+  public let column: Int
+
   /// Short version of the notification (displayed inline and in the popup) — one line only.
   ///
   public let summary: String
