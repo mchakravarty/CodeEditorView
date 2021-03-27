@@ -21,10 +21,10 @@ import AppKit
 
 // FIXME: It should be possible to enable this via a defaults setting.
 private let visualDebugging               = false
-private let visualDebuggingEditedColour   = Color(red: 0.5, green: 1.0, blue: 0.5, alpha: 0.3)
-private let visualDebuggingLinesColour    = Color(red: 0.5, green: 0.5, blue: 1.0, alpha: 0.3)
-private let visualDebuggingTrailingColour = Color(red: 1.0, green: 0.5, blue: 0.5, alpha: 0.3)
-private let visualDebuggingTokenColour    = Color(red: 1.0, green: 0.0, blue: 0.0, alpha: 0.5)
+private let visualDebuggingEditedColour   = OSColor(red: 0.5, green: 1.0, blue: 0.5, alpha: 0.3)
+private let visualDebuggingLinesColour    = OSColor(red: 0.5, green: 0.5, blue: 1.0, alpha: 0.3)
+private let visualDebuggingTrailingColour = OSColor(red: 1.0, green: 0.5, blue: 0.5, alpha: 0.3)
+private let visualDebuggingTokenColour    = OSColor(red: 1.0, green: 0.0, blue: 0.0, alpha: 0.5)
 
 
 // MARK: -
@@ -339,11 +339,11 @@ extension CodeStorageDelegate {
     codeStorage.addAttribute(.foregroundColor, value: labelColor, range: range)
     codeStorage.enumerateTokens(in: range){ (value, attrRange, _) in
       
-      if value == .string { codeStorage.addAttribute(.foregroundColor, value: Color.systemGreen, range: attrRange) }
+      if value == .string { codeStorage.addAttribute(.foregroundColor, value: OSColor.systemGreen, range: attrRange) }
     }
     codeStorage.enumerateAttribute(.comment, in: range){ (optionalValue, attrRange, _) in
 
-      if optionalValue != nil { codeStorage.addAttribute(.foregroundColor, value: Color.gray, range: attrRange) }
+      if optionalValue != nil { codeStorage.addAttribute(.foregroundColor, value: OSColor.gray, range: attrRange) }
     }
   }
 }

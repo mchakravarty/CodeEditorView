@@ -152,9 +152,9 @@ extension GutterView {
         insertionPoint   = textView.insertionPoint
 
     backgroundColour?.setFill()
-    BezierPath(rect: rect).fill()
-    let fontSize = textView.textFont?.pointSize ?? Font.systemFontSize,
-        desc     = Font.systemFont(ofSize: fontSize).fontDescriptor.addingAttributes(
+    OSBezierPath(rect: rect).fill()
+    let fontSize = textView.textFont?.pointSize ?? OSFont.systemFontSize,
+        desc     = OSFont.systemFont(ofSize: fontSize).fontDescriptor.addingAttributes(
                      [ FontDescriptor.AttributeName.featureSettings:
                          [
                            [
@@ -173,9 +173,9 @@ extension GutterView {
                      ]
                    )
     #if os(iOS)
-    let font = Font(descriptor: desc, size: 0)
+    let font = OSFont(descriptor: desc, size: 0)
     #elseif os(macOS)
-    let font = Font(descriptor: desc, size: 0) ?? Font.systemFont(ofSize: 0)
+    let font = OSFont(descriptor: desc, size: 0) ?? OSFont.systemFont(ofSize: 0)
     #endif
 
     let selectedLines = textView.selectedLines

@@ -165,8 +165,8 @@ public struct CodeEditor: UIViewRepresentable {
 fileprivate class CodeView: NSTextView {
 
   // Delegates
-  fileprivate var codeViewDelegate:      CodeViewDelegate?
-  fileprivate var codeStorageDelegate:   CodeStorageDelegate?
+  fileprivate var codeViewDelegate:    CodeViewDelegate?
+  fileprivate var codeStorageDelegate: CodeStorageDelegate?
 
   // Subviews
   fileprivate var gutterView:         GutterView?
@@ -365,7 +365,7 @@ fileprivate class CodeView: NSTextView {
         gutterWithInCharacters = CGFloat(6),
         gutterWidth            = ceil(fontWidth * gutterWithInCharacters),
         gutterRect             = CGRect(origin: CGPoint.zero, size: CGSize(width: gutterWidth, height: frame.height)),
-        gutterExclusionPath    = BezierPath(rect: gutterRect),
+        gutterExclusionPath    = OSBezierPath(rect: gutterRect),
         minLineFragmentPadding = CGFloat(6)
 
     gutterView?.frame = gutterRect
@@ -385,7 +385,7 @@ fileprivate class CodeView: NSTextView {
         padding              = codeViewWidth - (gutterWidth + ceil(numberOfCharacters * fontWidth)),
         minimapX             = floor(frame.width - minimapWidth),
         minimapRect          = CGRect(x: minimapX, y: 0, width: minimapWidth, height: frame.height),
-        minimapExclusionPath = BezierPath(rect: minimapGutterRect),
+        minimapExclusionPath = OSBezierPath(rect: minimapGutterRect),
         minimapDividerRect   = CGRect(x: minimapX - dividerWidth, y: 0, width: dividerWidth, height: frame.height)
 
     minimapDividerView?.frame = minimapDividerRect
