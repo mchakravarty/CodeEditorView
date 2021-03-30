@@ -230,15 +230,19 @@ struct MessageViews_Previews: PreviewProvider {
 
     MessageInlineView(messages: [message1], theme: Message.defaultTheme)
       .frame(width: 80, height: 15, alignment: .center)
+      .preferredColorScheme(.dark)
 
     MessageInlineView(messages: [message1], theme: Message.defaultTheme)
       .frame(width: 80, height: 25, alignment: .center)
+      .preferredColorScheme(.dark)
 
     MessageInlineView(messages: [message1, message2], theme: Message.defaultTheme)
       .frame(width: 180, height: 15, alignment: .center)
+      .preferredColorScheme(.dark)
 
     MessageInlineView(messages: [message1, message2, message3], theme: Message.defaultTheme)
       .frame(width: 180, height: 15, alignment: .center)
+      .preferredColorScheme(.dark)
 
     MessageInlineView(messages: [message1, message2, message3], theme: Message.defaultTheme)
       .frame(width: 180, height: 15, alignment: .center)
@@ -249,15 +253,19 @@ struct MessageViews_Previews: PreviewProvider {
     MessagePopupView(messages: [message1], theme: Message.defaultTheme)
       .font(.system(size: 32))
       .frame(maxWidth: 320, minHeight: 15)
+      .preferredColorScheme(.dark)
 
     MessagePopupView(messages: [message1, message4], theme: Message.defaultTheme)
       .frame(maxWidth: 320, minHeight: 15)
+      .preferredColorScheme(.dark)
 
     MessagePopupView(messages: [message1, message2, message3], theme: Message.defaultTheme)
       .frame(maxWidth: 320, minHeight: 15)
+      .preferredColorScheme(.dark)
 
     MessagePopupView(messages: [message1, message5, message2, message4, message3], theme: Message.defaultTheme)
       .frame(maxWidth: 320, minHeight: 15)
+      .preferredColorScheme(.dark)
 
     MessagePopupView(messages: [message1, message5, message2, message4, message3], theme: Message.defaultTheme)
       .frame(maxWidth: 320, minHeight: 15)
