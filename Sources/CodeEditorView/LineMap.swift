@@ -178,6 +178,8 @@ struct LineMap<LineInfo> {
   ///   - line: The line whose info field ought to be set.
   ///   - info: The new info value for that line.
   ///
+  ///   NB: Ignores lines that do not exist.
+  ///
   mutating func setInfoOf(line: Int, to info: LineInfo?) {
     guard line < lines.count else { return }
 

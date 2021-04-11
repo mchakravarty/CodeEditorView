@@ -16,7 +16,6 @@ fileprivate struct RectWithRoundedCornersOnTheLeft: Shape {
   let cornerRadius: CGFloat
 
   func path(in rect: CGRect) -> Path {
-    print("\(rect)")
     var path = Path()
 
     let minXCorner = rect.minX + cornerRadius,

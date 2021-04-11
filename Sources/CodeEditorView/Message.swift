@@ -49,9 +49,9 @@ public struct Message: Identifiable {
   ///
   public let line: Int
 
-  /// The column whose character ought to be underlined.
+  /// The columns whose characters the message are related to and which ought to be underlined.
   ///
-  public let column: Int
+  public let columns: Range<Int>
 
   /// Short version of the message (displayed inline and in the popup) — one line only.
   ///

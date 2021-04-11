@@ -55,52 +55,76 @@ struct MessageInlineView: View {
 
       let height = geometryProxy.size.height
 
-      HStack(alignment: .center, spacing: 0) {
-        let colour = theme(categories[0]).colour
+      HStack {
 
-        // Category summary
+        Spacer()
+
         HStack(alignment: .center, spacing: 0) {
+          let colour = theme(categories[0]).colour
 
-          // Overall message count
-          let count = messages.count
-          if count > 1 {
-            Text("\(count)")
-              .padding([.leading, .trailing], 3)
-          }
-
-          // All category icons
+          // Category summary
           HStack(alignment: .center, spacing: 0) {
-            ForEach(0..<categories.count){ i in
-              HStack(alignment: .center, spacing: 0) {
-                theme(categories[i]).icon
-                  .padding([.leading, .trailing], 2)
+
+            // Overall message count
+            let count = messages.count
+            if count > 1 {
+              Text("\(count)")
+                .padding([.leading, .trailing], 3)
+            }
+
+            // All category icons
+            HStack(alignment: .center, spacing: 0) {
+              ForEach(0..<categories.count){ i in
+                HStack(alignment: .center, spacing: 0) {
+                  theme(categories[i]).icon
+                    .padding([.leading, .trailing], 2)
+                }
               }
             }
+            .padding([.leading, .trailing], 2)
+
           }
-          .padding([.leading, .trailing], 2)
+          .frame(height: height)
+          .background(colour.opacity(0.5))
+          .roundedCornersOnTheLeft(cornerRadius: 5)
+
+          // Transparent narrow separator
+          Divider()
+            .background(Color.clear)
+
+          // Topmost message of the highest priority category
+          HStack {
+            Text(messages.filter{ $0.category == categories[0] }.first?.summary ?? "")
+              .padding([.leading, .trailing], 5)
+          }
+          .frame(height: height)
+          .background(colour.opacity(0.5))
 
         }
-        .frame(height: height)
-        .background(colour.opacity(0.5))
-        .roundedCornersOnTheLeft(cornerRadius: 5)
-
-        // Transparent narrow separator
-        Spacer(minLength: 1)
-          .background(Color.clear)
-
-        // Topmost message of the highest priority category
-        HStack {
-          Text(messages.filter{ $0.category == categories[0] }.first?.summary ?? "")
-            .padding([.leading, .trailing], 5)
-          Spacer(minLength: 0)
-        }
-        .frame(height: height)
-        .background(colour.opacity(0.5))
-
       }
     }
   }
 }
+
+#if os(iOS)
+
+//extension MessageInlineView {
+//
+//  /// Wrap the message view into a hosting view.
+//  ///
+//  var hostedView: UIHostingView<MessageInlineView> { UIHostingView(rootView: self) }   // FIXME: there is no `UIHostingView`!!!
+//}
+
+#elseif os(macOS)
+
+extension MessageInlineView {
+
+  /// Wrap the message view into a hosting view.
+  ///
+  var hostedView: NSHostingView<MessageInlineView> { NSHostingView(rootView: self) }
+}
+
+#endif
 
 
 // MARK: -
@@ -127,6 +151,40 @@ extension EnvironmentValues {
   }
 }
 
+private struct MessageBorder: ViewModifier {
+  let cornerRadius: CGFloat
+
+  @Environment(\.colorScheme) var colourScheme: ColorScheme
+
+  func body(content: Content) -> some View {
+
+    let shadowColour = colourScheme == .dark ? Color(.sRGBLinear, white: 0, opacity: 0.66)
+                                             : Color(.sRGBLinear, white: 0, opacity: 0.33)
+
+    if colourScheme == .dark {
+      return AnyView(content
+                      .shadow(color: shadowColour, radius: 2, y: 2)
+                      .overlay(RoundedRectangle(cornerRadius: cornerRadius)
+                                .stroke(Color.white.opacity(0.3), lineWidth: 1))
+                      .padding(1)
+                      .overlay(RoundedRectangle(cornerRadius: cornerRadius)
+                                .stroke(Color.black, lineWidth: 1)))
+    } else {
+      return AnyView(content
+                      .shadow(color: shadowColour, radius: 1, y: 1)
+                      .overlay(RoundedRectangle(cornerRadius: cornerRadius)
+                                .stroke(Color.black.opacity(0.2), lineWidth: 1)))
+    }
+  }
+}
+
+extension View {
+
+  fileprivate func messageBorder(cornerRadius: CGFloat) -> some View {
+    modifier(MessageBorder(cornerRadius: cornerRadius))
+  }
+}
+
 /// A view that display all the information of a list of messages.
 ///
 /// NB: The array of messages may not be empty.
@@ -136,31 +194,26 @@ fileprivate struct MessagePopupCategoryView: View {
   let messages: [Message]
   let theme:    Message.Theme
 
-  let cornerRadius: CGFloat = 10,
-      iconWidth   : CGFloat = 20
+  let cornerRadius: CGFloat = 10
 
   @Environment(\.colorScheme) var colourScheme: ColorScheme
   @Environment(\.popupWidth)  var popupWidth:   CGFloat?
 
   var body: some View {
 
-    let backgroundColour = colourScheme == .dark ? Color.black : Color.white,
-        shadowColour     = colourScheme == .dark ? Color(.sRGBLinear, white: 1, opacity: 0.33)
-                                                 : Color(.sRGBLinear, white: 0, opacity: 0.33)
+    let backgroundColour = colourScheme == .dark ? Color.black : Color.white
 
     HStack(spacing: 0) {
 
       // Category icon
-      VStack {
+      ZStack (alignment: .top) {
+        theme(category).colour.opacity(0.5)
         Text("XX")       // We want the icon to have the height of text
           .hidden()
           .overlay( theme(category).icon.frame(alignment: .center) )
-        Spacer(minLength: 0)
-      }
-      .padding([.leading, .trailing], 5)
-      .padding([.top, .bottom], 3)
-      .background(theme(category).colour.opacity(0.5))
-
+          .padding([.leading, .trailing], 5)
+          .padding([.top, .bottom], 3)
+      }.fixedSize(horizontal: true, vertical: false)
 
       // Vertical stack of message
       VStack(alignment: .leading, spacing: 6) {
@@ -182,9 +235,7 @@ fileprivate struct MessagePopupCategoryView: View {
     .background(backgroundColour)
     .cornerRadius(cornerRadius)
     .fixedSize(horizontal: false, vertical: true)           // horizontal must wrap and vertical extend
-    .overlay(RoundedRectangle(cornerRadius: cornerRadius)
-              .stroke(Color.gray, lineWidth: 1))
-    .shadow(color: shadowColour, radius: 1)
+    .messageBorder(cornerRadius: cornerRadius)
   }
 }
 
@@ -213,17 +264,83 @@ struct MessagePopupView: View {
 
 
 // MARK: -
+// MARK: Combined view
+
+/// SwiftUI view that displays an array of messages that lie on the same line. It supports switching between an inline
+/// format and a full popup format.
+///
+struct MessageView: View {
+  let messages:    [Message]        // The array of messages that are displayed by this view
+  let theme:       Message.Theme    // The message display theme to use
+  let lineWidth:   CGFloat          // The maximum width that the inline view may use
+  let lineHeight:  CGFloat          // The height of the inline view
+  let popupWidth:  CGFloat          // The maximum width that the popup view may use
+  let popupOffset: CGFloat          // The distance from the top where the popup view must be placed
+
+  @Binding var unfolded: Bool       // False => inline view; true => popup view
+
+  var body: some View {
+    Group {
+      if unfolded {
+
+        MessagePopupView(messages: messages, theme: theme)
+          .frame(maxWidth: popupWidth)
+          .offset(x: -20, y: popupOffset)
+          .onTapGesture { unfolded.toggle() }
+
+      } else {
+
+        MessageInlineView(messages: messages, theme: theme)
+          .frame(minWidth: MessageView.minimumInlineWidth, maxWidth: lineWidth, maxHeight: lineHeight)
+          .transition(.opacity)
+          .onTapGesture { unfolded.toggle() }
+
+      }
+    }
+  }
+}
+
+extension MessageView {
+
+  // FIXME: This should maybe depend on the font size and may need to be configurable.
+  static let minimumInlineWidth = CGFloat(60)
+}
+
+
+// MARK: -
 // MARK: Previews
 
-let message1 = Message(category: .error, line: 1, column: 1, summary: "It's wrong!", description: nil),
-    message2 = Message(category: .error, line: 1, column: 1, summary: "Need to fix this.", description: nil),
-    message3 = Message(category: .warning, line: 1, column: 1, summary: "Looks dodgy.",
+let message1 = Message(category: .error, line: 1, columns: 1..<2, summary: "It's wrong!", description: nil),
+    message2 = Message(category: .error, line: 1, columns: 1..<2, summary: "Need to fix this.", description: nil),
+    message3 = Message(category: .warning, line: 1, columns: 1..<2, summary: "Looks dodgy.",
                        description: NSAttributedString(string: "This doesn't seem right and also totally unclear " +
                                                         "what it is supposed to do.")),
-    message4 = Message(category: .live, line: 1, column: 1, summary: "Thread 1", description: nil),
-    message5 = Message(category: .informational, line: 1, column: 1, summary: "Cool stuff!", description: nil)
+    message4 = Message(category: .live, line: 1, columns: 1..<2, summary: "Thread 1", description: nil),
+    message5 = Message(category: .informational, line: 1, columns: 1..<2, summary: "Cool stuff!", description: nil)
+
+struct MessageViewPreview: View {
+  let messages:    [Message]
+  let theme:       Message.Theme
+  let lineWidth:   CGFloat
+  let lineHeight:  CGFloat
+  let popupWidth:  CGFloat
+  let popupOffset: CGFloat
+
+  @State private var unfolded: Bool = false
+
+  var body: some View {
+    MessageView(messages: messages,
+                theme: theme,
+                lineWidth: lineWidth,
+                lineHeight: lineHeight,
+                popupWidth: popupWidth,
+                popupOffset: popupOffset,
+                unfolded: $unfolded)
+  }
+}
 
 struct MessageViews_Previews: PreviewProvider {
+
   static var previews: some View {
 
     // Inline view
@@ -236,13 +353,17 @@ struct MessageViews_Previews: PreviewProvider {
       .frame(width: 80, height: 25, alignment: .center)
       .preferredColorScheme(.dark)
 
-    MessageInlineView(messages: [message1, message2], theme: Message.defaultTheme)
-      .frame(width: 180, height: 15, alignment: .center)
-      .preferredColorScheme(.dark)
+    VStack{
 
-    MessageInlineView(messages: [message1, message2, message3], theme: Message.defaultTheme)
-      .frame(width: 180, height: 15, alignment: .center)
-      .preferredColorScheme(.dark)
+      MessageInlineView(messages: [message1, message2], theme: Message.defaultTheme)
+        .frame(width: 180, height: 15, alignment: .center)
+        .preferredColorScheme(.dark)
+
+      MessageInlineView(messages: [message1, message2, message3], theme: Message.defaultTheme)
+        .frame(width: 180, height: 15, alignment: .center)
+        .preferredColorScheme(.dark)
+
+    }
 
     MessageInlineView(messages: [message1, message2, message3], theme: Message.defaultTheme)
       .frame(width: 180, height: 15, alignment: .center)
@@ -270,6 +391,25 @@ struct MessageViews_Previews: PreviewProvider {
     MessagePopupView(messages: [message1, message5, message2, message4, message3], theme: Message.defaultTheme)
       .frame(maxWidth: 320, minHeight: 15)
       .preferredColorScheme(.light)
+
+    // Combined view
+
+    ZStack(alignment: .topTrailing) {
+
+      Rectangle()
+        .foregroundColor(Color.red.opacity(0.1))
+        .frame(height: 30)
+      HStack { Text("main = putStrLn \"Hello World!\""); Spacer() }
+      MessageViewPreview(messages: [message1, message5, message2, message4, message3],
+                         theme: Message.defaultTheme,
+                         lineWidth: 150,
+                         lineHeight: 15,
+                         popupWidth: 300,
+                         popupOffset: 30)
+
+    }
+    .frame(width: 400, height: 300, alignment: .topTrailing)
+//    .preferredColorScheme(.light)
 
   }
 }

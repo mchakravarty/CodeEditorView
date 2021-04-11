@@ -57,11 +57,31 @@ enum CommentStyle {
 ///     replaced lines.
 ///
 struct LineInfo {
+
+  /// Structure characterising a bundle of messages reported for a single line. It features a stable identity to be able
+  /// to associate display information in separate structures.
+  ///
+  struct MessageBundle: Identifiable {
+    let id:       UUID
+    var messages: [Message]
+
+    init(messages: [Message]) {
+      self.id       = UUID()
+      self.messages = messages
+    }
+  }
+
   var commentDepthStart: Int   // nesting depth for nested comments at the start of this line
   var commentDepthEnd:   Int   // nesting depth for nested comments at the end of this line
+
+  // FIXME: we are not actually using the following three variables (their are maintained, but they are never useful).
   var roundBracketDiff:  Int   // increase or decrease of the nesting level of round brackets on this line
   var squareBracketDiff: Int   // increase or decrease of the nesting level of square brackets on this line
   var curlyBracketDiff:  Int   // increase or decrease of the nesting level of curly brackets on this line
+
+  /// The messages reported for this line.
+  ///
+  var messages: MessageBundle? = nil
 }
 
 
@@ -350,7 +370,7 @@ extension CodeStorageDelegate {
 
 
 // MARK: -
-// MARK: Completion
+// MARK: Token completion
 
 extension CodeStorageDelegate {
 
@@ -460,4 +480,46 @@ extension CodeStorageDelegate {
       }
     }
   }
+}
+
+
+// MARK: -
+// MARK: Messages
+
+extension CodeStorageDelegate {
+
+  /// Add the given message to the line info of the line where the message is located.
+  ///
+  /// - Parameter message: The message to add.
+  /// - Returns: The message bundle to which the message was added, or `nil` if the line for which the message is
+  ///     intended doesn't exist.
+  ///
+  /// NB: Ignores messages for lines that do not exist in the line map.
+  ///
+  func add(message: Message) -> LineInfo.MessageBundle? {
+    guard var info = lineMap.lookup(line: message.line)?.info else { return nil }
+
+    if info.messages != nil {
+
+      // Add a message to an existing message bundle for this line
+      info.messages?.messages.append(message)
+
+    } else {
+
+      // Create a new message bundle for this line with the new message
+      info.messages = LineInfo.MessageBundle(messages: [message])
+
+    }
+    lineMap.setInfoOf(line: message.line, to: info)
+    return info.messages
+  }
+
+  /// Returns the message bundle associated with the given line if it exists.
+  ///
+  /// - Parameter line: The line for which we want to know the associated message bundle.
+  /// - Returns: The message bundle associated with the given line or `nil`.
+  ///
+  /// NB: In case that the line does not exist, an empty array is returned.
+  ///
+  func messages(at line: Int) -> LineInfo.MessageBundle? { return lineMap.lookup(line: line)?.info?.messages }
 }
