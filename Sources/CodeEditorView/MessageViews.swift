@@ -304,12 +304,12 @@ extension MessageView {
 
 
 // MARK: -
-// MARK: Updatable combined view
+// MARK: Stateful combined view
 
 /// SwiftUI view that displays an array of messages that lie on the same line. It supports switching between an inline
 /// and popup view by tapping.
 ///
-struct UpdatableMessageView: View {
+struct StatefulMessageView: View {
   let messages:    [Message]              // The array of messages that are displayed by this view
   let theme:       Message.Theme          // The message display theme to use
   let geometry:    MessageView.Geometry   // The geometry constrains for the view
@@ -337,10 +337,10 @@ struct UpdatableMessageView: View {
 
 #elseif os(macOS)
 
-extension UpdatableMessageView {
+extension StatefulMessageView {
 
   class HostingView: NSView {
-    private var hostingView: NSHostingView<UpdatableMessageView>?
+    private var hostingView: NSHostingView<StatefulMessageView>?
 
     private let messages: [Message]
     private let theme   : Message.Theme
@@ -362,10 +362,10 @@ extension UpdatableMessageView {
       self.unfolded = false
       super.init(frame: NSRect.zero)
 
-      self.hostingView = NSHostingView(rootView: UpdatableMessageView(messages: messages,
-                                                                      theme: theme,
-                                                                      geometry: geometry,
-                                                                      unfolded: unfolded))
+      self.hostingView = NSHostingView(rootView: StatefulMessageView(messages: messages,
+                                                                     theme: theme,
+                                                                     geometry: geometry,
+                                                                     unfolded: unfolded))
       hostingView?.autoresizingMask = [.width, .height]
       if let view = hostingView { addSubview(view) }
     }
@@ -375,10 +375,10 @@ extension UpdatableMessageView {
     }
 
     private func reconfigure() {
-      self.hostingView?.rootView = UpdatableMessageView(messages: messages,
-                                                        theme: theme,
-                                                        geometry: geometry,
-                                                        unfolded: unfolded)
+      self.hostingView?.rootView = StatefulMessageView(messages: messages,
+                                                       theme: theme,
+                                                       geometry: geometry,
+                                                       unfolded: unfolded)
     }
   }
 }
@@ -474,12 +474,13 @@ struct MessageViews_Previews: PreviewProvider {
         .foregroundColor(Color.red.opacity(0.1))
         .frame(height: 30)
       HStack { Text("main = putStrLn \"Hello World!\""); Spacer() }
-      MessageViewPreview(messages: [message1, message5, message2, message4, message3],
-                         theme: Message.defaultTheme,
-                         geometry: MessageView.Geometry(lineWidth: 150,
-                                                        lineHeight: 15,
-                                                        popupWidth: 300,
-                                                        popupOffset: 30))
+      StatefulMessageView(messages: [message1, message5, message2, message4, message3],
+                          theme: Message.defaultTheme,
+                          geometry: MessageView.Geometry(lineWidth: 150,
+                                                         lineHeight: 15,
+                                                         popupWidth: 300,
+                                                         popupOffset: 30),
+                          unfolded: false)
     }
     .frame(width: 400, height: 300, alignment: .topTrailing)
 //    .preferredColorScheme(.light)
