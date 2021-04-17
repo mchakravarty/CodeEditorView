@@ -106,26 +106,6 @@ struct MessageInlineView: View {
   }
 }
 
-#if os(iOS)
-
-//extension MessageInlineView {
-//
-//  /// Wrap the message view into a hosting view.
-//  ///
-//  var hostedView: UIHostingView<MessageInlineView> { UIHostingView(rootView: self) }   // FIXME: there is no `UIHostingView`!!!
-//}
-
-#elseif os(macOS)
-
-extension MessageInlineView {
-
-  /// Wrap the message view into a hosting view.
-  ///
-  var hostedView: NSHostingView<MessageInlineView> { NSHostingView(rootView: self) }
-}
-
-#endif
-
 
 // MARK: -
 // MARK: Popup view
@@ -245,7 +225,7 @@ struct MessagePopupView: View {
 
   /// The width of the text in the message category with the widest text.
   ///
-  @State var popupWidth: CGFloat?  = nil
+  @State private var popupWidth: CGFloat?  = nil
 
   var body: some View {
 
@@ -267,15 +247,31 @@ struct MessagePopupView: View {
 // MARK: Combined view
 
 /// SwiftUI view that displays an array of messages that lie on the same line. It supports switching between an inline
-/// format and a full popup format.
+/// format and a full popup format by clicking/tapping on the message.
 ///
 struct MessageView: View {
+  struct Geometry {
+
+    /// The maximum width that the inline view may use.
+    ///
+    let lineWidth:   CGFloat
+
+    /// The height of the inline view
+    ///
+    let lineHeight:  CGFloat
+
+    /// The maximum width that the popup view may use.
+    ///
+    let popupWidth:  CGFloat
+
+    /// The distance from the top where the popup view must be placed.
+    ///
+    let popupOffset: CGFloat
+  }
+
   let messages:    [Message]        // The array of messages that are displayed by this view
   let theme:       Message.Theme    // The message display theme to use
-  let lineWidth:   CGFloat          // The maximum width that the inline view may use
-  let lineHeight:  CGFloat          // The height of the inline view
-  let popupWidth:  CGFloat          // The maximum width that the popup view may use
-  let popupOffset: CGFloat          // The distance from the top where the popup view must be placed
+  let geometry:    Geometry
 
   @Binding var unfolded: Bool       // False => inline view; true => popup view
 
@@ -284,14 +280,14 @@ struct MessageView: View {
       if unfolded {
 
         MessagePopupView(messages: messages, theme: theme)
-          .frame(maxWidth: popupWidth)
-          .offset(x: -20, y: popupOffset)
+          .frame(maxWidth: geometry.popupWidth)
+          .offset(x: -20, y: geometry.popupOffset)
           .onTapGesture { unfolded.toggle() }
 
       } else {
 
         MessageInlineView(messages: messages, theme: theme)
-          .frame(minWidth: MessageView.minimumInlineWidth, maxWidth: lineWidth, maxHeight: lineHeight)
+          .frame(minWidth: MessageView.minimumInlineWidth, maxWidth: geometry.lineWidth, maxHeight: geometry.lineHeight)
           .transition(.opacity)
           .onTapGesture { unfolded.toggle() }
 
@@ -308,6 +304,90 @@ extension MessageView {
 
 
 // MARK: -
+// MARK: Updatable combined view
+
+/// SwiftUI view that displays an array of messages that lie on the same line. It supports switching between an inline
+/// and popup view by tapping.
+///
+struct UpdatableMessageView: View {
+  let messages:    [Message]              // The array of messages that are displayed by this view
+  let theme:       Message.Theme          // The message display theme to use
+  let geometry:    MessageView.Geometry   // The geometry constrains for the view
+  let unfolded:    Bool                   // `true` iff the view should first appear in the popup flavour
+
+  @State private var toggeld: Bool = false
+
+  var body: some View {
+    MessageView(messages: messages,
+                theme: theme,
+                geometry: geometry,
+                unfolded: Binding(get: { unfolded != toggeld },
+                                  set: { toggeld = $0 != unfolded }))
+  }
+}
+
+#if os(iOS)
+
+//extension MessageInlineView {
+//
+//  /// Wrap the message view into a hosting view.
+//  ///
+//  var hostedView: UIHostingView<MessageInlineView> { UIHostingView(rootView: self) }   // FIXME: there is no `UIHostingView`!!!
+//}
+
+#elseif os(macOS)
+
+extension UpdatableMessageView {
+
+  class HostingView: NSView {
+    private var hostingView: NSHostingView<UpdatableMessageView>?
+
+    private let messages: [Message]
+    private let theme   : Message.Theme
+
+    var geometry: MessageView.Geometry {
+      didSet { reconfigure() }
+    }
+    var unfolded: Bool {
+      didSet { reconfigure() }
+    }
+
+    private var unfoldedBinding: Binding<Bool>?
+
+    init(messages: [Message], theme: @escaping Message.Theme, geometry: MessageView.Geometry)
+    {
+      self.messages = messages
+      self.theme    = theme
+      self.geometry = geometry
+      self.unfolded = false
+      super.init(frame: NSRect.zero)
+
+      self.hostingView = NSHostingView(rootView: UpdatableMessageView(messages: messages,
+                                                                      theme: theme,
+                                                                      geometry: geometry,
+                                                                      unfolded: unfolded))
+      hostingView?.autoresizingMask = [.width, .height]
+      if let view = hostingView { addSubview(view) }
+    }
+
+    @objc required dynamic init?(coder aDecoder: NSCoder) {
+      fatalError("init(coder:) has not been implemented")
+    }
+
+    private func reconfigure() {
+      self.hostingView?.rootView = UpdatableMessageView(messages: messages,
+                                                        theme: theme,
+                                                        geometry: geometry,
+                                                        unfolded: unfolded)
+    }
+  }
+}
+
+#endif
+
+
+
+// MARK: -
 // MARK: Previews
 
 let message1 = Message(category: .error, line: 1, columns: 1..<2, summary: "It's wrong!", description: nil),
@@ -321,20 +401,14 @@ let message1 = Message(category: .error, line: 1, columns: 1..<2, summary: "It's
 struct MessageViewPreview: View {
   let messages:    [Message]
   let theme:       Message.Theme
-  let lineWidth:   CGFloat
-  let lineHeight:  CGFloat
-  let popupWidth:  CGFloat
-  let popupOffset: CGFloat
+  let geometry:    MessageView.Geometry
 
   @State private var unfolded: Bool = false
 
   var body: some View {
     MessageView(messages: messages,
                 theme: theme,
-                lineWidth: lineWidth,
-                lineHeight: lineHeight,
-                popupWidth: popupWidth,
-                popupOffset: popupOffset,
+                geometry: geometry,
                 unfolded: $unfolded)
   }
 }
@@ -402,11 +476,10 @@ struct MessageViews_Previews: PreviewProvider {
       HStack { Text("main = putStrLn \"Hello World!\""); Spacer() }
       MessageViewPreview(messages: [message1, message5, message2, message4, message3],
                          theme: Message.defaultTheme,
-                         lineWidth: 150,
-                         lineHeight: 15,
-                         popupWidth: 300,
-                         popupOffset: 30)
-
+                         geometry: MessageView.Geometry(lineWidth: 150,
+                                                        lineHeight: 15,
+                                                        popupWidth: 300,
+                                                        popupOffset: 30))
     }
     .frame(width: 400, height: 300, alignment: .topTrailing)
 //    .preferredColorScheme(.light)
