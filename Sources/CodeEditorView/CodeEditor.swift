@@ -165,15 +165,35 @@ public struct CodeEditor: UIViewRepresentable {
 fileprivate class CodeView: NSTextView {
 
   // Delegates
-  fileprivate var codeViewDelegate:    CodeViewDelegate?
-  fileprivate var codeStorageDelegate: CodeStorageDelegate?
+  var codeViewDelegate:    CodeViewDelegate?
+  var codeStorageDelegate: CodeStorageDelegate?
 
   // Subviews
-  fileprivate var gutterView:         GutterView?
-  fileprivate var minimapView:        NSTextView?
-  fileprivate var minimapGutterView:  GutterView?
-  fileprivate var documentVisibleBox: NSBox?
-  fileprivate var minimapDividerView: NSBox?
+  var gutterView:         GutterView?
+  var minimapView:        NSTextView?
+  var minimapGutterView:  GutterView?
+  var documentVisibleBox: NSBox?
+  var minimapDividerView: NSBox?
+
+  /// Information needed to layout message views.
+  ///
+  /// NB: This information is computed incrementally. We get the `lineFragementRect` from the text container during the
+  ///     type setting processes. This indicates that the message layout may have to change (if it was already
+  ///     computed), but at this point, we cannot determine the new geometry yet; hence, `geometry` will be `nil`.
+  ///     The `geomtry` will be determined after text layout is complete.
+  ///
+  struct MessageInfo {
+    let view:               StatefulMessageView.HostingView
+    var lineFragementRect:  CGRect                            // The *full* line fragement rectangle (incl. message)
+    var geometry:           MessageView.Geometry?
+
+    var topAnchorConstraint:   NSLayoutConstraint?
+    var rightAnchorConstraint: NSLayoutConstraint?
+  }
+
+  /// Keeps track of the set of message views.
+  ///
+  var messageViews: [LineInfo.MessageBundle.ID: MessageInfo] = [:]
 
   /// Designated initializer for code views with a gutter.
   ///
@@ -417,7 +437,7 @@ fileprivate class CodeView: NSTextView {
 
   /// Sets the scrolling position of the minimap in dependence of the scroll position of the main code view.
   ///
-  fileprivate func adjustScrollPositionOfMinimap() {
+  func adjustScrollPositionOfMinimap() {
     let codeViewHeight = frame.size.height,
         minimapHeight  = minimapView?.frame.size.height ?? 0,
         visibleHeight  = documentVisibleRect.size.height
@@ -442,6 +462,81 @@ fileprivate class CodeView: NSTextView {
                                        y: minimapVisibleY,
                                        width: minimapView?.bounds.size.width ?? 0,
                                        height: minimapVisibleHeight)
+  }
+
+  /// Update the layout of the specified message view if its geometry got invalidated by
+  /// `CodeTextContainer.lineFragmentRect(forProposedRect:at:writingDirection:remaining:)`.
+  ///
+  func layoutMessageView(identifiedBy id: UUID) {
+    guard let codeLayoutManager = layoutManager as? CodeLayoutManager,
+          let codeStorage       = textStorage as? CodeStorage,
+          let codeContainer     = textContainer,
+          let messageBundle     = messageViews[id]
+    else { return }
+
+    if messageBundle.geometry == nil {
+
+      let glyphRange = codeLayoutManager.glyphRange(forBoundingRect: messageBundle.lineFragementRect, in: codeContainer),
+          charRange  = codeLayoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil),
+          lineRange  = (codeStorage.string as NSString).lineRange(for: charRange),
+          lineGlyphs = codeLayoutManager.glyphRange(forCharacterRange: lineRange, actualCharacterRange: nil),
+          usedRect   = codeLayoutManager.lineFragmentUsedRect(forGlyphAt: glyphRange.location, effectiveRange: nil),
+          lineRect   = codeLayoutManager.boundingRect(forGlyphRange: lineGlyphs, in: codeContainer)
+
+      // Compute the message view geometry from the text layout information
+      let geometry = MessageView.Geometry(lineWidth: messageBundle.lineFragementRect.width - usedRect.width,
+                                          lineHeight: messageBundle.lineFragementRect.height,
+                                          popupWidth:
+                                            (codeContainer.size.width - MessageView.popupRightSideOffset) * 0.75,
+                                          popupOffset: lineRect.height + 2)
+      messageViews[id]?.geometry = geometry
+
+      // Configure the view with the new geometry
+      messageBundle.view.geometry = geometry
+      if messageBundle.view.superview == nil {
+
+        // Add the messages view
+        addSubview(messageBundle.view)
+        let topAnchorConstraint = messageBundle.view.topAnchor.constraint(equalTo: self.topAnchor,
+                                                                          constant: messageBundle.lineFragementRect.minY)
+        let rightAnchorConstraint = messageBundle.view.rightAnchor.constraint(equalTo: self.leftAnchor,
+                                                                              constant: messageBundle.lineFragementRect.maxX)
+        messageViews[id]?.topAnchorConstraint   = topAnchorConstraint
+        messageViews[id]?.rightAnchorConstraint = rightAnchorConstraint
+        NSLayoutConstraint.activate([topAnchorConstraint, rightAnchorConstraint])
+
+
+      } else {
+
+        // Update the messages view constraints
+        messageViews[id]?.topAnchorConstraint?.constant   = messageBundle.lineFragementRect.minY
+        messageViews[id]?.rightAnchorConstraint?.constant = messageBundle.lineFragementRect.maxX
+
+      }
+    }
+  }
+
+  /// Adds a new message to the set of messages for this code view.
+  ///
+  func report(message: Message) {
+    guard let codeStorageDelegate = codeStorageDelegate,
+          let messageBundle       = codeStorageDelegate.add(message: message),
+          let charRange           = codeStorageDelegate.lineMap.lookup(line: message.line)?.range
+    else { return }
+
+    let messageView = StatefulMessageView.HostingView(messages: messageBundle.messages,
+                                                      theme: Message.defaultTheme,
+                                                      geometry: MessageView.Geometry(lineWidth: 100,
+                                                                                     lineHeight: 15,
+                                                                                     popupWidth: 300,
+                                                                                     popupOffset: 16))
+    messageViews[messageBundle.id] = MessageInfo(view: messageView,
+                                                 lineFragementRect: CGRect.zero,
+                                                 geometry: nil)
+
+    // We invalidate the layout of the line where the message belongs as their may be less space for the text now and
+    // because the layout process for the text fills the `lineFragmentRect` property of the above `MessageInfo`.
+    layoutManager?.invalidateLayout(forCharacterRange: charRange, actualCharacterRange: nil)
   }
 }
 
@@ -470,12 +565,52 @@ fileprivate class CodeViewDelegate: NSObject, NSTextViewDelegate {
 }
 
 class CodeContainer: NSTextContainer {
+
+  override func lineFragmentRect(forProposedRect proposedRect: NSRect,
+                                 at characterIndex: Int,
+                                 writingDirection baseWritingDirection: NSWritingDirection,
+                                 remaining remainingRect: UnsafeMutablePointer<NSRect>?)
+  -> NSRect
+  {
+    let calculatedRect = super.lineFragmentRect(forProposedRect: proposedRect,
+                                                at: characterIndex,
+                                                writingDirection: baseWritingDirection,
+                                                remaining: remainingRect)
+
+    guard let codeView    = textView as? CodeView,
+          let codeStorage = layoutManager?.textStorage as? CodeStorage,
+          let delegate    = codeStorage.delegate as? CodeStorageDelegate,
+          let line        = delegate.lineMap.lineOf(index: characterIndex),
+          let oneLine     = delegate.lineMap.lookup(line: line),
+          characterIndex == oneLine.range.location    // we are only interested in the first line fragment of a line
+    else { return calculatedRect }
+
+    // On lines that contain messages, we reduce the width of the available line fragement rect such that there is
+    // always space for a minimal truncated message (provided the text container is wide enough to accomodate that).
+    if let messageBundleId = delegate.messages(at: line)?.id,
+       calculatedRect.width > 2 * MessageView.minimumInlineWidth
+    {
+
+      codeView.messageViews[messageBundleId]?.lineFragementRect = calculatedRect
+      codeView.messageViews[messageBundleId]?.geometry = nil                      // invalidate the geometry
+
+      // To fully determine the layout of the message view, typesetting needs to complete for this line; hence, we defer
+      // configuring the view.
+      DispatchQueue.main.async { codeView.layoutMessageView(identifiedBy: messageBundleId) }
+
+      return CGRect(origin: calculatedRect.origin,
+                    size: CGSize(width: calculatedRect.width - MessageView.minimumInlineWidth,
+                                 height: calculatedRect.height))
+
+    } else { return calculatedRect }
+  }
 }
 
 /// SwiftUI code editor based on TextKit
 ///
 public struct CodeEditor: NSViewRepresentable {
   let language: LanguageConfiguration
+//  let messagePublisher: PassthroughSubject<Message,NSError>
 
   @Binding var text: String
 

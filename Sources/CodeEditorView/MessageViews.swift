@@ -276,22 +276,30 @@ struct MessageView: View {
   @Binding var unfolded: Bool       // False => inline view; true => popup view
 
   var body: some View {
-    Group {
-      if unfolded {
 
-        MessagePopupView(messages: messages, theme: theme)
-          .frame(maxWidth: geometry.popupWidth)
-          .offset(x: -20, y: geometry.popupOffset)
-          .onTapGesture { unfolded.toggle() }
+    // Overlaying the two different views (and switching between them by adjusting their opacity ensures that the view
+    // is always sized the same and such that it can accomodate both modes).
+    ZStack(alignment: .topTrailing) {
 
-      } else {
-
-        MessageInlineView(messages: messages, theme: theme)
-          .frame(minWidth: MessageView.minimumInlineWidth, maxWidth: geometry.lineWidth, maxHeight: geometry.lineHeight)
-          .transition(.opacity)
-          .onTapGesture { unfolded.toggle() }
-
+      // We adjust the position of the popup with spacers to ensure that the view frame extends appropriately (this
+      // would not be the case if we used `.offset(x:y:)`).
+      VStack {
+        Spacer(minLength: geometry.popupOffset)
+        HStack {
+          MessagePopupView(messages: messages, theme: theme)
+            .frame(maxWidth: geometry.popupWidth)
+            .onTapGesture { unfolded.toggle() }
+          Spacer(minLength: MessageView.popupRightSideOffset)
+        }
       }
+      .opacity(unfolded ? 1.0 : 0.0)
+
+      MessageInlineView(messages: messages, theme: theme)
+        .frame(minWidth: MessageView.minimumInlineWidth, maxWidth: geometry.lineWidth, maxHeight: geometry.lineHeight)
+        .transition(.opacity)
+        .onTapGesture { unfolded.toggle() }
+        .opacity(unfolded ? 0.0 : 1.0)
+
     }
   }
 }
@@ -300,6 +308,10 @@ extension MessageView {
 
   // FIXME: This should maybe depend on the font size and may need to be configurable.
   static let minimumInlineWidth = CGFloat(60)
+
+  /// The distance of the popup view from the right side of the text container.
+  ///
+  static let popupRightSideOffset = CGFloat(20)
 }
 
 
@@ -323,6 +335,7 @@ struct StatefulMessageView: View {
                 geometry: geometry,
                 unfolded: Binding(get: { unfolded != toggeld },
                                   set: { toggeld = $0 != unfolded }))
+      .fixedSize()    // to enforce intrinsic size in the encapsulating `NSHostingView`
   }
 }
 
@@ -352,8 +365,6 @@ extension StatefulMessageView {
       didSet { reconfigure() }
     }
 
-    private var unfoldedBinding: Binding<Bool>?
-
     init(messages: [Message], theme: @escaping Message.Theme, geometry: MessageView.Geometry)
     {
       self.messages = messages
@@ -362,12 +373,25 @@ extension StatefulMessageView {
       self.unfolded = false
       super.init(frame: NSRect.zero)
 
+      self.translatesAutoresizingMaskIntoConstraints = false
+
       self.hostingView = NSHostingView(rootView: StatefulMessageView(messages: messages,
                                                                      theme: theme,
                                                                      geometry: geometry,
                                                                      unfolded: unfolded))
-      hostingView?.autoresizingMask = [.width, .height]
-      if let view = hostingView { addSubview(view) }
+      hostingView?.translatesAutoresizingMaskIntoConstraints = false
+      if let view = hostingView {
+
+        addSubview(view)
+        let constraints = [
+          view.topAnchor.constraint(equalTo: self.topAnchor),
+          view.bottomAnchor.constraint(equalTo: self.bottomAnchor),
+          view.leftAnchor.constraint(equalTo: self.leftAnchor),
+          view.rightAnchor.constraint(equalTo: self.rightAnchor)
+        ]
+        NSLayoutConstraint.activate(constraints)
+
+      }
     }
 
     @objc required dynamic init?(coder aDecoder: NSCoder) {
