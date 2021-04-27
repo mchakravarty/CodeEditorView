@@ -538,6 +538,46 @@ fileprivate class CodeView: NSTextView {
     // because the layout process for the text fills the `lineFragmentRect` property of the above `MessageInfo`.
     layoutManager?.invalidateLayout(forCharacterRange: charRange, actualCharacterRange: nil)
   }
+
+  /// Remove the messages associated with a specified range of lines.
+  ///
+  /// - Parameter onLines: The line range where messages are to be removed. If `nil`, all messages on this code view are
+  ///     to be removed.
+  ///
+  func retractMessages(onLines lines: Range<Int>? = nil) {
+    guard let codeStorageDelegate = codeStorageDelegate else { return }
+
+    var messageIds: [LineInfo.MessageBundle.ID] = []
+
+    // Remove all message bundles in the line map and collect their ids for subsequent view removal.
+    for line in lines ?? 1..<codeStorageDelegate.lineMap.lines.count {
+
+      if let messageBundle = codeStorageDelegate.messages(at: line) {
+
+        messageIds.append(messageBundle.id)
+        codeStorageDelegate.removeMessages(at: line)
+
+      }
+
+    }
+
+    // Make sure to remove all views that are still around if necessary.
+    if lines == nil { removeMessageViews() } else { removeMessageViews(withIDs: messageIds) }
+  }
+
+  /// Remove the message views with the given ids.
+  ///
+  /// - Parameter ids: The IDs of the message bundles that ought to be removed. If `nil`, remove all.
+  ///
+  func removeMessageViews(withIDs ids: [LineInfo.MessageBundle.ID]? = nil) {
+
+    for id in ids ?? Array<LineInfo.MessageBundle.ID>(messageViews.keys) {
+
+      if let info = messageViews[id] { info.view.removeFromSuperview() }
+      messageViews.removeValue(forKey: id)
+
+    }
+  }
 }
 
 fileprivate class CodeViewDelegate: NSObject, NSTextViewDelegate {
@@ -1001,6 +1041,15 @@ class CodeLayoutManager: NSLayoutManager {
     //     error in the layout manager.
     if let gutterView = gutterView {
       Dispatch.DispatchQueue.main.async { gutterView.invalidateGutter(forCharRange: invalidatedCharRange) }
+    }
+
+    // Remove all messages in the edited range.
+    if let codeStorageDelegate = textStorage.delegate as? CodeStorageDelegate,
+       let codeView            = firstTextView as? CodeView
+    {
+
+      codeView.removeMessageViews(withIDs: codeStorageDelegate.lastEvictedMessageIDs)
+
     }
   }
 }

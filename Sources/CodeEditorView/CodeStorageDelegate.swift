@@ -61,6 +61,9 @@ struct LineInfo {
   /// Structure characterising a bundle of messages reported for a single line. It features a stable identity to be able
   /// to associate display information in separate structures.
   ///
+  /// NB: We don't identify a message bundle by the line number on which it appears, because edits further up can
+  ///     increase and decrease the line number of a given bundle. We need a stable identifier.
+  ///
   struct MessageBundle: Identifiable {
     let id:       UUID
     var messages: [Message]
@@ -74,7 +77,7 @@ struct LineInfo {
   var commentDepthStart: Int   // nesting depth for nested comments at the start of this line
   var commentDepthEnd:   Int   // nesting depth for nested comments at the end of this line
 
-  // FIXME: we are not actually using the following three variables (their are maintained, but they are never useful).
+  // FIXME: we are not currently using the following three variables (they are maintained, but they are never useful).
   var roundBracketDiff:  Int   // increase or decrease of the nesting level of round brackets on this line
   var squareBracketDiff: Int   // increase or decrease of the nesting level of square brackets on this line
   var curlyBracketDiff:  Int   // increase or decrease of the nesting level of curly brackets on this line
@@ -94,6 +97,11 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
   private let tokeniser: Tokeniser<LanguageConfiguration.Token, LanguageConfiguration.State>? // cache the tokeniser
 
   private(set) var lineMap = LineMap<LineInfo>(string: "")
+
+  /// The message bundle IDs that got invalidated by the last editing operation because the lines to which they were
+  /// attached got changed.
+  ///
+  private(set) var lastEvictedMessageIDs: [LineInfo.MessageBundle.ID] = []
 
   /// If the last text change was a one-character addition, which completed a token, then that token is remembered here
   /// together with its range until the next text change.
@@ -144,6 +152,10 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
       textStorage.removeAttribute(.underlineColor, range: wholeTextRange)
       textStorage.removeAttribute(.underlineStyle, range: wholeTextRange)
     }
+
+    // Determine the ids of message bundles that are removed by this edit.
+    let lines = lineMap.linesAffected(by: editedRange, changeInLength: delta)
+    lastEvictedMessageIDs = lines.compactMap{ lineMap.lookup(line: $0)?.info?.messages?.id  }
 
     lineMap.updateAfterEditing(string: textStorage.string, range: editedRange, changeInLength: delta)
     tokeniseAttributesFor(range: editedRange, in: textStorage)
@@ -522,4 +534,15 @@ extension CodeStorageDelegate {
   /// NB: In case that the line does not exist, an empty array is returned.
   ///
   func messages(at line: Int) -> LineInfo.MessageBundle? { return lineMap.lookup(line: line)?.info?.messages }
+
+  /// Remove all messages associated with a given line.
+  ///
+  /// - Parameter line: The line whose messages ought ot be removed.
+  ///
+  func removeMessages(at line: Int) {
+    guard var info = lineMap.lookup(line: line)?.info else  { return }
+
+    info.messages = nil
+    lineMap.setInfoOf(line: line, to: info)
+  }
 }

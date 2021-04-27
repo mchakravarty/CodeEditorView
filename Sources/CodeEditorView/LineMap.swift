@@ -168,6 +168,24 @@ struct LineMap<LineInfo> {
     }
   }
 
+  /// Compute the lines affected by an editing activity.
+  ///
+  /// - Parameters:
+  ///   - editedRange: The character range that was affected by editing (after the edit).
+  ///   - delta: The length increase of the edited string (negative if it got shorter).
+  /// - Returns: The range of lines (of the original string) that is affected by the editing action.
+  ///
+  func linesAffected(by editedRange: NSRange, changeInLength delta: Int) -> Range<Int> {
+
+    // To compute the line range, we extend the character range by one extra character. This is crucial as, if the
+    // edited range ends on a newline, this may insert a new line break, which means, line *after* the new line break
+    // also belongs to the affected lines.
+    //
+    let oldStringRange = NSRange(location: 0, length: NSMaxRange(lines.last?.range ?? NSRange(location: 0, length: 0)))
+
+    return linesOf(range: extend(range: NSRange(location: editedRange.location,
+                                                length: editedRange.length - delta), clippingTo: oldStringRange))
+  }
 
   // MARK: -
   // MARK: Editing
@@ -186,7 +204,8 @@ struct LineMap<LineInfo> {
     lines[line] = (range: lines[line].range, info: info)
   }
 
-  /// Update line map given the specified editing activity of the underlying string.
+  /// Update line map given the specified editing activity of the underlying string. It resets the info field for each
+  /// affected line.
   ///
   /// - Parameters:
   ///   - string: The string after editing.
@@ -198,24 +217,13 @@ struct LineMap<LineInfo> {
   ///
   mutating func updateAfterEditing(string: String, range editedRange: NSRange, changeInLength delta: Int) {
 
-    // Extend the `range` by one character, clipped by the `stringRange`, but such that a zero length range after the
-    // end of the string is preserved.
-    func extend(range: NSRange, clippingTo stringRange: NSRange) -> NSRange {
-      return
-        range.location == NSMaxRange(stringRange)
-        ? NSRange(location: range.location, length: 0)
-        : NSIntersectionRange(NSRange(location: range.location, length: range.length + 1), stringRange)
-    }
-
     // To compute line ranges, we extend all character ranges by one extra character. This is crucial as, if the
     // edited range ends on a newline, this may insert a new line break, which means, we also need to update the line
     // *after* the new line break.
     //
-    let oldStringRange = NSRange(location: 0, length: NSMaxRange(lines.last?.range ?? NSRange(location: 0, length: 0))),
-        newStringRange = NSRange(location: 0, length: string.count),
+    let newStringRange = NSRange(location: 0, length: string.count),
         nsString       = string as NSString,
-        oldLinesRange  = linesOf(range: extend(range: NSRange(location: editedRange.location,
-                                                              length: editedRange.length - delta), clippingTo: oldStringRange)),
+        oldLinesRange  = linesAffected(by: editedRange, changeInLength: delta),
         newLinesRange  = nsString.lineRange(for: extend(range: editedRange,
                                                         clippingTo: newStringRange)),
         newLinesString = nsString.substring(with: newLinesRange),
@@ -271,5 +279,15 @@ struct LineMap<LineInfo> {
     }
 
     return resultingLines
+  }
+
+  /// Extend the `range` by one character, clipped by the `stringRange`, but such that a zero length range after the
+  /// end of the string is preserved.
+  ///
+  private func extend(range: NSRange, clippingTo stringRange: NSRange) -> NSRange {
+    return
+      range.location == NSMaxRange(stringRange)
+      ? NSRange(location: range.location, length: 0)
+      : NSIntersectionRange(NSRange(location: range.location, length: range.length + 1), stringRange)
   }
 }
