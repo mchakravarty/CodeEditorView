@@ -325,12 +325,20 @@ fileprivate class CodeView: NSTextView {
     }
     if oldLineRange != newLineRange {
 
-      if let range = oldLineRange {
-        layoutManager?.invalidateDisplay(forCharacterRange: range)
+      if let range = oldLineRange
+      {
+        layoutManager?.enumerateFragmentRects(forLineContaining: range.location){ fragmentRect in
+
+          self.setNeedsDisplay(self.lineBackgroundRect(fragmentRect))   // need to invalidate the whole background (incl message views)
+        }
         minimapGutterView?.optLayoutManager?.invalidateDisplay(forCharacterRange: range)
       }
-      if let range = newLineRange {
-        layoutManager?.invalidateDisplay(forCharacterRange: range)
+      if let range      = newLineRange
+      {
+        layoutManager?.enumerateFragmentRects(forLineContaining: range.location){ fragmentRect in
+
+          self.setNeedsDisplay(self.lineBackgroundRect(fragmentRect))   // need to invalidate the whole background (incl message views)
+        }
         minimapGutterView?.optLayoutManager?.invalidateDisplay(forCharacterRange: range)
       }
 
@@ -346,19 +354,49 @@ fileprivate class CodeView: NSTextView {
   override func drawBackground(in rect: NSRect) {
     super.drawBackground(in: rect)
 
-    guard let layoutManager = layoutManager
+    guard let layoutManager = layoutManager,
+          let textContainer = textContainer
     else { return }
 
+    let glyphRange = layoutManager.glyphRange(forBoundingRectWithoutAdditionalLayout: rect, in: textContainer),
+        charRange  = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+
     // FIXME: this must come from the theme
-    let currentLineColour = backgroundColor.highlight(withLevel: 0.1)
-    currentLineColour?.setFill()
+    let currentLineColour = backgroundColor.highlight(withLevel: 0.1) ?? backgroundColor
 
-    if let location = insertionPoint {
+    if let location = insertionPoint, charRange.contains(location) || location == NSMaxRange(charRange) {
 
-      layoutManager.enumerateFragmentRects(forLineContaining: location){ rect in
-        NSBezierPath(rect: rect).fill()
+      drawBackgroundHighlight(in: rect, forLineContaining: location, withColour: currentLineColour)
 
-      }
+    }
+  }
+
+  /// Draw the background of an entire line of text with a highlight colour, including below any messages views.
+  ///
+  private func drawBackgroundHighlight(in rect: NSRect, forLineContaining charIndex: Int, withColour colour: NSColor) {
+    guard let layoutManager = layoutManager else { return }
+
+    colour.setFill()
+    layoutManager.enumerateFragmentRects(forLineContaining: charIndex){ fragmentRect in
+
+      let drawRect = self.lineBackgroundRect(fragmentRect).intersection(rect)
+      if !drawRect.isNull { NSBezierPath(rect: drawRect).fill() }
+    }
+  }
+
+  /// Compute the background rect from a line's fragement rect. On lines that contain a message view, the fragement
+  /// rect doesn't cover the entire background.
+  ///
+  private func lineBackgroundRect(_ lineFragementRect: CGRect) -> CGRect {
+
+    if let textContainerWidth = textContainer?.size.width {
+
+      return CGRect(origin: lineFragementRect.origin,
+                    size: CGSize(width: textContainerWidth - lineFragementRect.minX, height: lineFragementRect.height))
+
+    } else {
+
+      return lineFragementRect
 
     }
   }
@@ -1086,7 +1124,7 @@ extension NSLayoutManager {
   func enumerateFragmentRects(forLineContaining charIndex: Int, using block: @escaping (CGRect) -> Void) {
     guard let text = textStorage?.string as NSString? else { return }
 
-    let currentLineCharRange  = text.lineRange(for: NSRange(location: charIndex, length: 0))
+    let currentLineCharRange = text.lineRange(for: NSRange(location: charIndex, length: 0))
 
     if currentLineCharRange.length > 0 {  // all, but the last line if it is empty
 
