@@ -49,7 +49,7 @@ struct MessageInlineView: View {
 
   var body: some View {
 
-    let categories = Dictionary(grouping: messages){ $0.category }.keys.sorted()
+    let categories = messagesByCategory(messages).map{ $0.key }
 
     GeometryReader { geometryProxy in
 
@@ -229,7 +229,7 @@ struct MessagePopupView: View {
 
   var body: some View {
 
-    let categories = Array(Dictionary(grouping: messages){ $0.category }).sorted{ $0.key < $1.key }
+    let categories = messagesByCategory(messages)
 
     VStack(spacing: 4) {
       ForEach(0..<categories.count) { i in

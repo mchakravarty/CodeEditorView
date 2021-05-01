@@ -61,3 +61,9 @@ public struct Message: Identifiable {
   ///
   public let description: NSAttributedString?
 }
+
+/// Order and sort an array of messages by categories.
+///
+func messagesByCategory(_ messages: [Message]) -> [(key: Message.Category, value: [Message])] {
+  Array(Dictionary(grouping: messages){ $0.category }).sorted{ $0.key < $1.key }
+}

@@ -175,7 +175,7 @@ fileprivate class CodeView: NSTextView {
   var documentVisibleBox: NSBox?
   var minimapDividerView: NSBox?
 
-  /// Information needed to layout message views.
+  /// Information required to layout message views.
   ///
   /// NB: This information is computed incrementally. We get the `lineFragementRect` from the text container during the
   ///     type setting processes. This indicates that the message layout may have to change (if it was already
@@ -186,6 +186,7 @@ fileprivate class CodeView: NSTextView {
     let view:               StatefulMessageView.HostingView
     var lineFragementRect:  CGRect                            // The *full* line fragement rectangle (incl. message)
     var geometry:           MessageView.Geometry?
+    var colour:             NSColor                           // The category colour of the most severe category
 
     var topAnchorConstraint:   NSLayoutConstraint?
     var rightAnchorConstraint: NSLayoutConstraint?
@@ -364,10 +365,25 @@ fileprivate class CodeView: NSTextView {
     // FIXME: this must come from the theme
     let currentLineColour = backgroundColor.highlight(withLevel: 0.1) ?? backgroundColor
 
+    // If the selection is an insertion point, highlight the corresponding line
     if let location = insertionPoint, charRange.contains(location) || location == NSMaxRange(charRange) {
 
       drawBackgroundHighlight(in: rect, forLineContaining: location, withColour: currentLineColour)
 
+    }
+
+    // Highlight each line that has a message view
+    for messageView in messageViews {
+
+      let glyphRange = layoutManager.glyphRange(forBoundingRect: messageView.value.lineFragementRect, in: textContainer),
+          index      = layoutManager.characterIndexForGlyph(at: glyphRange.location)
+      if charRange.contains(index) {
+
+        drawBackgroundHighlight(in: rect,
+                                forLineContaining: index,
+                                withColour: messageView.value.colour.withAlphaComponent(0.1))
+
+      }
     }
   }
 
@@ -562,15 +578,22 @@ fileprivate class CodeView: NSTextView {
           let charRange           = codeStorageDelegate.lineMap.lookup(line: message.line)?.range
     else { return }
 
+    // TODO: CodeEditor needs to be parameterised by nessage theme
+    let theme = Message.defaultTheme
+
     let messageView = StatefulMessageView.HostingView(messages: messageBundle.messages,
-                                                      theme: Message.defaultTheme,
+                                                      theme: theme,
                                                       geometry: MessageView.Geometry(lineWidth: 100,
                                                                                      lineHeight: 15,
                                                                                      popupWidth: 300,
-                                                                                     popupOffset: 16))
+                                                                                     popupOffset: 16)),
+        principalCategory = messagesByCategory(messageBundle.messages)[0].key,
+        colour            = (theme(principalCategory).colour.cgColor.map{ NSColor(cgColor: $0) } as? NSColor) ?? NSColor.red
+
     messageViews[messageBundle.id] = MessageInfo(view: messageView,
                                                  lineFragementRect: CGRect.zero,
-                                                 geometry: nil)
+                                                 geometry: nil,
+                                                 colour: colour)
 
     // We invalidate the layout of the line where the message belongs as their may be less space for the text now and
     // because the layout process for the text fills the `lineFragmentRect` property of the above `MessageInfo`.
