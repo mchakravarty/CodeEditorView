@@ -32,6 +32,10 @@ class GutterView: UIView {
   ///
   let textView: UITextView
 
+  /// Accessor for the associated text view's message views.
+  ///
+  let getMessageViews: () -> MessageViews
+
   /// Determines whether this gutter is for a main code view or for the minimap of a code view.
   ///
   let isMinimapGutter: Bool = false
@@ -39,8 +43,9 @@ class GutterView: UIView {
   /// Create and configure a gutter view for the given text view. This will also set the appropiate exclusion path for
   /// text container.
   ///
-  init(frame: CGRect, textView: UITextView) {
-    self.textView = textView
+  init(frame: CGRect, textView: UITextView, getMessageViews: @escaping () -> MessageViews) {
+    self.textView        = textView
+    self.getMessageViews = getMessageViews
     super.init(frame: frame)
     let gutterExclusionPath = UIBezierPath(rect: CGRect(origin: frame.origin,
                                                         size: CGSize(width: frame.width,
@@ -76,6 +81,10 @@ class GutterView: NSView {
   ///
   let textView: NSTextView
 
+  /// Accessor for the associated text view's message views.
+  ///
+  let getMessageViews: () -> MessageViews
+
   /// Determines whether this gutter is for a main code view or for the minimap of a code view.
   ///
   let isMinimapGutter: Bool
@@ -83,8 +92,9 @@ class GutterView: NSView {
   /// Create and configure a gutter view for the given text view. This will also set the appropiate exclusion path for
   /// text container.
   ///
-  init(frame: CGRect, textView: NSTextView, isMinimapGutter: Bool) {
+  init(frame: CGRect, textView: NSTextView, getMessageViews: @escaping () -> MessageViews, isMinimapGutter: Bool) {
     self.textView        = textView
+    self.getMessageViews = getMessageViews
     self.isMinimapGutter = isMinimapGutter
     super.init(frame: frame)
     // NB: If were decide to use layer backing, we need to set the `layerContentsRedrawPolicy` to redraw on resizing
@@ -183,7 +193,7 @@ extension GutterView {
     // Currently only supported on macOS as `UITextView` is less configurable
     #if os(macOS)
 
-    // Highlight the current line in the main code view and in the gutter
+    // Highlight the current line in the gutter
     if let location = insertionPoint {
 
       backgroundColour?.highlight(withLevel: 0.1)?.setFill()
@@ -192,6 +202,27 @@ extension GutterView {
         if !intersectionRect.isEmpty { NSBezierPath(rect: intersectionRect).fill() }
       }
 
+    }
+
+    // FIXME: Eventually, we want this in the minimap, too, but `messageView.value.lineFragementRect` is of course
+    //        incorrect for the minimap, so we need a more general set up.
+    if !isMinimapGutter {
+
+      // Highlight lines with messages
+      for messageView in getMessageViews() {
+
+        let glyphRange = layoutManager.glyphRange(forBoundingRect: messageView.value.lineFragementRect, in: textContainer),
+            index      = layoutManager.characterIndexForGlyph(at: glyphRange.location)
+  //      if charRange.contains(index) {
+
+        messageView.value.colour.withAlphaComponent(0.1).setFill()
+        layoutManager.enumerateFragmentRects(forLineContaining: index){ fragmentRect in
+          let intersectionRect = rect.intersection(self.gutterRectFrom(textRect: fragmentRect))
+          if !intersectionRect.isEmpty { NSBezierPath(rect: intersectionRect).fill() }
+        }
+
+  //      }
+      }
     }
 
     #endif

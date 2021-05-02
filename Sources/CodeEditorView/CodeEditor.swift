@@ -8,6 +8,31 @@
 import SwiftUI
 
 
+// MARK: -
+// MARK: Message info
+
+/// Information required to layout message views.
+///
+/// NB: This information is computed incrementally. We get the `lineFragementRect` from the text container during the
+///     type setting processes. This indicates that the message layout may have to change (if it was already
+///     computed), but at this point, we cannot determine the new geometry yet; hence, `geometry` will be `nil`.
+///     The `geomtry` will be determined after text layout is complete.
+///
+struct MessageInfo {
+  let view:               StatefulMessageView.HostingView
+  var lineFragementRect:  CGRect                            // The *full* line fragement rectangle (incl. message)
+  var geometry:           MessageView.Geometry?
+  var colour:             NSColor                           // The category colour of the most severe category
+
+  var topAnchorConstraint:   NSLayoutConstraint?
+  var rightAnchorConstraint: NSLayoutConstraint?
+}
+
+/// Dictionary of message views.
+///
+typealias MessageViews = [LineInfo.MessageBundle.ID: MessageInfo]
+
+
 #if os(iOS)
 
 // MARK: -
@@ -15,7 +40,7 @@ import SwiftUI
 
 /// `UITextView` with a gutter
 ///
-fileprivate class CodeView: UITextView {
+class CodeView: UITextView {
 
   fileprivate var gutterView:          GutterView?
   fileprivate var codeViewDelegate:    CodeViewDelegate?
@@ -162,7 +187,7 @@ public struct CodeEditor: UIViewRepresentable {
 
 /// `NSTextView` with a gutter
 ///
-fileprivate class CodeView: NSTextView {
+class CodeView: NSTextView {
 
   // Delegates
   var codeViewDelegate:    CodeViewDelegate?
@@ -175,26 +200,9 @@ fileprivate class CodeView: NSTextView {
   var documentVisibleBox: NSBox?
   var minimapDividerView: NSBox?
 
-  /// Information required to layout message views.
-  ///
-  /// NB: This information is computed incrementally. We get the `lineFragementRect` from the text container during the
-  ///     type setting processes. This indicates that the message layout may have to change (if it was already
-  ///     computed), but at this point, we cannot determine the new geometry yet; hence, `geometry` will be `nil`.
-  ///     The `geomtry` will be determined after text layout is complete.
-  ///
-  struct MessageInfo {
-    let view:               StatefulMessageView.HostingView
-    var lineFragementRect:  CGRect                            // The *full* line fragement rectangle (incl. message)
-    var geometry:           MessageView.Geometry?
-    var colour:             NSColor                           // The category colour of the most severe category
-
-    var topAnchorConstraint:   NSLayoutConstraint?
-    var rightAnchorConstraint: NSLayoutConstraint?
-  }
-
   /// Keeps track of the set of message views.
   ///
-  var messageViews: [LineInfo.MessageBundle.ID: MessageInfo] = [:]
+  var messageViews: MessageViews = [:]
 
   /// Designated initializer for code views with a gutter.
   ///
@@ -246,7 +254,10 @@ fileprivate class CodeView: NSTextView {
     codeStorage.delegate = codeStorageDelegate
 
     // Add a gutter view
-    let gutterView = GutterView(frame: CGRect.zero, textView: self, isMinimapGutter: false)
+    let gutterView = GutterView(frame: CGRect.zero,
+                                textView: self,
+                                getMessageViews: { self.messageViews },
+                                isMinimapGutter: false)
     gutterView.autoresizingMask = .none
     addSubview(gutterView)
     self.gutterView              = gutterView
@@ -256,7 +267,10 @@ fileprivate class CodeView: NSTextView {
     //
     let minimapLayoutManager = MinimapLayoutManager(),
         minimapView          = MinimapView(),
-        minimapGutterView    = GutterView(frame: CGRect.zero, textView: minimapView, isMinimapGutter: true),
+        minimapGutterView    = GutterView(frame: CGRect.zero,
+                                          textView: minimapView,
+                                          getMessageViews: { self.messageViews },
+                                          isMinimapGutter: true),
         minimapDividerView   = NSBox()
     minimapView.codeView = self
 
@@ -641,7 +655,7 @@ fileprivate class CodeView: NSTextView {
   }
 }
 
-fileprivate class CodeViewDelegate: NSObject, NSTextViewDelegate {
+class CodeViewDelegate: NSObject, NSTextViewDelegate {
 
   // Hooks for events
   //
