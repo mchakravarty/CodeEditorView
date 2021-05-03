@@ -348,7 +348,7 @@ class CodeView: NSTextView {
         }
         minimapGutterView?.optLayoutManager?.invalidateDisplay(forCharacterRange: range)
       }
-      if let range      = newLineRange
+      if let range = newLineRange
       {
         layoutManager?.enumerateFragmentRects(forLineContaining: range.location){ fragmentRect in
 
@@ -364,6 +364,8 @@ class CodeView: NSTextView {
       self.gutterView?.invalidateGutter(forCharRange: combinedRanges(ranges: oldSelectedRanges + ranges))
       self.minimapGutterView?.invalidateGutter(forCharRange: combinedRanges(ranges: oldSelectedRanges + ranges))
     }
+
+    collapseMessageViews()
   }
 
   override func drawBackground(in rect: NSRect) {
@@ -651,6 +653,14 @@ class CodeView: NSTextView {
       if let info = messageViews[id] { info.view.removeFromSuperview() }
       messageViews.removeValue(forKey: id)
 
+    }
+  }
+
+  /// Ensure that all message views are in their collapsed state.
+  ///
+  func collapseMessageViews() {
+    for messageView in messageViews {
+      messageView.value.view.unfolded = false
     }
   }
 }

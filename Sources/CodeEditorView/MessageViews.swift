@@ -325,16 +325,25 @@ struct StatefulMessageView: View {
   let messages:    [Message]              // The array of messages that are displayed by this view
   let theme:       Message.Theme          // The message display theme to use
   let geometry:    MessageView.Geometry   // The geometry constrains for the view
-  let unfolded:    Bool                   // `true` iff the view should first appear in the popup flavour
 
-  @State private var toggeld: Bool = false
+  @ObservedObject var unfolded: ObservableBool  // `true` iff the view shows the popup flavour
+
+  /// The unfolding state needs to be communicated between the SwiftUI view and the external world. Hence, we need to
+  /// go via an `ObservableObject`.
+  ///
+  class ObservableBool: ObservableObject {
+    @Published var bool: Bool
+
+    init(bool: Bool) {
+      self.bool = bool
+    }
+  }
 
   var body: some View {
     MessageView(messages: messages,
                 theme: theme,
                 geometry: geometry,
-                unfolded: Binding(get: { unfolded != toggeld },
-                                  set: { toggeld = $0 != unfolded }))
+                unfolded: $unfolded.bool)
       .fixedSize()    // to enforce intrinsic size in the encapsulating `NSHostingView`
   }
 }
@@ -358,11 +367,16 @@ extension StatefulMessageView {
     private let messages: [Message]
     private let theme   : Message.Theme
 
+    /// Unfolding status as sharable state.
+    ///
+    private let unfoldedState = StatefulMessageView.ObservableBool(bool: false)
+
     var geometry: MessageView.Geometry {
       didSet { reconfigure() }
     }
     var unfolded: Bool {
-      didSet { reconfigure() }
+      get { unfoldedState.bool }
+      set { unfoldedState.bool = newValue }
     }
 
     init(messages: [Message], theme: @escaping Message.Theme, geometry: MessageView.Geometry)
@@ -370,7 +384,6 @@ extension StatefulMessageView {
       self.messages = messages
       self.theme    = theme
       self.geometry = geometry
-      self.unfolded = false
       super.init(frame: NSRect.zero)
 
       self.translatesAutoresizingMaskIntoConstraints = false
@@ -378,7 +391,7 @@ extension StatefulMessageView {
       self.hostingView = NSHostingView(rootView: StatefulMessageView(messages: messages,
                                                                      theme: theme,
                                                                      geometry: geometry,
-                                                                     unfolded: unfolded))
+                                                                     unfolded: unfoldedState))
       hostingView?.translatesAutoresizingMaskIntoConstraints = false
       if let view = hostingView {
 
@@ -402,7 +415,7 @@ extension StatefulMessageView {
       self.hostingView?.rootView = StatefulMessageView(messages: messages,
                                                        theme: theme,
                                                        geometry: geometry,
-                                                       unfolded: unfolded)
+                                                       unfolded: unfoldedState)
     }
   }
 }
@@ -504,7 +517,8 @@ struct MessageViews_Previews: PreviewProvider {
                                                          lineHeight: 15,
                                                          popupWidth: 300,
                                                          popupOffset: 30),
-                          unfolded: false)
+                          unfolded: StatefulMessageView.ObservableBool(bool: false))
+        .offset(y: 8)
     }
     .frame(width: 400, height: 300, alignment: .topTrailing)
 //    .preferredColorScheme(.light)
