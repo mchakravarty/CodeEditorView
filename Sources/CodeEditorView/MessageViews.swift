@@ -350,12 +350,66 @@ struct StatefulMessageView: View {
 
 #if os(iOS)
 
-//extension MessageInlineView {
-//
-//  /// Wrap the message view into a hosting view.
-//  ///
-//  var hostedView: UIHostingView<MessageInlineView> { UIHostingView(rootView: self) }   // FIXME: there is no `UIHostingView`!!!
-//}
+extension StatefulMessageView {
+
+  class HostingView: UIView {
+    private var hostingView: UIHostingView<StatefulMessageView>?
+
+    private let messages: [Message]
+    private let theme   : Message.Theme
+
+    /// Unfolding status as sharable state.
+    ///
+    private let unfoldedState = StatefulMessageView.ObservableBool(bool: false)
+
+    var geometry: MessageView.Geometry {
+      didSet { reconfigure() }
+    }
+    var unfolded: Bool {
+      get { unfoldedState.bool }
+      set { unfoldedState.bool = newValue }
+    }
+
+    init(messages: [Message], theme: @escaping Message.Theme, geometry: MessageView.Geometry)
+    {
+      self.messages = messages
+      self.theme    = theme
+      self.geometry = geometry
+      super.init(frame: .zero)
+
+      self.translatesAutoresizingMaskIntoConstraints = false
+
+      self.hostingView = UIHostingView(rootView: StatefulMessageView(messages: messages,
+                                                                     theme: theme,
+                                                                     geometry: geometry,
+                                                                     unfolded: unfoldedState))
+      hostingView?.translatesAutoresizingMaskIntoConstraints = false
+      if let view = hostingView {
+
+        addSubview(view)
+        let constraints = [
+          view.topAnchor.constraint(equalTo: self.topAnchor),
+          view.bottomAnchor.constraint(equalTo: self.bottomAnchor),
+          view.leftAnchor.constraint(equalTo: self.leftAnchor),
+          view.rightAnchor.constraint(equalTo: self.rightAnchor)
+        ]
+        NSLayoutConstraint.activate(constraints)
+
+      }
+    }
+
+    @objc required dynamic init?(coder aDecoder: NSCoder) {
+      fatalError("init(coder:) has not been implemented")
+    }
+
+    private func reconfigure() {
+      self.hostingView?.rootView = StatefulMessageView(messages: messages,
+                                                       theme: theme,
+                                                       geometry: geometry,
+                                                       unfolded: unfoldedState)
+    }
+  }
+}
 
 #elseif os(macOS)
 
@@ -384,7 +438,7 @@ extension StatefulMessageView {
       self.messages = messages
       self.theme    = theme
       self.geometry = geometry
-      super.init(frame: NSRect.zero)
+      super.init(frame: .zero)
 
       self.translatesAutoresizingMaskIntoConstraints = false
 

@@ -129,17 +129,22 @@ extension GutterView {
   /// status changes; thus, the corresponding gutter area might require redrawing, too.
   ///
   /// - Parameters:
-  ///   - charRange: The invalidated range of characters.
+  ///   - charRange: The invalidated range of characters. It will be trimmed to be within the valid character range of
+  ///     the underlying text storage.
   ///
   /// We invalidate the area corresponding to entire lines. This makes a difference in the presence of lines breaks.
   ///
   func invalidateGutter(forCharRange charRange: NSRange) {
+    let string        = textView.text as NSString,
+        safeCharRange = NSIntersectionRange(charRange, NSRange(location: 0, length: string.length))
+
     guard let layoutManager = optLayoutManager,
-          let textContainer = optTextContainer
+          let textContainer = optTextContainer,
+          safeCharRange.length > 0
     else { return }
 
     let documentVisibleRect = textView.documentVisibleRect,
-        extendedCharRange   = (textView.text as NSString).paragraphRange(for: charRange),
+        extendedCharRange   = string.paragraphRange(for: safeCharRange),
         glyphRange          = layoutManager.glyphRange(forCharacterRange: extendedCharRange, actualCharacterRange: nil),
         gutterRect          = gutterRectFrom(textRect: layoutManager.boundingRect(forGlyphRange: glyphRange,
                                                                                  in: textContainer)),
