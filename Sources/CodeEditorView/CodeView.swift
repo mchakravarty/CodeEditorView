@@ -98,7 +98,7 @@ class CodeView: UITextView {
     codeLayoutManager.gutterView = gutterView
 
     DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + .seconds(1)){
-      self.report(message: Message(category: .error, line: 1, columns: 5..<6, summary: "A disastrous error!", description: NSAttributedString(string: "This is such an aweful error. This program is going to break real quick.")))
+      self.report(message: Message(category: .error, line: 2, columns: 5..<6, summary: "A disastrous error!", description: NSAttributedString(string: "This is such an aweful error. This program is going to break real quick.")))
     }
   }
 
@@ -129,7 +129,7 @@ class CodeViewDelegate: NSObject, UITextViewDelegate {
   // MARK: -
   // MARK: UITextViewDelegate protocol
 
-  func textDidChange(_ textView: UITextView) { textDidChange?(textView) }
+  func textViewDidChange(_ textView: UITextView) { textDidChange?(textView) }
 
   func textViewDidChangeSelection(_ textView: UITextView) {
     guard let codeView = textView as? CodeView else { return }
@@ -601,7 +601,8 @@ extension CodeView {
                                                       geometry: MessageView.Geometry(lineWidth: 100,
                                                                                      lineHeight: 15,
                                                                                      popupWidth: 300,
-                                                                                     popupOffset: 16)),
+                                                                                     popupOffset: 16),
+                                                      fontSize: font?.pointSize ?? OSFont.systemFontSize),
         principalCategory = messagesByCategory(messageBundle.messages)[0].key,
         colour            = OSColor(color: theme(principalCategory).colour)
 
