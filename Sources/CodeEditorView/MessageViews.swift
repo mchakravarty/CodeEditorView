@@ -183,35 +183,43 @@ fileprivate struct MessagePopupCategoryView: View {
 
     let backgroundColour = colourScheme == .dark ? Color.black : Color.white
 
-    HStack(spacing: 0) {
+    let theActualView =
+      HStack(spacing: 0) {
 
-      // Category icon
-      ZStack (alignment: .top) {
-        theme(category).colour.opacity(0.5)
-        Text("XX")       // We want the icon to have the height of text
-          .hidden()
-          .overlay( theme(category).icon.frame(alignment: .center) )
-          .padding([.leading, .trailing], 5)
-          .padding([.top, .bottom], 3)
-      }.fixedSize(horizontal: true, vertical: false)
+        // Category icon
+        ZStack (alignment: .top) {
+          theme(category).colour.opacity(0.5)
+          Text("XX")       // We want the icon to have the height of text
+            .hidden()
+            .overlay( theme(category).icon.frame(alignment: .center) )
+            .padding([.leading, .trailing], 5)
+            .padding([.top, .bottom], 3)
+        }.fixedSize(horizontal: true, vertical: false)
 
-      // Vertical stack of message
-      VStack(alignment: .leading, spacing: 6) {
-        ForEach(0..<messages.count) { i in
-          Text(messages[i].summary)
-          if let description = messages[i].description { Text(description.string) }
+        // Vertical stack of message
+        VStack(alignment: .leading, spacing: 6) {
+          ForEach(0..<messages.count) { i in
+            Text(messages[i].summary)
+            if let description = messages[i].description { Text(description.string) }
+          }
         }
+        .padding([.leading, .trailing], 5)
+        .padding([.top, .bottom], 3)
+        .frame(maxWidth: popupWidth, alignment: .leading)       // Constrain width if `popupWidth` is not `nil`
+        .background(theme(category).colour.opacity(0.3))
+        .background(GeometryReader { proxy in                   // Propagate current width up the view tree
+          Color.clear.preference(key: PopupWidth.self, value: proxy.size.width)
+        })
+
       }
-      .padding([.leading, .trailing], 5)
-      .padding([.top, .bottom], 3)
-      .frame(maxWidth: popupWidth, alignment: .leading)       // Constrain width if `popupWidth` is not `nil`
-      .background(theme(category).colour.opacity(0.3))
-      .background(GeometryReader { proxy in                   // Propagate current width up the view tree
-        Color.clear.preference(key: PopupWidth.self, value: proxy.size.width)
-      })
 
-
-    }
+    // The construction with the overlay is necessary to reliably get the theme colour underneath the
+    // category icon to extend to vertically fill the available space. Essentially, the first use of
+    // `theActualView` calculates the height, which depends on the vertical stack of messages, and inside
+    // the overlay, we then just use the previously calculated height.
+    theActualView
+    .hidden()
+    .overlay(theActualView)
     .background(backgroundColour)
     .cornerRadius(cornerRadius)
     .fixedSize(horizontal: false, vertical: true)           // horizontal must wrap and vertical extend
@@ -583,7 +591,7 @@ struct MessageViews_Previews: PreviewProvider {
                                                          popupOffset: 30),
                           fontSize: 15,
                           unfolded: StatefulMessageView.ObservableBool(bool: false))
-        .offset(y: 8)
+        .offset(y: 18)
     }
     .frame(width: 400, height: 300, alignment: .topTrailing)
 //    .preferredColorScheme(.light)

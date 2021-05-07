@@ -566,10 +566,12 @@ extension CodeView {
 
         // Add the messages view
         addSubview(messageBundle.view)
-        let topAnchorConstraint = messageBundle.view.topAnchor.constraint(equalTo: self.topAnchor,
-                                                                          constant: messageBundle.lineFragementRect.minY)
-        let rightAnchorConstraint = messageBundle.view.rightAnchor.constraint(equalTo: self.leftAnchor,
-                                                                              constant: messageBundle.lineFragementRect.maxX)
+        let topOffset = textContainerOrigin.y + messageBundle.lineFragementRect.minY,
+            topAnchorConstraint = messageBundle.view.topAnchor.constraint(equalTo: self.topAnchor,
+                                                                          constant: topOffset)
+        let leftOffset = textContainerOrigin.x + messageBundle.lineFragementRect.maxX,
+            rightAnchorConstraint = messageBundle.view.rightAnchor.constraint(equalTo: self.leftAnchor,
+                                                                              constant: leftOffset)
         messageViews[id]?.topAnchorConstraint   = topAnchorConstraint
         messageViews[id]?.rightAnchorConstraint = rightAnchorConstraint
         NSLayoutConstraint.activate([topAnchorConstraint, rightAnchorConstraint])

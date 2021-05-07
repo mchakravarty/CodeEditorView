@@ -45,7 +45,7 @@ protocol TextView {
   var selectedLines: Set<Int> { get }
 
   /// The visible portion of the text view. (This only accounts for portions of the text view that are obscured through
-  /// visibility in a scroll view.
+  /// visibility in a scroll view.)
   ///
   var documentVisibleRect: CGRect { get }
 
