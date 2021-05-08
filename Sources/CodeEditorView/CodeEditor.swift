@@ -146,20 +146,6 @@ public struct CodeEditor: NSViewRepresentable {
 
 
 // MARK: -
-// MARK: Shared code
-
-
-/// Combine selection ranges into the smallest ranges encompassing them all.
-///
-private func combinedRanges(ranges: [NSValue]) -> NSRange {
-  let actualranges = ranges.compactMap{ $0 as? NSRange }
-  return actualranges.dropFirst().reduce(actualranges.first ?? NSRange(location: 0, length: 0)) {
-    NSUnionRange($0, $1)
-  }
-}
-
-
-// MARK: -
 // MARK: Previews
 
 struct CodeEditor_Previews: PreviewProvider {

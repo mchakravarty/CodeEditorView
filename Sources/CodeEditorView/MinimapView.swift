@@ -14,7 +14,7 @@ import SwiftUI
 
 /// Customised text view for the minimap.
 ///
-fileprivate class MinimapView: NSTextView {
+class MinimapView: NSTextView {
   weak var codeView: CodeView?
 
   // Highlight the current line.
@@ -40,7 +40,7 @@ fileprivate class MinimapView: NSTextView {
 
 /// Customised layout manager for the minimap.
 ///
-fileprivate class MinimapLayoutManager: NSLayoutManager {
+class MinimapLayoutManager: NSLayoutManager {
 
   // In place of drawing the actual glyphs, we draw small rectangles in the glyph's foreground colour. We ignore the
   // actual glyph metrics and draw all glyphs as a fixed-sized rectangle whose height is determined by the "used
@@ -284,7 +284,7 @@ class MinimapTypeSetter: NSATSTypesetter {
 ///   - font: The fixed pitch font of the main text view.
 /// - Returns: The width of the code view in number of characters.
 ///
-private func codeWidthInCharacters(for width: CGFloat, with font: NSFont) -> CGFloat {
+func codeWidthInCharacters(for width: CGFloat, with font: NSFont) -> CGFloat {
   let minimapCharWidth = minimapFontSize(for: font.pointSize) / 2
   return floor(width / (font.maximumAdvancement.width + minimapCharWidth))
 }
@@ -297,7 +297,7 @@ private func codeWidthInCharacters(for width: CGFloat, with font: NSFont) -> CGF
 /// The result is always divisible by two, to enable the use of full pixels for the font width while avoiding aspect
 /// ratios that are too unbalanced.
 ///
-private func minimapFontSize(for fontSize: CGFloat) -> CGFloat {
+func minimapFontSize(for fontSize: CGFloat) -> CGFloat {
   return max(1, ceil(fontSize / 20)) * 2
 }
 

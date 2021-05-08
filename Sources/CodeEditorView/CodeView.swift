@@ -472,7 +472,7 @@ class CodeView: NSTextView {
 
   /// Sets the scrolling position of the minimap in dependence of the scroll position of the main code view.
   ///
-  private func adjustScrollPositionOfMinimap() {
+  func adjustScrollPositionOfMinimap() {
     let codeViewHeight = frame.size.height,
         minimapHeight  = minimapView?.frame.size.height ?? 0,
         visibleHeight  = documentVisibleRect.size.height
@@ -796,3 +796,14 @@ extension NSLayoutManager {
     }
   }
 }
+
+/// Combine selection ranges into the smallest ranges encompassing them all.
+///
+private func combinedRanges(ranges: [NSValue]) -> NSRange {
+  let actualranges = ranges.compactMap{ $0 as? NSRange }
+  return actualranges.dropFirst().reduce(actualranges.first ?? NSRange(location: 0, length: 0)) {
+    NSUnionRange($0, $1)
+  }
+}
+
+
