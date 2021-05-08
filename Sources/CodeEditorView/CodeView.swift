@@ -358,13 +358,16 @@ class CodeView: NSTextView {
 
       let glyphRange = layoutManager.glyphRange(forBoundingRect: messageView.value.lineFragementRect, in: textContainer),
           index      = layoutManager.characterIndexForGlyph(at: glyphRange.location)
-      if charRange.contains(index) {
+
+// This seems like a worthwhile optimisatiob but, sometimes we are called in a situation, where `charRange` computes
+// to be the empty range although the whole visible area is being redrawn.
+//      if charRange.contains(index) {
 
         drawBackgroundHighlight(in: rect,
                                 forLineContaining: index,
                                 withColour: messageView.value.colour.withAlphaComponent(0.1))
 
-      }
+//      }
     }
   }
 
@@ -616,6 +619,10 @@ extension CodeView {
     // We invalidate the layout of the line where the message belongs as their may be less space for the text now and
     // because the layout process for the text fills the `lineFragmentRect` property of the above `MessageInfo`.
     optLayoutManager?.invalidateLayout(forCharacterRange: charRange, actualCharacterRange: nil)
+    self.optLayoutManager?.invalidateDisplay(forCharacterRange: charRange)
+//    DispatchQueue.main.async {
+//      self.optLayoutManager?.invalidateDisplay(forCharacterRange: charRange)
+//    }
     gutterView?.invalidateGutter(forCharRange: charRange)
   }
 
