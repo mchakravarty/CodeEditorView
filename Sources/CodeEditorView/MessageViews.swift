@@ -16,20 +16,20 @@ extension Message {
 
   /// Defines the colours and icons that identify each of the various message categories.
   ///
-  typealias Theme = (Message.Category) -> (colour: Color, icon: Image)
+  typealias Theme = (Message.Category) -> (colour: OSColor, icon: Image)
 
   /// The default category theme
   ///
-  static func defaultTheme(for category: Message.Category) -> (colour: Color, icon: Image) {
+  static func defaultTheme(for category: Message.Category) -> (colour: OSColor, icon: Image) {
     switch category {
     case .live:
-      return (colour: Color.green, icon: Image(systemName: "line.horizontal.3"))
+      return (colour: OSColor.green, icon: Image(systemName: "line.horizontal.3"))
     case .error:
-      return (colour: Color.red, icon: Image(systemName: "xmark.circle.fill"))
+      return (colour: OSColor.red, icon: Image(systemName: "xmark.circle.fill"))
     case .warning:
-      return (colour: Color.yellow, icon: Image(systemName: "exclamationmark.triangle.fill"))
+      return (colour: OSColor.yellow, icon: Image(systemName: "exclamationmark.triangle.fill"))
     case .informational:
-      return (colour: Color.gray, icon: Image(systemName: "info.circle.fill"))
+      return (colour: OSColor.gray, icon: Image(systemName: "info.circle.fill"))
     }
   }
 }
@@ -54,13 +54,13 @@ struct MessageInlineView: View {
     GeometryReader { geometryProxy in
 
       let height = geometryProxy.size.height
+      let colour = Color(theme(categories[0]).colour)
 
       HStack {
 
         Spacer()
 
         HStack(alignment: .center, spacing: 0) {
-          let colour = theme(categories[0]).colour
 
           // Category summary
           HStack(alignment: .center, spacing: 0) {
@@ -182,13 +182,14 @@ fileprivate struct MessagePopupCategoryView: View {
   var body: some View {
 
     let backgroundColour = colourScheme == .dark ? Color.black : Color.white
+    let colour           = Color(theme(category).colour)
 
     let theActualView =
       HStack(spacing: 0) {
 
         // Category icon
         ZStack (alignment: .top) {
-          theme(category).colour.opacity(0.5)
+          colour.opacity(0.5)
           Text("XX")       // We want the icon to have the height of text
             .hidden()
             .overlay( theme(category).icon.frame(alignment: .center) )
@@ -206,7 +207,7 @@ fileprivate struct MessagePopupCategoryView: View {
         .padding([.leading, .trailing], 5)
         .padding([.top, .bottom], 3)
         .frame(maxWidth: popupWidth, alignment: .leading)       // Constrain width if `popupWidth` is not `nil`
-        .background(theme(category).colour.opacity(0.3))
+        .background(colour.opacity(0.3))
         .background(GeometryReader { proxy in                   // Propagate current width up the view tree
           Color.clear.preference(key: PopupWidth.self, value: proxy.size.width)
         })

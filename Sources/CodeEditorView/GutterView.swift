@@ -218,7 +218,8 @@ extension GutterView {
 
         let glyphRange = layoutManager.glyphRange(forBoundingRect: messageView.value.lineFragementRect, in: textContainer),
             index      = layoutManager.characterIndexForGlyph(at: glyphRange.location)
-  //      if charRange.contains(index) {
+        // TODO: should be filter by char range
+        //      if charRange.contains(index) {
 
         messageView.value.colour.withAlphaComponent(0.1).setFill()
         layoutManager.enumerateFragmentRects(forLineContaining: index){ fragmentRect in
@@ -254,6 +255,9 @@ extension GutterView {
                                     .paragraphStyle: lineNumberStyle,
                                     .kern: NSNumber(value: Float(-fontSize / 11))]
 
+      // TODO: CodeEditor needs to be parameterised by message theme
+      let theme = Message.defaultTheme
+
       for line in lineRange {
 
         // NB: We adjust the range, so that in case of a trailing empty line that last line break is not included in
@@ -267,7 +271,15 @@ extension GutterView {
             lineGlyphRect     = layoutManager.boundingRect(forGlyphRange: lineGlyphRange, in: textContainer),
             gutterRect        = gutterRectForLineNumbersFrom(textRect: lineGlyphRect)
 
-        let attributes = selectedLines.contains(line) ? textAttributesSelected : textAttributesDefault
+        var attributes = selectedLines.contains(line) ? textAttributesSelected : textAttributesDefault
+
+        if let messageBundle = lineMap.lines[line].info?.messages
+        {
+          let themeColour = theme(messagesByCategory(messageBundle.messages)[0].key).colour,
+              colour      = selectedLines.contains(line) ? themeColour : themeColour.withAlphaComponent(0.5)
+          attributes.updateValue(colour, forKey: .foregroundColor)
+        }
+
         ("\(line)" as NSString).draw(in: gutterRect, withAttributes: attributes)
       }
     }

@@ -595,7 +595,7 @@ extension CodeView {
           let charRange           = codeStorageDelegate.lineMap.lookup(line: message.line)?.range
     else { return }
 
-    // TODO: CodeEditor needs to be parameterised by nessage theme
+    // TODO: CodeEditor needs to be parameterised by message theme
     let theme = Message.defaultTheme
 
     let messageView = StatefulMessageView.HostingView(messages: messageBundle.messages,
@@ -606,16 +606,17 @@ extension CodeView {
                                                                                      popupOffset: 16),
                                                       fontSize: font?.pointSize ?? OSFont.systemFontSize),
         principalCategory = messagesByCategory(messageBundle.messages)[0].key,
-        colour            = OSColor(color: theme(principalCategory).colour)
+        colour            = theme(principalCategory).colour
 
     messageViews[messageBundle.id] = MessageInfo(view: messageView,
                                                  lineFragementRect: CGRect.zero,
                                                  geometry: nil,
-                                                 colour: colour ?? OSColor.red)
+                                                 colour: colour)
 
     // We invalidate the layout of the line where the message belongs as their may be less space for the text now and
     // because the layout process for the text fills the `lineFragmentRect` property of the above `MessageInfo`.
     optLayoutManager?.invalidateLayout(forCharacterRange: charRange, actualCharacterRange: nil)
+    gutterView?.invalidateGutter(forCharRange: charRange)
   }
 
   /// Remove the messages associated with a specified range of lines.
