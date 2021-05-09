@@ -508,21 +508,21 @@ extension CodeStorageDelegate {
   ///
   /// NB: Ignores messages for lines that do not exist in the line map.
   ///
-  func add(message: Message) -> LineInfo.MessageBundle? {
-    guard var info = lineMap.lookup(line: message.line)?.info else { return nil }
+  func add(message: Located<Message>) -> LineInfo.MessageBundle? {
+    guard var info = lineMap.lookup(line: message.location.line)?.info else { return nil }
 
     if info.messages != nil {
 
       // Add a message to an existing message bundle for this line
-      info.messages?.messages.append(message)
+      info.messages?.messages.append(message.entity)
 
     } else {
 
       // Create a new message bundle for this line with the new message
-      info.messages = LineInfo.MessageBundle(messages: [message])
+      info.messages = LineInfo.MessageBundle(messages: [message.entity])
 
     }
-    lineMap.setInfoOf(line: message.line, to: info)
+    lineMap.setInfoOf(line: message.location.line, to: info)
     return info.messages
   }
 

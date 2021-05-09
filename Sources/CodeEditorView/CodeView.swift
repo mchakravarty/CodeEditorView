@@ -98,7 +98,8 @@ class CodeView: UITextView {
     codeLayoutManager.gutterView = gutterView
 
     DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + .seconds(1)){
-      self.report(message: Message(category: .error, line: 2, columns: 5..<6, summary: "A disastrous error!", description: NSAttributedString(string: "This is such an aweful error. This program is going to break real quick.")))
+      self.report(message: Located(location: Location(file: "MyFile", line: 2, column: 5),
+                                   entity: Message(category: .error, length: 1, summary: "A disastrous error!", description: NSAttributedString(string: "This is such an aweful error. This program is going to break real quick."))))
     }
   }
 
@@ -266,7 +267,8 @@ class CodeView: NSTextView {
     self.documentVisibleBox = documentVisibleBox
 
     DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + .seconds(1)){
-      self.report(message: Message(category: .error, line: 2, columns: 5..<6, summary: "A disastrous error!", description: NSAttributedString(string: "This is such an aweful error. This program is going to break real quick.")))
+      self.report(message: Located(location: Location(file: "MyFile", line: 2, column: 5),
+                                   entity: Message(category: .error, length: 1, summary: "A disastrous error!", description: NSAttributedString(string: "This is such an aweful error. This program is going to break real quick."))))
     }
 
     tile()
@@ -592,10 +594,10 @@ extension CodeView {
 
   /// Adds a new message to the set of messages for this code view.
   ///
-  func report(message: Message) {
+  func report(message: Located<Message>) {
     guard let codeStorageDelegate = codeStorageDelegate,
           let messageBundle       = codeStorageDelegate.add(message: message),
-          let charRange           = codeStorageDelegate.lineMap.lookup(line: message.line)?.range
+          let charRange           = codeStorageDelegate.lineMap.lookup(line: message.location.line)?.range
     else { return }
 
     // TODO: CodeEditor needs to be parameterised by message theme

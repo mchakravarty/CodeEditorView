@@ -45,13 +45,9 @@ public struct Message: Identifiable {
   ///
   public let category: Category
 
-  /// The line at which the message is to be displayed.
+  /// The number of characters that the message is related to and which ought to be underlined.
   ///
-  public let line: Int
-
-  /// The columns whose characters the message are related to and which ought to be underlined.
-  ///
-  public let columns: Range<Int>
+  public let length: Int
 
   /// Short version of the message (displayed inline and in the popup) — one line only.
   ///
