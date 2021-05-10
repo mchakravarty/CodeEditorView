@@ -22,7 +22,7 @@ private let logger = Logger(subsystem: "org.justtesting.CodeEditor", category: "
 
 /// Token descriptions
 ///
-enum TokenPattern: Hashable, Equatable, Comparable {
+public enum TokenPattern: Hashable, Equatable, Comparable {
 
   /// The token has only one lexeme, given as a simple string
   ///
@@ -33,7 +33,7 @@ enum TokenPattern: Hashable, Equatable, Comparable {
   case pattern(String)
 }
 
-protocol TokeniserState {
+public protocol TokeniserState {
 
   /// Finite projection of tokeniser state to determine sub-tokenisers (and hence, the regular expression to use)
   ///
@@ -44,25 +44,38 @@ protocol TokeniserState {
   var tag: StateTag { get }
 }
 
+/// Type used to attribute characters with their token value.
+///
+public struct TokenAttribute<TokenType> {
+
+  /// `true` iff this is the first character of a tokens lexeme.
+  ///
+  public let isHead: Bool
+
+  /// The type of tokens that this character is a part of.
+  ///
+  public let token: TokenType
+}
+
 /// Actions taken in response to matching a token
 ///
 /// The `token` component determines the token type of the matched pattern and `transition` determines the state
 /// transition implied by the matched token. If the `transition` component is `nil`, the tokeniser stays in the current
 /// state.
 ///
-typealias TokenAction<TokenType, StateType> = (token: TokenType, transition: ((StateType) -> StateType)?)
+public typealias TokenAction<TokenType, StateType> = (token: TokenType, transition: ((StateType) -> StateType)?)
 
 /// For each possible state tag of the underlying tokeniser state, a mapping from token patterns to token kinds and
 /// maybe a state transition to determine a new tokeniser state
 ///
-typealias TokenDictionary<TokenType, StateType: TokeniserState>
+public typealias TokenDictionary<TokenType, StateType: TokeniserState>
   = [StateType.StateTag: [TokenPattern: TokenAction<TokenType, StateType>]]
 
-/// Pre-compiled regular expression tokeniser
+/// Pre-compiled regular expression tokeniser.
 ///
 /// The `TokenType` identifies the various tokens that can be recognised by the tokeniser.
 ///
-struct Tokeniser<TokenType, StateType: TokeniserState> {
+public struct Tokeniser<TokenType, StateType: TokeniserState> {
 
   /// Tokeniser for one state of the compound tokeniser
   ///
@@ -87,11 +100,6 @@ struct Tokeniser<TokenType, StateType: TokeniserState> {
   /// Sub-tokeniser for all states of the compound tokeniser
   ///
   let states: [StateType.StateTag: State]
-
-  /// The token value to use to attribute all body characters of a token's lexeme; i.e., all characters except
-  /// for the initial one.
-  ///
-  let tokenBody: TokenType
 }
 
 extension NSMutableAttributedString {
@@ -115,8 +123,7 @@ extension NSMutableAttributedString {
   /// attributed with `tokenBody`. This is crucial to be able to distinguish the boundaries of multiple successive
   /// tokens of the same type.
   ///
-  static func tokeniser<TokenType, StateType: TokeniserState>(for tokenMap: TokenDictionary<TokenType, StateType>,
-                                                              with tokenBody: TokenType)
+  public static func tokeniser<TokenType, StateType: TokeniserState>(for tokenMap: TokenDictionary<TokenType, StateType>)
   -> Tokeniser<TokenType, StateType>?
   {
     func tokeniser(for stateMap: [TokenPattern: TokenAction<TokenType, StateType>])
@@ -153,7 +160,7 @@ extension NSMutableAttributedString {
     do {
 
       let states = try tokenMap.mapValues{ try tokeniser(for: $0) }
-      return Tokeniser(states: states, tokenBody: tokenBody)
+      return Tokeniser(states: states)
 
     } catch let err { logger.error("failed to compile regexp: \(err.localizedDescription)"); return nil }
   }
@@ -168,10 +175,10 @@ extension NSMutableAttributedString {
   ///
   /// All previously existing occurences of `attribute` in the given range are removed.
   ///
-  func tokeniseAndSetTokenAttribute<TokenType, StateType>(attribute: NSAttributedString.Key,
-                                                          with tokeniser: Tokeniser<TokenType, StateType>,
-                                                          state startState: StateType,
-                                                          in range: NSRange)
+  public func tokeniseAndSetTokenAttribute<TokenType, StateType>(attribute: NSAttributedString.Key,
+                                                                 with tokeniser: Tokeniser<TokenType, StateType>,
+                                                                 state startState: StateType,
+                                                                 in range: NSRange)
   {
     var state        = startState
     var currentRange = range
@@ -208,12 +215,15 @@ extension NSMutableAttributedString {
 
       if let action = tokenAction, result.range.length > 0 {
 
-        // Set the token attribute on the first character of the lexeme and the token body value on the other characters
-        self.addAttribute(attribute, value: action.token, range: NSRange(location: result.range.location, length: 1))
+        // Set the token attribute on the lexeme, specially marking the first character of the lexeme.
+        self.addAttribute(attribute,
+                          value: TokenAttribute(isHead: true, token: action.token),
+                          range: NSRange(location: result.range.location, length: 1))
         if result.range.length > 1 {
 
-          self.addAttribute(attribute, value: tokeniser.tokenBody, range: NSRange(location: result.range.location + 1,
-                                                                                  length: result.range.length - 1))
+          self.addAttribute(attribute,
+                            value: TokenAttribute(isHead: false, token: action.token),
+                            range: NSRange(location: result.range.location + 1, length: result.range.length - 1))
 
         }
 

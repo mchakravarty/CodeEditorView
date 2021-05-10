@@ -15,15 +15,11 @@ import AppKit
 #endif
 
 
-/// Specificies the language-dependent aspects of a code editor.
+/// Specifies the language-dependent aspects of a code editor.
 ///
 public struct LanguageConfiguration {
 
-  /// Supported token attribute values
-  ///
-  /// The first character of each lexeme carries a token-specific value. All characters after the leading one, in a
-  /// multi-character lexeme, carry the value `.tokenBody`. (This is necessary to be able to generically determine
-  /// lexeme boundaries.)
+  /// Supported flavours of tokens
   ///
   enum Token {
     case roundBracketOpen
@@ -36,7 +32,6 @@ public struct LanguageConfiguration {
     case singleLineComment
     case nestedCommentOpen
     case nestedCommentClose
-    case tokenBody
 
     var isOpenBracket: Bool {
       switch self {
@@ -74,20 +69,11 @@ public struct LanguageConfiguration {
       default:                  return false
       }
     }
-
-    /// This is `true` for all characters of a multi-character lexeme, except for the lexeme's leading chracter.
-    ///
-    var isTokenBody: Bool {
-      switch self {
-      case .tokenBody: return true
-      default:         return false
-      }
-    }
   }
 
   /// Tokeniser state
   ///
-  public enum State: TokeniserState {
+  enum State: TokeniserState {
     case tokenisingCode
     case tokenisingComment(Int)   // the argument gives the comment nesting depth > 0
 
@@ -132,7 +118,6 @@ public struct LanguageConfiguration {
     case .singleLineComment:  return singleLineComment
     case .nestedCommentOpen:  return nestedComment?.open
     case .nestedCommentClose: return nestedComment?.close
-    case .tokenBody:          return nil
     }
   }
 }

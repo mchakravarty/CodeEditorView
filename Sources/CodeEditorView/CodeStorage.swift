@@ -27,7 +27,20 @@ class CodeStorage: NSTextStorage {
   override var string: String { textStorage.string }
 
   override func attributes(at location: Int, effectiveRange range: NSRangePointer?) -> [NSAttributedString.Key : Any] {
-    return textStorage.attributes(at: location, effectiveRange: range)
+    var attributes = textStorage.attributes(at: location, effectiveRange: range)
+
+    // FIXME: colour must come from a theme
+    var foregroundColour = OSColor.labelColor
+
+    // Translate attributes indicating text highlighting to the foreground colour determined by the current theme.
+    if attributes[.comment] != nil { foregroundColour = OSColor.gray }
+    else if let tokenAttr = attributes[.token] as? TokenAttribute<LanguageConfiguration.Token> {
+
+      if tokenAttr.token == .string { foregroundColour = OSColor.systemGreen }
+    }
+
+    attributes[.foregroundColor] = foregroundColour
+    return attributes
   }
 
   // Extended to handle auto-deletion of adjcent matching brackets
@@ -42,12 +55,12 @@ class CodeStorage: NSTextStorage {
        let language = (delegate as? CodeStorageDelegate)?.language
     {
 
-      let isOpen    = token.isOpenBracket,
-          isBracket = isOpen || token.isCloseBracket,
+      let isOpen    = token.token.isOpenBracket,
+          isBracket = isOpen || token.token.isCloseBracket,
           isSafe    = (isOpen && range.location + 1 < string.utf16.count) || range.location > 0,
           offset    = isOpen ? 1 : -1
-      if isBracket && isSafe && language.lexeme(of: token)?.count == 1 &&
-          tokenAttribute(at: range.location + offset) == token.matchingBracket
+      if isBracket && isSafe && language.lexeme(of: token.token)?.count == 1 &&
+          tokenAttribute(at: range.location + offset)?.token == token.token.matchingBracket
       {
 
         let extendedRange = NSRange(location: isOpen ? range.location : range.location - 1, length: 2)
@@ -149,8 +162,12 @@ extension CodeStorage {
   /// Determine the token attribute value at the given character index. This will be `.tokenBody` if the indexed
   /// character is a body character (i.e., second or later) of a token lexeme.
   ///
-  func tokenAttribute(at location: Int) -> LanguageConfiguration.Token? {
-    return attribute(.token, at: location, effectiveRange: nil) as? LanguageConfiguration.Token
+  func tokenAttribute(at location: Int) -> TokenAttribute<LanguageConfiguration.Token>? {
+
+    // Use the concrete text storage here as `CodeStorage.attributes(_:at:effectiveRange:)` does attribute synthesis
+    // that we don't want here.
+    return textStorage.attribute(.token, at: location, effectiveRange: nil)
+      as? TokenAttribute<LanguageConfiguration.Token>
   }
 
   /// Determine the type and range of the token to which the character at the given index belongs, if it is part of a
@@ -162,7 +179,7 @@ extension CodeStorage {
       -> (type: LanguageConfiguration.Token, range: NSRange)?
     {
       var idx = location + 1
-      while idx < length, tokenAttribute(at: idx)?.isTokenBody == true { idx += 1 }
+      while idx < length, tokenAttribute(at: idx)?.isHead == false { idx += 1 }
       return (type: type, range: NSRange(location: start, length: idx - start))
     }
 
@@ -171,13 +188,13 @@ extension CodeStorage {
 
       if let attribute = tokenAttribute(at: idx) {
 
-        if attribute.isTokenBody { idx -= 1 }   // still looking for the first character of the lexeme
-        else {                                  // we found the first character of a token
+        if !attribute.isHead { idx -= 1 }   // still looking for the first character of the lexeme
+        else {                              // we found the first character of a token
 
-          return determineTokenLength(type: attribute, start: idx)
+          return determineTokenLength(type: attribute.token, start: idx)
 
         }
-      } else { return nil }   // no token attribute => character is not part of a token lexeme
+      } else { return nil }   // no token (head) attribute => character is not part of a token lexeme
     }
     return nil      // this shouldn't happen...
   }
@@ -199,8 +216,8 @@ extension CodeStorage {
                                                                          : [.longestEffectiveRangeNotRequired]
     enumerateAttribute(.token, in: enumerationRange, options: opts){ (value, range, stop) in
 
-      // we are only intereted in token body matches
-      guard let tokenType = value as? LanguageConfiguration.Token, !tokenType.isTokenBody else { return }
+      // we are only interested in non-token body matches
+      guard let tokenType = value as? TokenAttribute<LanguageConfiguration.Token>, tokenType.isHead else { return }
 
       theSwitch: switch range.length {
       case 0:
@@ -215,7 +232,7 @@ extension CodeStorage {
 
         forLoop: for idx in reverseEnumeration ? theRange.reversed() : Array(theRange) {
 
-          block(tokenType, NSRange(location: idx, length: 1), stop)
+          block(tokenType.token, NSRange(location: idx, length: 1), stop)
           if stop.pointee.boolValue { break forLoop }
 
         }

@@ -115,7 +115,7 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
 
   init(with language: LanguageConfiguration) {
     self.language  = language
-    self.tokeniser = NSMutableAttributedString.tokeniser(for: language.tokenDictionary, with: .tokenBody)
+    self.tokeniser = NSMutableAttributedString.tokeniser(for: language.tokenDictionary)
     super.init()
   }
 
@@ -347,7 +347,7 @@ extension CodeStorageDelegate {
         // Collect the tokens and update line info
         tokeniseAndUpdateInfo(for: currentLine, commentDepth: &commentDepth, lastCommentStart: &lastCommentStart)
 
-        // The currently processed line needs to be highlighted, too
+        // Keep track of the trailing range for debugging purpose
         highlightingRange = NSUnionRange(highlightingRange, lineEntry.range)
 
       }
@@ -357,25 +357,6 @@ extension CodeStorageDelegate {
     if visualDebugging {
       textStorage.addAttribute(.backgroundColor, value: visualDebuggingTrailingColour, range: highlightingRange)
       textStorage.addAttribute(.backgroundColor, value: visualDebuggingLinesColour, range: range)
-    }
-
-    fixHighlightingAttributes(range: highlightingRange, in: textStorage)
-  }
-
-  /// Based on the token attributes, set the highlighting attributes of the characters in the given line range.
-  ///
-  func fixHighlightingAttributes(range: NSRange, in textStorage: NSTextStorage) {
-    guard let codeStorage = textStorage as? CodeStorage else { return }
-
-    // FIXME: colours need to come from a theme
-    codeStorage.addAttribute(.foregroundColor, value: labelColor, range: range)
-    codeStorage.enumerateTokens(in: range){ (value, attrRange, _) in
-      
-      if value == .string { codeStorage.addAttribute(.foregroundColor, value: OSColor.systemGreen, range: attrRange) }
-    }
-    codeStorage.enumerateAttribute(.comment, in: range){ (optionalValue, attrRange, _) in
-
-      if optionalValue != nil { codeStorage.addAttribute(.foregroundColor, value: OSColor.gray, range: attrRange) }
     }
   }
 }
