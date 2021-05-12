@@ -29,6 +29,7 @@ public struct LanguageConfiguration {
     case curlyBracketOpen
     case curlyBracketClose
     case string
+    case character
     case number
     case singleLineComment
     case nestedCommentOpen
@@ -98,6 +99,10 @@ public struct LanguageConfiguration {
   ///
   public let stringRegexp: String?
 
+  /// Regular expression matching character literals
+  ///
+  public let characterRegexp: String?
+
   /// Regular expression matching numbers
   ///
   public let numberRegexp: String?
@@ -120,6 +125,7 @@ public struct LanguageConfiguration {
     case .curlyBracketOpen:   return "{"
     case .curlyBracketClose:  return "}"
     case .string:             return nil
+    case .character:          return nil
     case .number:             return nil
     case .singleLineComment:  return singleLineComment
     case .nestedCommentOpen:  return nestedComment?.open
@@ -131,6 +137,7 @@ public struct LanguageConfiguration {
 /// Empty language configuration
 ///
 public let noConfiguration = LanguageConfiguration(stringRegexp: nil,
+                                                   characterRegexp: nil,
                                                    numberRegexp: nil,
                                                    singleLineComment: nil,
                                                    nestedComment: nil)
@@ -141,7 +148,6 @@ private let octal     = "(?:[0-7]_*)+"
 private let decimal   = "(?:[0-9]_*)+"
 private let hexal     = "(?:[0-9A-Fa-f]_*)+"
 private let optNeg    = "(?:\\B-|\\b)"
-//private let optNeg    = "(?:\\b-)?"
 private let exponent  = "[eE](?:[+-])?" + decimal
 private let hexponent = "[pP](?:[+-])?" + decimal
 
@@ -151,6 +157,7 @@ private func alternatives(_ alts: [String]) -> String { alts.map{ group($0) }.jo
 /// Language configuration for Haskell (including GHC extensions)
 ///
 public let haskellConfiguration = LanguageConfiguration(stringRegexp: "\"(?:\\\\\"|[^\"])*+\"",
+                                                        characterRegexp: "'(?:\\\\'|[^']|\\\\[^']*+)'",
                                                         numberRegexp:
                                                           optNeg +
                                                           group(alternatives([
@@ -168,6 +175,7 @@ public let haskellConfiguration = LanguageConfiguration(stringRegexp: "\"(?:\\\\
 /// Language configuration for Swift
 ///
 public let swiftConfiguration = LanguageConfiguration(stringRegexp: "\"(?:\\\\\"|[^\"])*+\"",
+                                                      characterRegexp: nil,
                                                       numberRegexp:
                                                         optNeg +
                                                         group(alternatives([
@@ -221,6 +229,7 @@ extension LanguageConfiguration {
     codeTokenDictionary.updateValue(token(Token.curlyBracketOpen), forKey: .string("{"))
     codeTokenDictionary.updateValue(token(Token.curlyBracketClose), forKey: .string("}"))
     if let lexeme = stringRegexp { codeTokenDictionary.updateValue(token(Token.string), forKey: .pattern(lexeme)) }
+    if let lexeme = characterRegexp { codeTokenDictionary.updateValue(token(Token.character), forKey: .pattern(lexeme)) }
     if let lexeme = numberRegexp { codeTokenDictionary.updateValue(token(Token.number), forKey: .pattern(lexeme)) }
     if let lexeme = singleLineComment {
       codeTokenDictionary.updateValue(token(Token.singleLineComment), forKey: .string(lexeme))
