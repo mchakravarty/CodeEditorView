@@ -29,6 +29,7 @@ public struct LanguageConfiguration {
     case curlyBracketOpen
     case curlyBracketClose
     case string
+    case number
     case singleLineComment
     case nestedCommentOpen
     case nestedCommentClose
@@ -97,6 +98,10 @@ public struct LanguageConfiguration {
   ///
   public let stringRegexp: String?
 
+  /// Regular expression matching numbers
+  ///
+  public let numberRegexp: String?
+
   /// Lexeme that introduces a single line comment
   public let singleLineComment: String?
 
@@ -115,6 +120,7 @@ public struct LanguageConfiguration {
     case .curlyBracketOpen:   return "{"
     case .curlyBracketClose:  return "}"
     case .string:             return nil
+    case .number:             return nil
     case .singleLineComment:  return singleLineComment
     case .nestedCommentOpen:  return nestedComment?.open
     case .nestedCommentClose: return nestedComment?.close
@@ -125,18 +131,54 @@ public struct LanguageConfiguration {
 /// Empty language configuration
 ///
 public let noConfiguration = LanguageConfiguration(stringRegexp: nil,
+                                                   numberRegexp: nil,
                                                    singleLineComment: nil,
                                                    nestedComment: nil)
 
-/// Language configuration for Haskell
+// Helpers
+private let binary    = "(?:[01]_*)+"
+private let octal     = "(?:[0-7]_*)+"
+private let decimal   = "(?:[0-9]_*)+"
+private let hexal     = "(?:[0-9A-Fa-f]_*)+"
+private let optNeg    = "(?:\\B-|\\b)"
+//private let optNeg    = "(?:\\b-)?"
+private let exponent  = "[eE](?:[+-])?" + decimal
+private let hexponent = "[pP](?:[+-])?" + decimal
+
+private func group(_ regexp: String) -> String { "(?:" + regexp + ")" }
+private func alternatives(_ alts: [String]) -> String { alts.map{ group($0) }.joined(separator: "|") }
+
+/// Language configuration for Haskell (including GHC extensions)
 ///
 public let haskellConfiguration = LanguageConfiguration(stringRegexp: "\"(?:\\\\\"|[^\"])*+\"",
+                                                        numberRegexp:
+                                                          optNeg +
+                                                          group(alternatives([
+                                                            "0[bB]" + binary,
+                                                            "0[oO]" + octal,
+                                                            "0[xX]" + hexal,
+                                                            "0[xX]" + hexal + "\\." + hexal + hexponent + "?",
+                                                            decimal + "\\." + decimal + exponent + "?",
+                                                            decimal + exponent,
+                                                            decimal
+                                                          ])),
                                                         singleLineComment: "--",
                                                         nestedComment: (open: "{-", close: "-}"))
 
 /// Language configuration for Swift
 ///
 public let swiftConfiguration = LanguageConfiguration(stringRegexp: "\"(?:\\\\\"|[^\"])*+\"",
+                                                      numberRegexp:
+                                                        optNeg +
+                                                        group(alternatives([
+                                                          "0b" + binary,
+                                                          "0o" + octal,
+                                                          "0x" + hexal,
+                                                          "0x" + hexal + "\\." + hexal + hexponent + "?",
+                                                          decimal + "\\." + decimal + exponent + "?",
+                                                          decimal + exponent,
+                                                          decimal
+                                                        ])),
                                                       singleLineComment: "//",
                                                       nestedComment: (open: "/*", close: "*/"))
 
@@ -179,6 +221,7 @@ extension LanguageConfiguration {
     codeTokenDictionary.updateValue(token(Token.curlyBracketOpen), forKey: .string("{"))
     codeTokenDictionary.updateValue(token(Token.curlyBracketClose), forKey: .string("}"))
     if let lexeme = stringRegexp { codeTokenDictionary.updateValue(token(Token.string), forKey: .pattern(lexeme)) }
+    if let lexeme = numberRegexp { codeTokenDictionary.updateValue(token(Token.number), forKey: .pattern(lexeme)) }
     if let lexeme = singleLineComment {
       codeTokenDictionary.updateValue(token(Token.singleLineComment), forKey: .string(lexeme))
     }
