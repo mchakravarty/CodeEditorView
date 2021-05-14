@@ -37,9 +37,11 @@ class CodeStorage: NSTextStorage {
     else if let tokenAttr = attributes[.token] as? TokenAttribute<LanguageConfiguration.Token> {
 
       switch tokenAttr.token {
-      case .string:    foregroundColour = OSColor.systemGreen
-      case .character: foregroundColour = OSColor.systemTeal
-      case .number:    foregroundColour = OSColor.systemYellow
+      case .string:     foregroundColour = OSColor.systemGreen
+      case .character:  foregroundColour = OSColor.systemTeal
+      case .number:     foregroundColour = OSColor.systemYellow
+      case .identifier: foregroundColour = OSColor.systemBrown
+      case .keyword:    foregroundColour = OSColor.systemPink
       default: ()
       }
     }

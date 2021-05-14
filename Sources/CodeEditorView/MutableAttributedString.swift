@@ -24,13 +24,15 @@ private let logger = Logger(subsystem: "org.justtesting.CodeEditor", category: "
 ///
 public enum TokenPattern: Hashable, Equatable, Comparable {
 
-  /// The token has only one lexeme, given as a simple string
-  ///
-  case string(String)
-
   /// The token has multiple lexemes, specified in the form of a regular expression string
   ///
   case pattern(String)
+
+  /// The token has only one lexeme, given as a simple string
+  ///
+  case string(String) // This case needs to be the second one as we want it to compare as being greater than `.pattern`;
+                      // that ensures that it will appear first in the generated tokeniser regexp and hence match first
+                      // in case of overlap.
 }
 
 public protocol TokeniserState {
@@ -108,20 +110,19 @@ extension NSMutableAttributedString {
   ///
   /// - Parameters:
   ///   - tokenMap: The token dictionary determining the lexemes to match and their token type.
-  ///   - tokenBody: The token value to use to attribute all body characters of a token's lexeme; i.e., all characters
-  ///                except for the initial one.
   /// - Returns: A tokeniser that matches all lexemes contained in the token dictionary.
   ///
   /// The tokeniser is based on an eager regular expression matcher. Hence, it will match the first matching alternative
   /// in a sequence of alternatives. To deal with string patterns, where some patterns may be a prefix of another, the
   /// string patterns are turned into regular expression alternatives longest string first. However, pattern consisting
   /// of regular expressions are tried in an indeterminate order. Hence, no pattern should have as a full match a prefix
-  /// of another pattern's full match, to avoid indeterminate results.
+  /// of another pattern's full match, to avoid indeterminate results. Moreover, strings match before patterns that
+  /// cover the same lexeme.
   ///
   /// For each token that has got a multi-character lexeme, the tokeniser attributes the first character of that lexeme
-  /// with the token-specific token type. All other characters of the lexeme —what we call the token body— gets
-  /// attributed with `tokenBody`. This is crucial to be able to distinguish the boundaries of multiple successive
-  /// tokens of the same type.
+  /// with a token attribute marked as being the lexeme head character. All other characters of the lexeme —what we call
+  /// the token body— are marked with the same token attribute, but without being identified as a lexeme head. This
+  /// distinction is crucial to be able to distinguish the boundaries of multiple successive tokens of the same type.
   ///
   public static func tokeniser<TokenType, StateType: TokeniserState>(for tokenMap: TokenDictionary<TokenType, StateType>)
   -> Tokeniser<TokenType, StateType>?
@@ -131,7 +132,7 @@ extension NSMutableAttributedString {
     {
 
       // NB: Be careful with the re-ordering, because the order in `patternTokenTypes` below must match the order of
-      //     the patterns in the laternatives of the regular expression. (We must re-order due to eager matching as
+      //     the patterns in the alternatives of the regular expression. (We must re-order due to eager matching as
       //     explained in the documentation of this function.)
       let orderedMap = stateMap.sorted{ (lhs, rhs) in return lhs.key > rhs.key },
           pattern    = orderedMap.reduce("") { (regexp, mapEntry) in
