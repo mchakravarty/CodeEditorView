@@ -11,7 +11,8 @@ import Foundation
 
 /// A code highlighting theme. Different syntactic elements are purely distinguished by colour.
 ///
-public struct Theme {
+public struct Theme: Identifiable {
+  public var id = UUID()
 
   /// The name of the font to use.
   ///
@@ -77,7 +78,7 @@ typealias Themes = [String: Theme]
 extension Theme {
 
   public static var defaultDark: Theme
-    = Theme(fontName: "SF Mono Medium",
+    = Theme(fontName: "SFMono-Medium",
             fontSize: 13.0,
             textColour: OSColor(red: 0.87, green: 0.87, blue: 0.88, alpha: 1.0),
             commentColour: OSColor(red: 0.51, green: 0.55, blue: 0.59, alpha: 1.0),
@@ -93,7 +94,7 @@ extension Theme {
             invisiblesColour: OSColor(red: 0.33, green: 0.37, blue: 0.42, alpha: 1.0))
 
   public static var defaultLight: Theme
-    = Theme(fontName: "SF Mono Regular",
+    = Theme(fontName: "SFMono-Regular",
             fontSize: 13.0,
             textColour: OSColor(red: 0.15, green: 0.15, blue: 0.15, alpha: 1.0),
             commentColour: OSColor(red: 0.45, green: 0.50, blue: 0.55, alpha: 1.0),
@@ -107,4 +108,33 @@ extension Theme {
             selectionColour: OSColor(red: 0.73, green: 0.84, blue: 0.99, alpha: 1.0),
             cursorColour: OSColor(red: 0.0, green: 0.0, blue: 0.0, alpha: 1.0),
             invisiblesColour: OSColor(red: 0.84, green: 0.84, blue: 0.84, alpha: 1.0))
+}
+
+extension Theme {
+
+  var font: OSFont {
+    if fontName.hasPrefix("SFMono") {
+
+      let weightString = fontName.dropFirst("SFMono".count)
+      let weight       : OSFont.Weight
+      switch weightString {
+      case "UltraLight": weight = .ultraLight
+      case "Thin":       weight = .thin
+      case "Light":      weight = .light
+      case "Regular":    weight = .regular
+      case "Medium":     weight = .medium
+      case "Semibold":   weight = .semibold
+      case "Bold":       weight = .bold
+      case "Heavy":      weight = .heavy
+      case "Black":      weight = .black
+      default:           weight = .regular
+      }
+      return OSFont.monospacedSystemFont(ofSize: fontSize, weight: weight)
+
+    } else {
+
+      return OSFont(name: fontName, size: fontSize) ?? OSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+
+    }
+  }
 }

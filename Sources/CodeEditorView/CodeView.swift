@@ -48,6 +48,19 @@ class CodeView: UITextView {
   fileprivate var codeViewDelegate:    CodeViewDelegate?
   fileprivate var codeStorageDelegate: CodeStorageDelegate?
 
+  /// The current highlighting theme
+  ///
+  var theme: Theme {
+    didSet {
+      font                                 = NSFont(name: theme.fontName, size: theme.fontSize)
+      backgroundColor                      = theme.backgroundColour
+      insertionPointColor                  = theme.cursorColour
+      selectedTextAttributes               = [.backgroundColor: theme.selectionColour]
+      (textStorage as? CodeStorage)?.theme = theme
+      gutterView?.theme                    = theme
+    }
+  }
+
   /// Keeps track of the set of message views.
   ///
   var messageViews: MessageViews = [:]
@@ -59,7 +72,7 @@ class CodeView: UITextView {
     // Use custom components that are gutter-aware and support code-specific editing actions and highlighting.
     let codeLayoutManager = CodeLayoutManager(),
         codeContainer     = CodeContainer(),
-        codeStorage       = CodeStorage()
+        codeStorage       = CodeStorage(theme: theme)
     codeStorage.addLayoutManager(codeLayoutManager)
     codeContainer.layoutManager = codeLayoutManager
     codeLayoutManager.addTextContainer(codeContainer)
@@ -68,8 +81,10 @@ class CodeView: UITextView {
     codeContainer.textView = self
 
     // Set basic display and input properties
-    font = UIFont.monospacedSystemFont(ofSize: UIFont.systemFontSize, weight: .regular)
-    backgroundColor        = UIColor.systemBackground
+    font                   = theme.font
+    backgroundColor        = theme.backgroundColour
+    insertionPointColor    = theme.cursorColour
+    selectedTextAttributes = [.backgroundColor: theme.selectionColour]
     autocapitalizationType = .none
     autocorrectionType     = .no
     spellCheckingType      = .no
@@ -86,11 +101,12 @@ class CodeView: UITextView {
     codeStorage.delegate     = self.codeStorageDelegate
 
     // Add a gutter view
-    let gutterWidth = ceil(font?.pointSize ?? UIFont.systemFontSize) * 3,
+    let gutterWidth = ceil(theme.fontSize) * 3,
         gutterView  = GutterView(frame: CGRect(x: 0,
                                                y: 0,
                                                width: gutterWidth,
                                                height: CGFloat.greatestFiniteMagnitude),
+                                 theme: theme,
                                  textView: self,
                                  getMessageViews: { self.messageViews })
     addSubview(gutterView)
@@ -162,18 +178,36 @@ class CodeView: NSTextView {
   var documentVisibleBox: NSBox?
   var minimapDividerView: NSBox?
 
+  /// The current highlighting theme
+  ///
+  var theme: Theme {
+    didSet {
+      font                                 = theme.font
+      backgroundColor                      = theme.backgroundColour
+      insertionPointColor                  = theme.cursorColour
+      selectedTextAttributes               = [.backgroundColor: theme.selectionColour]
+      (textStorage as? CodeStorage)?.theme = theme
+      gutterView?.theme                    = theme
+      minimapView?.backgroundColor         = theme.backgroundColour
+      minimapGutterView?.theme             = theme
+      documentVisibleBox?.fillColor        = theme.textColour.withAlphaComponent(0.1)
+    }
+  }
+
   /// Keeps track of the set of message views.
   ///
   var messageViews: MessageViews = [:]
 
   /// Designated initializer for code views with a gutter.
   ///
-  init(frame: CGRect, with language: LanguageConfiguration) {
+  init(frame: CGRect, with language: LanguageConfiguration, theme: Theme) {
+
+    self.theme = theme
 
     // Use custom components that are gutter-aware and support code-specific editing actions and highlighting.
     let codeLayoutManager = CodeLayoutManager(),
         codeContainer     = CodeContainer(),
-        codeStorage       = CodeStorage()
+        codeStorage       = CodeStorage(theme: theme)
     codeStorage.addLayoutManager(codeLayoutManager)
     codeContainer.layoutManager = codeLayoutManager
     codeLayoutManager.addTextContainer(codeContainer)
@@ -181,9 +215,10 @@ class CodeView: NSTextView {
     super.init(frame: frame, textContainer: codeContainer)
 
     // Set basic display and input properties
-    font = NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
-    backgroundColor                      = NSColor.textBackgroundColor
-    insertionPointColor                  = NSColor.textColor
+    font                                 = theme.font
+    backgroundColor                      = theme.backgroundColour
+    insertionPointColor                  = theme.cursorColour
+    selectedTextAttributes               = [.backgroundColor: theme.selectionColour]
     isRichText                           = false
     isAutomaticQuoteSubstitutionEnabled  = false
     isAutomaticLinkDetectionEnabled      = false
@@ -218,6 +253,7 @@ class CodeView: NSTextView {
     // Add a gutter view
     let gutterView = GutterView(frame: CGRect.zero,
                                 textView: self,
+                                theme: theme,
                                 getMessageViews: { self.messageViews },
                                 isMinimapGutter: false)
     gutterView.autoresizingMask = .none
@@ -231,6 +267,7 @@ class CodeView: NSTextView {
         minimapView          = MinimapView(),
         minimapGutterView    = GutterView(frame: CGRect.zero,
                                           textView: minimapView,
+                                          theme: theme,
                                           getMessageViews: { self.messageViews },
                                           isMinimapGutter: true),
         minimapDividerView   = NSBox()
@@ -242,6 +279,7 @@ class CodeView: NSTextView {
 
     minimapView.textContainer?.replaceLayoutManager(minimapLayoutManager)
     codeStorage.addLayoutManager(minimapLayoutManager)
+    minimapView.backgroundColor                     = backgroundColor
     minimapView.autoresizingMask                    = .none
     minimapView.isEditable                          = false
     minimapView.isSelectable                        = false
@@ -261,7 +299,7 @@ class CodeView: NSTextView {
 
     let documentVisibleBox = NSBox()
     documentVisibleBox.boxType     = .custom
-    documentVisibleBox.fillColor   = NSColor(white: 1, alpha: 0.1)
+    documentVisibleBox.fillColor   = theme.textColour.withAlphaComponent(0.1)
     documentVisibleBox.borderWidth = 0
     minimapView.addSubview(documentVisibleBox)
     self.documentVisibleBox = documentVisibleBox
@@ -297,7 +335,7 @@ class CodeView: NSTextView {
     super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelectingFlag)
     minimapView?.selectedRanges = selectedRanges    // minimap mirrors the selection of the main code view
 
-    // To get the correct background colour for the (old and/or new) current line, we need to invalidate the line
+    // To get the correct background colour for the (old and/or new) current line, we need to invalidate the line 
     // region.
     let oldLineRange = oldInsertionPoint.flatMap{ (
       textStorage?.string as NSString?)?.lineRange(for: NSRange(location: $0, length: 0))
@@ -345,13 +383,10 @@ class CodeView: NSTextView {
     let glyphRange = layoutManager.glyphRange(forBoundingRectWithoutAdditionalLayout: rect, in: textContainer),
         charRange  = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
 
-    // FIXME: this must come from the theme
-    let currentLineColour = backgroundColor.highlight(withLevel: 0.1) ?? backgroundColor
-
     // If the selection is an insertion point, highlight the corresponding line
     if let location = insertionPoint, charRange.contains(location) || location == NSMaxRange(charRange) {
 
-      drawBackgroundHighlight(in: rect, forLineContaining: location, withColour: currentLineColour)
+      drawBackgroundHighlight(in: rect, forLineContaining: location, withColour: theme.currentLineColour)
 
     }
 
@@ -361,7 +396,7 @@ class CodeView: NSTextView {
       let glyphRange = layoutManager.glyphRange(forBoundingRect: messageView.value.lineFragementRect, in: textContainer),
           index      = layoutManager.characterIndexForGlyph(at: glyphRange.location)
 
-// This seems like a worthwhile optimisatiob but, sometimes we are called in a situation, where `charRange` computes
+// This seems like a worthwhile optimisatio, but sometimes we are called in a situation, where `charRange` computes
 // to be the empty range although the whole visible area is being redrawn.
 //      if charRange.contains(index) {
 

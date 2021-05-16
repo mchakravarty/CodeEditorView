@@ -32,6 +32,10 @@ class GutterView: UIView {
   ///
   let textView: UITextView
 
+  /// The current code editor theme
+  ///
+  var theme: Theme
+
   /// Accessor for the associated text view's message views.
   ///
   let getMessageViews: () -> MessageViews
@@ -43,8 +47,9 @@ class GutterView: UIView {
   /// Create and configure a gutter view for the given text view. This will also set the appropiate exclusion path for
   /// text container.
   ///
-  init(frame: CGRect, textView: UITextView, getMessageViews: @escaping () -> MessageViews) {
+  init(frame: CGRect, textView: UITextView, theme: Theme, getMessageViews: @escaping () -> MessageViews) {
     self.textView        = textView
+    self.theme           = theme
     self.getMessageViews = getMessageViews
     super.init(frame: frame)
     let gutterExclusionPath = UIBezierPath(rect: CGRect(origin: frame.origin,
@@ -81,6 +86,10 @@ class GutterView: NSView {
   ///
   let textView: NSTextView
 
+  /// The current code editor theme
+  ///
+  var theme: Theme
+
   /// Accessor for the associated text view's message views.
   ///
   let getMessageViews: () -> MessageViews
@@ -92,8 +101,9 @@ class GutterView: NSView {
   /// Create and configure a gutter view for the given text view. This will also set the appropiate exclusion path for
   /// text container.
   ///
-  init(frame: CGRect, textView: NSTextView, getMessageViews: @escaping () -> MessageViews, isMinimapGutter: Bool) {
+  init(frame: CGRect, textView: NSTextView, theme: Theme, getMessageViews: @escaping () -> MessageViews, isMinimapGutter: Bool) {
     self.textView        = textView
+    self.theme           = theme
     self.getMessageViews = getMessageViews
     self.isMinimapGutter = isMinimapGutter
     super.init(frame: frame)
@@ -162,31 +172,26 @@ extension GutterView {
           let lineMap       = optLineMap
     else { return }
 
-    // TODO: Inherit background colour and line number font size from the text view.
-    let backgroundColour = textView.textBackgroundColor,
-        insertionPoint   = textView.insertionPoint
-
-    backgroundColour?.setFill()
+    theme.backgroundColour.setFill()
     OSBezierPath(rect: rect).fill()
-    let fontSize = textView.textFont?.pointSize ?? OSFont.systemFontSize,
-        desc     = OSFont.systemFont(ofSize: fontSize).fontDescriptor.addingAttributes(
-                     [ FontDescriptor.AttributeName.featureSettings:
-                         [
-                           [
-                             fontDescriptorFeatureIdentifier: kNumberSpacingType,
-                             fontDescriptorTypeIdentifier: kMonospacedNumbersSelector,
-                           ],
-                           [
-                             fontDescriptorFeatureIdentifier: kStylisticAlternativesType,
-                             fontDescriptorTypeIdentifier: kStylisticAltOneOnSelector,  // alt 6 and 9
-                           ],
-                           [
-                             fontDescriptorFeatureIdentifier: kStylisticAlternativesType,
-                             fontDescriptorTypeIdentifier: kStylisticAltTwoOnSelector,  // alt 4
-                           ]
-                         ]
-                     ]
-                   )
+    let desc = OSFont.systemFont(ofSize: theme.fontSize).fontDescriptor.addingAttributes(
+      [ FontDescriptor.AttributeName.featureSettings:
+          [
+            [
+              fontDescriptorFeatureIdentifier: kNumberSpacingType,
+              fontDescriptorTypeIdentifier: kMonospacedNumbersSelector,
+            ],
+            [
+              fontDescriptorFeatureIdentifier: kStylisticAlternativesType,
+              fontDescriptorTypeIdentifier: kStylisticAltOneOnSelector,  // alt 6 and 9
+            ],
+            [
+              fontDescriptorFeatureIdentifier: kStylisticAlternativesType,
+              fontDescriptorTypeIdentifier: kStylisticAltTwoOnSelector,  // alt 4
+            ]
+          ]
+      ]
+    )
     #if os(iOS)
     let font = OSFont(descriptor: desc, size: 0)
     #elseif os(macOS)
@@ -199,9 +204,9 @@ extension GutterView {
     #if os(macOS)
 
     // Highlight the current line in the gutter
-    if let location = insertionPoint {
+    if let location = textView.insertionPoint {
 
-      backgroundColour?.highlight(withLevel: 0.1)?.setFill()
+      theme.currentLineColour.setFill()
       layoutManager.enumerateFragmentRects(forLineContaining: location){ fragmentRect in
         let intersectionRect = rect.intersection(self.gutterRectFrom(textRect: fragmentRect))
         if !intersectionRect.isEmpty { NSBezierPath(rect: intersectionRect).fill() }
@@ -245,15 +250,15 @@ extension GutterView {
       // Text attributes for the line numbers
       let lineNumberStyle = NSMutableParagraphStyle()
       lineNumberStyle.alignment = .right
-      lineNumberStyle.tailIndent = -fontSize / 11
+      lineNumberStyle.tailIndent = -theme.fontSize / 11
       let textAttributesDefault  = [NSAttributedString.Key.font: font,
                                     .foregroundColor: lineNumberColour,
                                     .paragraphStyle: lineNumberStyle,
-                                    .kern: NSNumber(value: Float(-fontSize / 11))],
+                                    .kern: NSNumber(value: Float(-theme.fontSize / 11))],
           textAttributesSelected = [NSAttributedString.Key.font: font,
-                                    .foregroundColor: labelColor,
+                                    .foregroundColor: theme.textColour,
                                     .paragraphStyle: lineNumberStyle,
-                                    .kern: NSNumber(value: Float(-fontSize / 11))]
+                                    .kern: NSNumber(value: Float(-theme.fontSize / 11))]
 
       // TODO: CodeEditor needs to be parameterised by message theme
       let theme = Message.defaultTheme

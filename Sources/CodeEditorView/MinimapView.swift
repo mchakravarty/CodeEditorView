@@ -22,14 +22,10 @@ class MinimapView: NSTextView {
   override func drawBackground(in rect: NSRect) {
     super.drawBackground(in: rect)
 
-    guard let layoutManager = layoutManager
-    else { return }
-
-    // FIXME: this must come from the theme
-    let currentLineColour = backgroundColor.highlight(withLevel: 0.1) ?? backgroundColor
+    guard let layoutManager = layoutManager else { return }
 
     // Highlight the current line
-    currentLineColour.setFill()
+    codeView?.theme.currentLineColour.setFill()
     if let location = insertionPoint {
 
       layoutManager.enumerateFragmentRects(forLineContaining: location){ rect in NSBezierPath(rect: rect).fill() }
@@ -70,7 +66,7 @@ class MinimapLayoutManager: NSLayoutManager {
           // TODO: could try to optimise by using the `effectiveRange` of the attribute lookup to compute an entire glyph run to draw as one rectangle
           let charIndex = self.characterIndexForGlyph(at: glyphRange.location + index)
           if let colour = textStorage.attribute(.foregroundColor, at: charIndex, effectiveRange: nil) as? NSColor {
-            colour.shadow(withLevel: 0.5)?.setFill()
+            colour.withAlphaComponent(0.30).setFill()
           }
           NSBezierPath(rect: CGRect(x: origin.x + CGFloat(index),
                                     y: origin.y,

@@ -24,24 +24,37 @@ class CodeStorage: NSTextStorage {
 
   let textStorage: NSTextStorage = NSTextStorage()
 
+  var theme: Theme
+
   override var string: String { textStorage.string }
 
-  override func attributes(at location: Int, effectiveRange range: NSRangePointer?) -> [NSAttributedString.Key : Any] {
-    var attributes = textStorage.attributes(at: location, effectiveRange: range)
+  init(theme: Theme) {
+    self.theme = theme
+    super.init()
+  }
 
-    // FIXME: colour must come from a theme
-    var foregroundColour = OSColor.labelColor
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  required init?(pasteboardPropertyList propertyList: Any, ofType type: NSPasteboard.PasteboardType) {
+    fatalError("init(pasteboardPropertyList:ofType:) has not been implemented")
+  }
+
+  override func attributes(at location: Int, effectiveRange range: NSRangePointer?) -> [NSAttributedString.Key : Any] {
+    var attributes       = textStorage.attributes(at: location, effectiveRange: range)
+    var foregroundColour = theme.textColour
 
     // Translate attributes indicating text highlighting to the foreground colour determined by the current theme.
-    if attributes[.comment] != nil { foregroundColour = OSColor.gray }
+    if attributes[.comment] != nil { foregroundColour = theme.commentColour }
     else if let tokenAttr = attributes[.token] as? TokenAttribute<LanguageConfiguration.Token> {
 
       switch tokenAttr.token {
-      case .string:     foregroundColour = OSColor.systemGreen
-      case .character:  foregroundColour = OSColor.systemTeal
-      case .number:     foregroundColour = OSColor.systemYellow
-      case .identifier: foregroundColour = OSColor.systemBrown
-      case .keyword:    foregroundColour = OSColor.systemPink
+      case .string:     foregroundColour = theme.stringColour
+      case .character:  foregroundColour = theme.characterColour
+      case .number:     foregroundColour = theme.numberColour
+      case .identifier: foregroundColour = theme.identifierColour
+      case .keyword:    foregroundColour = theme.keywordColour
       default: ()
       }
     }

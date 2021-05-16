@@ -13,7 +13,11 @@ import SwiftUI
 // MARK: -
 // MARK: UIKit version
 
-/// SwiftUI code editor based on TextKit
+/// SwiftUI code editor based on TextKit.
+///
+/// SwiftUI `Environment`:
+/// * Environment value `codeEditorTheme`: determines the code highlighting theme to use
+/// * Text-related values: affect the rendering of message views
 ///
 public struct CodeEditor: UIViewRepresentable {
   let language: LanguageConfiguration
@@ -27,7 +31,7 @@ public struct CodeEditor: UIViewRepresentable {
 
   public func makeUIView(context: Context) -> UITextView {
     let textView = CodeView(frame: CGRect(x: 0, y: 0, width: 100, height: 40),
-                                      with: language)
+                            with: language)
 
     textView.text = text
     if let delegate = textView.delegate as? CodeViewDelegate {
@@ -66,6 +70,10 @@ public struct CodeEditor: UIViewRepresentable {
 
 /// SwiftUI code editor based on TextKit
 ///
+/// SwiftUI `Environment`:
+/// * Environment value `codeEditorTheme`: determines the code highlighting theme to use
+/// * Text-related values: affect the rendering of message views
+///
 public struct CodeEditor: NSViewRepresentable {
   let language: LanguageConfiguration
 //  let messagePublisher: PassthroughSubject<Message,NSError>
@@ -88,7 +96,7 @@ public struct CodeEditor: NSViewRepresentable {
 
     // Set up text view with gutter
     let textView = CodeView(frame: CGRect(x: 0, y: 0, width: 100, height: 40),
-                                      with: language)
+                            with: language, theme: context.environment[CodeEditorTheme])
     textView.isVerticallyResizable   = true
     textView.isHorizontallyResizable = false
     textView.autoresizingMask        = .width
@@ -113,9 +121,12 @@ public struct CodeEditor: NSViewRepresentable {
   }
 
   public func updateNSView(_ nsView: NSScrollView, context: Context) {
-    guard let textView = nsView.documentView as? NSTextView else { return }
+    guard let codeView = nsView.documentView as? CodeView else { return }
 
-    if text != textView.string { textView.string = text }  // Hoping for the string comparison fast path...
+    let theme = context.environment[CodeEditorTheme]
+
+    if text != codeView.string { codeView.string = text }  // Hoping for the string comparison fast path...
+    if theme.id != codeView.theme.id { codeView.theme = theme }
   }
 
   public func makeCoordinator() -> Coordinator {
@@ -143,6 +154,26 @@ public struct CodeEditor: NSViewRepresentable {
 }
 
 #endif
+
+
+// MARK: -
+// MARK: Shared code
+
+/// Environment key for the current code editor theme.
+///
+public struct CodeEditorTheme: EnvironmentKey {
+  public static var defaultValue: Theme = Theme.defaultLight
+}
+
+extension EnvironmentValues {
+
+  /// The current code editor theme.
+  ///
+  var codeEditorTheme: Theme {
+    get { self[CodeEditorTheme.self] }
+    set { self[CodeEditorTheme.self] = newValue }
+  }
+}
 
 
 // MARK: -
