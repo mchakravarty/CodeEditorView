@@ -58,6 +58,7 @@ class CodeView: UITextView {
       selectedTextAttributes               = [.backgroundColor: theme.selectionColour]
       (textStorage as? CodeStorage)?.theme = theme
       gutterView?.theme                    = theme
+      setNeedsDisplay(bounds)
     }
   }
 
@@ -191,6 +192,8 @@ class CodeView: NSTextView {
       minimapView?.backgroundColor         = theme.backgroundColour
       minimapGutterView?.theme             = theme
       documentVisibleBox?.fillColor        = theme.textColour.withAlphaComponent(0.1)
+      tile()
+      setNeedsDisplay(visibleRect)
     }
   }
 
