@@ -390,13 +390,15 @@ extension StatefulMessageView {
       self.fontSize = fontSize
       super.init(frame: .zero)
 
-      self.translatesAutoresizingMaskIntoConstraints = false
+      isOpaque                                  = false
+      translatesAutoresizingMaskIntoConstraints = false
 
-      self.hostingView = UIHostingView(rootView: StatefulMessageView(messages: messages,
-                                                                     theme: theme,
-                                                                     geometry: geometry,
-                                                                     fontSize: fontSize,
-                                                                     unfolded: unfoldedState))
+      hostingView = UIHostingView(rootView: StatefulMessageView(messages: messages,
+                                                                theme: theme,
+                                                                geometry: geometry,
+                                                                fontSize: fontSize,
+                                                                unfolded: unfoldedState))
+      hostingView?.isOpaque                                  = false
       hostingView?.translatesAutoresizingMaskIntoConstraints = false
       if let view = hostingView {
 

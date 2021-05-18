@@ -52,10 +52,9 @@ class CodeView: UITextView {
   ///
   var theme: Theme {
     didSet {
-      font                                 = NSFont(name: theme.fontName, size: theme.fontSize)
+      font                                 = UIFont(name: theme.fontName, size: theme.fontSize)
       backgroundColor                      = theme.backgroundColour
-      insertionPointColor                  = theme.cursorColour
-      selectedTextAttributes               = [.backgroundColor: theme.selectionColour]
+      tintColor                            = theme.tintColour
       (textStorage as? CodeStorage)?.theme = theme
       gutterView?.theme                    = theme
       setNeedsDisplay(bounds)
@@ -68,7 +67,9 @@ class CodeView: UITextView {
 
   /// Designated initializer for code views with a gutter.
   ///
-  init(frame: CGRect, with language: LanguageConfiguration) {
+  init(frame: CGRect, with language: LanguageConfiguration, theme: Theme) {
+
+    self.theme = theme
 
     // Use custom components that are gutter-aware and support code-specific editing actions and highlighting.
     let codeLayoutManager = CodeLayoutManager(),
@@ -84,8 +85,7 @@ class CodeView: UITextView {
     // Set basic display and input properties
     font                   = theme.font
     backgroundColor        = theme.backgroundColour
-    insertionPointColor    = theme.cursorColour
-    selectedTextAttributes = [.backgroundColor: theme.selectionColour]
+    tintColor              = theme.tintColour
     autocapitalizationType = .none
     autocorrectionType     = .no
     spellCheckingType      = .no
@@ -107,8 +107,8 @@ class CodeView: UITextView {
                                                y: 0,
                                                width: gutterWidth,
                                                height: CGFloat.greatestFiniteMagnitude),
-                                 theme: theme,
                                  textView: self,
+                                 theme: theme,
                                  getMessageViews: { self.messageViews })
     addSubview(gutterView)
     self.gutterView              = gutterView

@@ -37,9 +37,11 @@ class CodeStorage: NSTextStorage {
     fatalError("init(coder:) has not been implemented")
   }
 
+  #if os(macOS)
   required init?(pasteboardPropertyList propertyList: Any, ofType type: NSPasteboard.PasteboardType) {
     fatalError("init(pasteboardPropertyList:ofType:) has not been implemented")
   }
+  #endif
 
   override func attributes(at location: Int, effectiveRange range: NSRangePointer?) -> [NSAttributedString.Key : Any] {
     var attributes       = textStorage.attributes(at: location, effectiveRange: range)

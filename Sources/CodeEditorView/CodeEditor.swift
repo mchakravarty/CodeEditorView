@@ -31,7 +31,7 @@ public struct CodeEditor: UIViewRepresentable {
 
   public func makeUIView(context: Context) -> UITextView {
     let textView = CodeView(frame: CGRect(x: 0, y: 0, width: 100, height: 40),
-                            with: language)
+                            with: language, theme: context.environment[CodeEditorTheme])
 
     textView.text = text
     if let delegate = textView.delegate as? CodeViewDelegate {

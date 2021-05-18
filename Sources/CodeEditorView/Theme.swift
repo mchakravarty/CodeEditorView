@@ -6,7 +6,7 @@
 //
 //  This module defines code highlight themes.
 
-import Foundation
+import SwiftUI
 
 
 /// A code highlighting theme. Different syntactic elements are purely distinguished by colour.
@@ -112,6 +112,8 @@ extension Theme {
 
 extension Theme {
 
+  /// Font object on the basis of the font name and size of the theme.
+  ///
   var font: OSFont {
     if fontName.hasPrefix("SFMono") {
 
@@ -137,4 +139,30 @@ extension Theme {
 
     }
   }
+
+  #if os(iOS)
+
+  /// Tint colour on the basis oc the cursor and selection colour of the theme.
+  ///
+  var tintColour: UIColor {
+    var selectionHue        = CGFloat(0.0),
+        selectionSaturation = CGFloat(0.0),
+        selectionBrigthness = CGFloat(0.0),
+        cursorHue           = CGFloat(0.0),
+        cursorSaturation    = CGFloat(0.0),
+        cursorBrigthness    = CGFloat(0.0)
+
+    // TODO: This is awkward...
+    selectionColour.getHue(&selectionHue,
+                           saturation: &selectionSaturation,
+                           brightness: &selectionBrigthness,
+                           alpha: nil)
+    cursorColour.getHue(&cursorHue, saturation: &cursorSaturation, brightness: &cursorBrigthness, alpha: nil)
+    return UIColor(hue: selectionHue,
+                   saturation: 1.0,
+                   brightness: selectionBrigthness,
+                   alpha: 1.0)
+  }
+
+  #endif
 }
