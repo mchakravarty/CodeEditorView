@@ -338,7 +338,7 @@ extension LanguageConfiguration {
     }
     if let lexeme = identifierRegexp { codeTokenDictionary.updateValue(token(Token.identifier), forKey: .pattern(lexeme)) }
     for reserved in reservedIdentifiers {
-      codeTokenDictionary.updateValue(token(.keyword), forKey: .string(reserved))
+      codeTokenDictionary.updateValue(token(.keyword), forKey: .word(reserved))
     }
 
     tokenDictionary.updateValue(codeTokenDictionary, forKey: .tokenisingCode)

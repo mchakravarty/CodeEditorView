@@ -24,15 +24,20 @@ private let logger = Logger(subsystem: "org.justtesting.CodeEditor", category: "
 ///
 public enum TokenPattern: Hashable, Equatable, Comparable {
 
-  /// The token has multiple lexemes, specified in the form of a regular expression string
+  /// The token has multiple lexemes, specified in the form of a regular expression string.
   ///
-  case pattern(String)
+  case pattern(String)  // This case needs to be the first one as we want it to compare as being smaller than the rest;
+                        // that ensures that it will appear last in the generated tokeniser regexp and hence match last
+                        // in case of overlap.
 
-  /// The token has only one lexeme, given as a simple string
+  /// The token has only one lexeme, given as a simple string. We only match this string if it starts and ends at a
+  /// word boundary (as per the "\b" regular expression metacharacter).
   ///
-  case string(String) // This case needs to be the second one as we want it to compare as being greater than `.pattern`;
-                      // that ensures that it will appear first in the generated tokeniser regexp and hence match first
-                      // in case of overlap.
+  case word(String)
+
+  /// The token has only one lexeme, given as a simple string.
+  ///
+  case string(String)
 }
 
 public protocol TokeniserState {
@@ -140,12 +145,15 @@ extension NSMutableAttributedString {
             let regexpPattern: String
             switch mapEntry.key {
             case .string(let lexeme):   regexpPattern = NSRegularExpression.escapedPattern(for: lexeme)
+            case .word(let lexeme):     regexpPattern = "\\b" + NSRegularExpression.escapedPattern(for: lexeme) + "\\b"
             case .pattern(let pattern): regexpPattern = "(" + pattern + ")"     // each pattern gets a capture group
             }
             if regexp.isEmpty { return regexpPattern } else { return regexp + "|" + regexpPattern}
           }
       let stringTokenTypes: [(String, TokenAction<TokenType, StateType>)] = orderedMap.compactMap{ (pattern, type) in
-        if case .string(let lexeme) = pattern { return (lexeme, type)  } else { return nil }
+        if case .string(let lexeme) = pattern { return (lexeme, type)  }
+        else if case .word(let lexeme) = pattern { return (lexeme, type)  }
+        else { return nil }
       }
       let patternTokenTypes: [TokenAction<TokenType, StateType>] = orderedMap.compactMap{ (pattern, type) in
         if case .pattern(_) = pattern { return type } else { return nil }
