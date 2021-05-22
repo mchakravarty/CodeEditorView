@@ -169,7 +169,7 @@ extension EnvironmentValues {
 
   /// The current code editor theme.
   ///
-  var codeEditorTheme: Theme {
+  public var codeEditorTheme: Theme {
     get { self[CodeEditorTheme.self] }
     set { self[CodeEditorTheme.self] = newValue }
   }
