@@ -199,78 +199,88 @@ private let idBodyChar   // from the Swift 5.4 reference
 private func group(_ regexp: String) -> String { "(?:" + regexp + ")" }
 private func alternatives(_ alts: [String]) -> String { alts.map{ group($0) }.joined(separator: "|") }
 
-/// Language configuration for Haskell (including GHC extensions)
-///
 private let haskellReservedIds =
   ["case", "class", "data", "default", "deriving", "do", "else", "foreign", "if", "import", "in", "infix", "infixl",
    "infixr", "instance", "let", "module", "newtype", "of", "then", "type", "where"]
-public let haskellConfiguration = LanguageConfiguration(stringRegexp: "\"(?:\\\\\"|[^\"])*+\"",
-                                                        characterRegexp: "'(?:\\\\'|[^']|\\\\[^']*+)'",
-                                                        numberRegexp:
-                                                          optNeg +
-                                                          group(alternatives([
-                                                            "0[bB]" + binary,
-                                                            "0[oO]" + octal,
-                                                            "0[xX]" + hexal,
-                                                            "0[xX]" + hexal + "\\." + hexal + hexponent + "?",
-                                                            decimal + "\\." + decimal + exponent + "?",
-                                                            decimal + exponent,
-                                                            decimal
-                                                          ])),
-                                                        singleLineComment: "--",
-                                                        nestedComment: (open: "{-", close: "-}"),
-                                                        identifierRegexp:
-                                                          idHeadChar +
-                                                          group(alternatives([
-                                                            idHeadChar,
-                                                            idBodyChar,
-                                                            "'"
-                                                          ])) + "*",
-                                                        reservedIdentifiers: haskellReservedIds)
 
-/// Language configuration for Swift
-///
+extension LanguageConfiguration {
+
+  /// Language configuration for Haskell (including GHC extensions)
+  ///
+  public static let haskell = LanguageConfiguration(stringRegexp: "\"(?:\\\\\"|[^\"])*+\"",
+                                                    characterRegexp: "'(?:\\\\'|[^']|\\\\[^']*+)'",
+                                                    numberRegexp:
+                                                      optNeg +
+                                                      group(alternatives([
+                                                        "0[bB]" + binary,
+                                                        "0[oO]" + octal,
+                                                        "0[xX]" + hexal,
+                                                        "0[xX]" + hexal + "\\." + hexal + hexponent + "?",
+                                                        decimal + "\\." + decimal + exponent + "?",
+                                                        decimal + exponent,
+                                                        decimal
+                                                      ])),
+                                                    singleLineComment: "--",
+                                                    nestedComment: (open: "{-", close: "-}"),
+                                                    identifierRegexp:
+                                                      idHeadChar +
+                                                      group(alternatives([
+                                                        idHeadChar,
+                                                        idBodyChar,
+                                                        "'"
+                                                      ])) + "*",
+                                                    reservedIdentifiers: haskellReservedIds)
+
+}
+
 private let swiftReservedIds =
   ["actor", "associatedtype", "async", "await", "as", "break", "case", "catch", "class", "continue", "default", "defer",
    "deinit", "do", "else", "enum", "extension", "fallthrough", "fileprivate", "for", "func", "guard", "if", "import",
    "init", "inout", "internal", "in", "is", "let", "operator", "precedencegroup", "private", "protocol", "public",
    "repeat", "rethrows", "return", "self", "static", "struct", "subscript", "super", "switch", "throws", "throw", "try",
    "typealias", "var", "where", "while"]
-public let swiftConfiguration = LanguageConfiguration(stringRegexp: "\"(?:\\\\\"|[^\"])*+\"",
-                                                      characterRegexp: nil,
-                                                      numberRegexp:
-                                                        optNeg +
+
+extension LanguageConfiguration {
+
+  /// Language configuration for Swift
+  ///
+  public static let swift = LanguageConfiguration(stringRegexp: "\"(?:\\\\\"|[^\"])*+\"",
+                                                  characterRegexp: nil,
+                                                  numberRegexp:
+                                                    optNeg +
+                                                    group(alternatives([
+                                                      "0b" + binary,
+                                                      "0o" + octal,
+                                                      "0x" + hexal,
+                                                      "0x" + hexal + "\\." + hexal + hexponent + "?",
+                                                      decimal + "\\." + decimal + exponent + "?",
+                                                      decimal + exponent,
+                                                      decimal
+                                                    ])),
+                                                  singleLineComment: "//",
+                                                  nestedComment: (open: "/*", close: "*/"),
+                                                  identifierRegexp:
+                                                    alternatives([
+                                                      idHeadChar +
                                                         group(alternatives([
-                                                          "0b" + binary,
-                                                          "0o" + octal,
-                                                          "0x" + hexal,
-                                                          "0x" + hexal + "\\." + hexal + hexponent + "?",
-                                                          decimal + "\\." + decimal + exponent + "?",
-                                                          decimal + exponent,
-                                                          decimal
-                                                        ])),
-                                                      singleLineComment: "//",
-                                                      nestedComment: (open: "/*", close: "*/"),
-                                                      identifierRegexp:
-                                                        alternatives([
-                                                          idHeadChar +
-                                                          group(alternatives([
-                                                            idHeadChar,
-                                                            idBodyChar,
-                                                          ])) + "*",
-                                                          "`" + idHeadChar +
-                                                          group(alternatives([
-                                                            idHeadChar,
-                                                            idBodyChar,
-                                                          ])) + "*`",
-                                                          "\\\\$" + decimal,
-                                                          "\\\\$" + idHeadChar +
-                                                            group(alternatives([
-                                                              idHeadChar,
-                                                              idBodyChar,
-                                                            ])) + "*"
-                                                        ]),
-                                                      reservedIdentifiers: swiftReservedIds)
+                                                          idHeadChar,
+                                                          idBodyChar,
+                                                        ])) + "*",
+                                                      "`" + idHeadChar +
+                                                        group(alternatives([
+                                                          idHeadChar,
+                                                          idBodyChar,
+                                                        ])) + "*`",
+                                                      "\\\\$" + decimal,
+                                                      "\\\\$" + idHeadChar +
+                                                        group(alternatives([
+                                                          idHeadChar,
+                                                          idBodyChar,
+                                                        ])) + "*"
+                                                    ]),
+                                                  reservedIdentifiers: swiftReservedIds)
+
+}
 
 extension LanguageConfiguration {
 

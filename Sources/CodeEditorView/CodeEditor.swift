@@ -181,6 +181,6 @@ extension EnvironmentValues {
 
 struct CodeEditor_Previews: PreviewProvider {
   static var previews: some View {
-    CodeEditor(text: .constant("-- Hello World!"), with: haskellConfiguration)
+    CodeEditor(text: .constant("-- Hello World!"), with: LanguageConfiguration.haskell)
   }
 }
