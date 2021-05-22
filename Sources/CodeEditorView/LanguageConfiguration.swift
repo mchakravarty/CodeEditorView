@@ -153,15 +153,19 @@ public struct LanguageConfiguration {
   }
 }
 
-/// Empty language configuration
-///
-public let noConfiguration = LanguageConfiguration(stringRegexp: nil,
-                                                   characterRegexp: nil,
-                                                   numberRegexp: nil,
-                                                   singleLineComment: nil,
-                                                   nestedComment: nil,
-                                                   identifierRegexp: nil,
-                                                   reservedIdentifiers: [])
+extension LanguageConfiguration {
+
+  /// Empty language configuration
+  ///
+  public static let none = LanguageConfiguration(stringRegexp: nil,
+                                                 characterRegexp: nil,
+                                                 numberRegexp: nil,
+                                                 singleLineComment: nil,
+                                                 nestedComment: nil,
+                                                 identifierRegexp: nil,
+                                                 reservedIdentifiers: [])
+
+}
 
 // Helpers
 private let binary    = "(?:[01]_*)+"

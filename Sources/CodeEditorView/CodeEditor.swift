@@ -24,7 +24,7 @@ public struct CodeEditor: UIViewRepresentable {
 
   @Binding var text: String
 
-  public init(text: Binding<String>, with language: LanguageConfiguration = noConfiguration) {
+  public init(text: Binding<String>, with language: LanguageConfiguration = .none) {
     self._text    = text
     self.language = language
   }
@@ -80,7 +80,7 @@ public struct CodeEditor: NSViewRepresentable {
 
   @Binding var text: String
 
-  public init(text: Binding<String>, with language: LanguageConfiguration = noConfiguration) {
+  public init(text: Binding<String>, with language: LanguageConfiguration = .none) {
     self._text    = text
     self.language = language
   }
@@ -181,6 +181,6 @@ extension EnvironmentValues {
 
 struct CodeEditor_Previews: PreviewProvider {
   static var previews: some View {
-    CodeEditor(text: .constant("-- Hello World!"), with: LanguageConfiguration.haskell)
+    CodeEditor(text: .constant("-- Hello World!"), with: .haskell)
   }
 }
