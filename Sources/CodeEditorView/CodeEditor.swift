@@ -22,11 +22,25 @@ import SwiftUI
 public struct CodeEditor: UIViewRepresentable {
   let language: LanguageConfiguration
 
-  @Binding var text: String
+  @Binding private var text:     String
+  @Binding private var messages: Set<Located<Message>>
 
-  public init(text: Binding<String>, with language: LanguageConfiguration = .none) {
-    self._text    = text
-    self.language = language
+  /// Creates a fully configured code editor.
+  ///
+  /// - Parameters:
+  ///   - text: Binding to the edited text.
+  ///   - messages: Binding to the messages reported at the appropriate lines of the edited text. NB: Messages
+  ///               processing and display is relatively expensive. Hence, there should only be a limited number of
+  ///               simultaneous messages and they shouldn't change to frequently.
+  ///   - language: Language configuration for highlighting and similar.
+  ///
+  public init(text: Binding<String>,
+              messages: Binding<Set<Located<Message>>>,
+              language: LanguageConfiguration = .none)
+  {
+    self._text     = text
+    self._messages = messages
+    self.language  = language
   }
 
   public func makeUIView(context: Context) -> UITextView {
@@ -38,11 +52,21 @@ public struct CodeEditor: UIViewRepresentable {
       delegate.textDidChange      = context.coordinator.textDidChange
       delegate.selectionDidChange = selectionDidChange
     }
+
+    // Report the initial message set
+    DispatchQueue.main.async {
+      for message in messages { codeView.report(message: message) }
+    }
+
     return textView
   }
 
   public func updateUIView(_ textView: UITextView, context: Context) {
+    let theme = context.environment[CodeEditorTheme]
+
     if text != textView.text { textView.text = text }  // Hoping for the string comparison fast path...
+    updateMessages(newMessages: messages)
+    if theme.id != codeView.theme.id { codeView.theme = theme }
   }
 
   public func makeCoordinator() -> Coordinator {
@@ -76,13 +100,26 @@ public struct CodeEditor: UIViewRepresentable {
 ///
 public struct CodeEditor: NSViewRepresentable {
   let language: LanguageConfiguration
-//  let messagePublisher: PassthroughSubject<Message,NSError>
 
-  @Binding var text: String
+  @Binding private var text:     String
+  @Binding private var messages: Set<Located<Message>>
 
-  public init(text: Binding<String>, with language: LanguageConfiguration = .none) {
-    self._text    = text
-    self.language = language
+  /// Creates a fully configured code editor.
+  ///
+  /// - Parameters:
+  ///   - text: Binding to the edited text.
+  ///   - messages: Binding to the messages reported at the appropriate lines of the edited text. NB: Messages
+  ///               processing and display is relatively expensive. Hence, there should only be a limited number of
+  ///               simultaneous messages and they shouldn't change to frequently.
+  ///   - language: Language configuration for highlighting and similar.
+  ///
+  public init(text: Binding<String>,
+              messages: Binding<Set<Located<Message>>>,
+              language: LanguageConfiguration = .none)
+  {
+    self._text     = text
+    self._messages = messages
+    self.language  = language
   }
 
   public func makeNSView(context: Context) -> NSScrollView {
@@ -95,27 +132,30 @@ public struct CodeEditor: NSViewRepresentable {
     scrollView.autoresizingMask    = [.width, .height]
 
     // Set up text view with gutter
-    let textView = CodeView(frame: CGRect(x: 0, y: 0, width: 100, height: 40),
+    let codeView = CodeView(frame: CGRect(x: 0, y: 0, width: 100, height: 40),
                             with: language, theme: context.environment[CodeEditorTheme])
-    textView.isVerticallyResizable   = true
-    textView.isHorizontallyResizable = false
-    textView.autoresizingMask        = .width
+    codeView.isVerticallyResizable   = true
+    codeView.isHorizontallyResizable = false
+    codeView.autoresizingMask        = .width
 
     // Embedd text view in scroll view
-    scrollView.documentView = textView
+    scrollView.documentView = codeView
 
-    textView.string = text
-    if let delegate = textView.delegate as? CodeViewDelegate {
+    codeView.string = text
+    if let delegate = codeView.delegate as? CodeViewDelegate {
       delegate.textDidChange      = context.coordinator.textDidChange
       delegate.selectionDidChange = selectionDidChange
     }
-    textView.setSelectedRange(NSRange(location: 0, length: 0))
+    codeView.setSelectedRange(NSRange(location: 0, length: 0))
 
     // The minimap needs to be vertically positioned in dependence on the scroll position of the main code view.
     context.coordinator.liveScrollNotificationObserver
       = NotificationCenter.default.addObserver(forName: NSView.boundsDidChangeNotification,
                                                object: scrollView.contentView,
-                                               queue: .main){ _ in textView.adjustScrollPositionOfMinimap() }
+                                               queue: .main){ _ in codeView.adjustScrollPositionOfMinimap() }
+
+    // Report the initial message set
+    DispatchQueue.main.async { updateMessages(in: codeView, with: context) }
 
     return scrollView
   }
@@ -124,9 +164,14 @@ public struct CodeEditor: NSViewRepresentable {
     guard let codeView = nsView.documentView as? CodeView else { return }
 
     let theme = context.environment[CodeEditorTheme]
-
+    updateMessages(in: codeView, with: context)
     if text != codeView.string { codeView.string = text }  // Hoping for the string comparison fast path...
     if theme.id != codeView.theme.id { codeView.theme = theme }
+  }
+
+  fileprivate func updateMessages(in codeView: CodeView, with context: Context) {
+    update(oldMessages: context.coordinator.lastMessages, to: messages, in: codeView)
+    context.coordinator.lastMessages = messages
   }
 
   public func makeCoordinator() -> Coordinator {
@@ -135,7 +180,11 @@ public struct CodeEditor: NSViewRepresentable {
   }
 
   public final class Coordinator {
-    @Binding var text: String
+    @Binding fileprivate var text: String
+
+    /// This is the last observed value of `messages`, to enable us to compute the difference in the next update.
+    ///
+    fileprivate var lastMessages: Set<Located<Message>> = Set()
 
     var liveScrollNotificationObserver: NSObjectProtocol?
 
@@ -147,7 +196,7 @@ public struct CodeEditor: NSViewRepresentable {
       if let oberver = liveScrollNotificationObserver { NotificationCenter.default.removeObserver(oberver) }
     }
 
-    func textDidChange(_ textView: NSTextView) {
+    fileprivate func textDidChange(_ textView: NSTextView) {
       self.text = textView.string
     }
   }
@@ -158,6 +207,22 @@ public struct CodeEditor: NSViewRepresentable {
 
 // MARK: -
 // MARK: Shared code
+
+extension CodeEditor {
+
+  /// Update the message set of the given code view.
+  ///
+  private func update(oldMessages: Set<Located<Message>>,
+                      to updatedMessages: Set<Located<Message>>,
+                      in codeView: CodeView)
+  {
+    let messagesToAdd    = updatedMessages.subtracting(oldMessages),
+        messagesToRemove = oldMessages.subtracting(updatedMessages)
+
+    for message in messagesToRemove { codeView.retract(message: message.entity) }
+    for message in messagesToAdd    { codeView.report(message: message) }
+  }
+}
 
 /// Environment key for the current code editor theme.
 ///
@@ -181,6 +246,6 @@ extension EnvironmentValues {
 
 struct CodeEditor_Previews: PreviewProvider {
   static var previews: some View {
-    CodeEditor(text: .constant("-- Hello World!"), with: .haskell)
+    CodeEditor(text: .constant("-- Hello World!"), messages: .constant(Set()), language: .haskell)
   }
 }

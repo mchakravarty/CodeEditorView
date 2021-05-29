@@ -633,10 +633,29 @@ extension CodeView {
   /// Adds a new message to the set of messages for this code view.
   ///
   func report(message: Located<Message>) {
-    guard let codeStorageDelegate = codeStorageDelegate,
-          let messageBundle       = codeStorageDelegate.add(message: message),
-          let charRange           = codeStorageDelegate.lineMap.lookup(line: message.location.line)?.range
-    else { return }
+    guard let messageBundle = codeStorageDelegate?.add(message: message) else { return }
+
+    updateMessageView(for: messageBundle, at: message.location.line)
+  }
+
+  /// Removes a given message. If it doesn't exist, do nothing. This function is quite expensive.
+  ///
+  func retract(message: Message) {
+    guard let (messageBundle, line) = codeStorageDelegate?.remove(message: message) else { return }
+
+    updateMessageView(for: messageBundle, at: line)
+  }
+
+  /// Given a new or updated message bundle, update the corresponding message view appropriately. This includes covering
+  /// the two special cases, where we create a new view or we remove a view for good (as its last message was deleted).
+  ///
+  private func updateMessageView(for messageBundle: LineInfo.MessageBundle, at line: Int) {
+    guard let charRange = codeStorageDelegate?.lineMap.lookup(line: line)?.range else { return }
+
+    removeMessageViews(withIDs: [messageBundle.id])
+
+    // If we removed the last message of this view, we don't need to create a new version
+    if messageBundle.messages.isEmpty { return }
 
     // TODO: CodeEditor needs to be parameterised by message theme
     let theme = Message.defaultTheme
@@ -660,9 +679,6 @@ extension CodeView {
     // because the layout process for the text fills the `lineFragmentRect` property of the above `MessageInfo`.
     optLayoutManager?.invalidateLayout(forCharacterRange: charRange, actualCharacterRange: nil)
     self.optLayoutManager?.invalidateDisplay(forCharacterRange: charRange)
-//    DispatchQueue.main.async {
-//      self.optLayoutManager?.invalidateDisplay(forCharacterRange: charRange)
-//    }
     gutterView?.invalidateGutter(forCharRange: charRange)
   }
 
@@ -696,7 +712,9 @@ extension CodeView {
   ///
   /// - Parameter ids: The IDs of the message bundles that ought to be removed. If `nil`, remove all.
   ///
-  func removeMessageViews(withIDs ids: [LineInfo.MessageBundle.ID]? = nil) {
+  /// IDs that do not have no associated message view cause no harm.
+  ///
+  fileprivate func removeMessageViews(withIDs ids: [LineInfo.MessageBundle.ID]? = nil) {
 
     for id in ids ?? Array<LineInfo.MessageBundle.ID>(messageViews.keys) {
 

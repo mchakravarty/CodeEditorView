@@ -13,7 +13,7 @@ import Foundation
 
 /// A message that can be displayed in a code view.
 ///
-public struct Message: Identifiable {
+public struct Message: Identifiable, Hashable {
 
   /// The various category that a message can be in. The earlier in the enumeration, the higher priority in the sense
   /// that in the one-line view, the colour of the highest priority message will be used.

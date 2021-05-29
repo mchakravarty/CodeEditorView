@@ -24,6 +24,16 @@ public struct Located<Entity> {
   public let entity:   Entity
 }
 
+extension Located: Equatable where Entity: Equatable {
+  static public func == (lhs: Located<Entity>, rhs: Located<Entity>) -> Bool {
+    lhs.entity == rhs.entity
+  }
+}
+
+extension Located: Hashable where Entity: Hashable {
+  public func hash(into hasher: inout Hasher) { hasher.combine(entity) }
+}
+
 /// Character span in a text file.
 ///
 public struct Span {
