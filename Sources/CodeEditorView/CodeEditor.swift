@@ -54,9 +54,7 @@ public struct CodeEditor: UIViewRepresentable {
     }
 
     // Report the initial message set
-    DispatchQueue.main.async {
-      for message in messages { codeView.report(message: message) }
-    }
+    DispatchQueue.main.async { updateMessages(in: codeView, with: context) }
 
     return textView
   }
@@ -65,7 +63,7 @@ public struct CodeEditor: UIViewRepresentable {
     let theme = context.environment[CodeEditorTheme]
 
     if text != textView.text { textView.text = text }  // Hoping for the string comparison fast path...
-    updateMessages(newMessages: messages)
+    updateMessages(in: codeView, with: context)
     if theme.id != codeView.theme.id { codeView.theme = theme }
   }
 
@@ -75,6 +73,10 @@ public struct CodeEditor: UIViewRepresentable {
 
   public final class Coordinator {
     @Binding var text: String
+
+    /// This is the last observed value of `messages`, to enable us to compute the difference in the next update.
+    ///
+    fileprivate var lastMessages: Set<Located<Message>> = Set()
 
     init(_ text: Binding<String>) {
       self._text = text
@@ -169,11 +171,6 @@ public struct CodeEditor: NSViewRepresentable {
     if theme.id != codeView.theme.id { codeView.theme = theme }
   }
 
-  fileprivate func updateMessages(in codeView: CodeView, with context: Context) {
-    update(oldMessages: context.coordinator.lastMessages, to: messages, in: codeView)
-    context.coordinator.lastMessages = messages
-  }
-
   public func makeCoordinator() -> Coordinator {
 
     return Coordinator($text)
@@ -209,6 +206,13 @@ public struct CodeEditor: NSViewRepresentable {
 // MARK: Shared code
 
 extension CodeEditor {
+
+  /// Update messages for a code view in the given context.
+  ///
+  private func updateMessages(in codeView: CodeView, with context: Context) {
+    update(oldMessages: context.coordinator.lastMessages, to: messages, in: codeView)
+    context.coordinator.lastMessages = messages
+  }
 
   /// Update the message set of the given code view.
   ///
