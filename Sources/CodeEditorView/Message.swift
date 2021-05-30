@@ -56,6 +56,13 @@ public struct Message: Identifiable, Hashable {
   /// Optional long message (only displayed in the popup, but may extend over multiple lines).
   ///
   public let description: NSAttributedString?
+
+  public init(category: Message.Category, length: Int, summary: String, description: NSAttributedString?) {
+    self.category    = category
+    self.length      = length
+    self.summary     = summary
+    self.description = description
+  }
 }
 
 /// Order and sort an array of messages by categories.
