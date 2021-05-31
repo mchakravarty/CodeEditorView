@@ -113,11 +113,6 @@ class CodeView: UITextView {
     addSubview(gutterView)
     self.gutterView              = gutterView
     codeLayoutManager.gutterView = gutterView
-
-    DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + .seconds(1)){
-      self.report(message: Located(location: Location(file: "MyFile", line: 2, column: 5),
-                                   entity: Message(category: .error, length: 1, summary: "A disastrous error!", description: NSAttributedString(string: "This is such an aweful error. This program is going to break real quick."))))
-    }
   }
 
   required init?(coder: NSCoder) {
@@ -306,11 +301,6 @@ class CodeView: NSTextView {
     documentVisibleBox.borderWidth = 0
     minimapView.addSubview(documentVisibleBox)
     self.documentVisibleBox = documentVisibleBox
-
-    DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + .seconds(1)){
-      self.report(message: Located(location: Location(file: "MyFile", line: 2, column: 5),
-                                   entity: Message(category: .error, length: 1, summary: "A disastrous error!", description: NSAttributedString(string: "This is such an aweful error. This program is going to break real quick."))))
-    }
 
     tile()
   }
