@@ -44,11 +44,11 @@ public struct CodeEditor: UIViewRepresentable {
   }
 
   public func makeUIView(context: Context) -> UITextView {
-    let textView = CodeView(frame: CGRect(x: 0, y: 0, width: 100, height: 40),
+    let codeView = CodeView(frame: CGRect(x: 0, y: 0, width: 100, height: 40),
                             with: language, theme: context.environment[CodeEditorTheme])
 
-    textView.text = text
-    if let delegate = textView.delegate as? CodeViewDelegate {
+    codeView.text = text
+    if let delegate = codeView.delegate as? CodeViewDelegate {
       delegate.textDidChange      = context.coordinator.textDidChange
       delegate.selectionDidChange = selectionDidChange
     }
@@ -56,10 +56,12 @@ public struct CodeEditor: UIViewRepresentable {
     // Report the initial message set
     DispatchQueue.main.async { updateMessages(in: codeView, with: context) }
 
-    return textView
+    return codeView
   }
 
   public func updateUIView(_ textView: UITextView, context: Context) {
+    guard let codeView = textView as? CodeView else { return }
+    
     let theme = context.environment[CodeEditorTheme]
 
     if text != textView.text { textView.text = text }  // Hoping for the string comparison fast path...
