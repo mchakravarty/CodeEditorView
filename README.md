@@ -43,6 +43,11 @@ To see the `CodeEditorView` in action, have a look at the repo with a [cross-pla
 For more information, see the [package documentation](Documentation/Overview.md).
 
 
+## Status
+
+It is still relative early days. While the `CodeEditor` view already supports quite a bit of advanced functionality (such as the inline messages and minimap), other components are still quite simple, such as the range of tokens covered by the language configuration. Moreover, performance is still an issue that needs to be addressed. The core archtecture, such as the incremental tokenisation for syntax highlighting, is designed to handle larger files smoothly, but the overall implementation still needs some performance debugging.
+
+
 ## License
 
 Copyright 2021 Manuel M. T. Chakravarty. 
