@@ -12,6 +12,7 @@ The following is the default light theme on iOS. Both line highlighting and the 
 
 <img src="app-demo-images/iOS-light-example.png">
 
+
 ## How to use it
 
 Typical usage of the view is as follows.
@@ -31,9 +32,16 @@ struct ContentView: View {
 }
 ```
 
+
 ## Demo app
 
 To see the `CodeEditorView` in action, have a look at the repo with a [cross-platform demo app](https://github.com/mchakravarty/CodeEditorDemo).
+
+
+## Documentation
+
+For more information, see the [package documentation](Documentation/Overview.md).
+
 
 ## License
 
