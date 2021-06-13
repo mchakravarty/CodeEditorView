@@ -14,7 +14,7 @@ import AppKit
 #endif
 
 
-private let logger = Logger(subsystem: "org.justtesting.CodeEditor", category: "MutableAttributedString")
+private let logger = Logger(subsystem: "org.justtesting.CodeEditorView", category: "MutableAttributedString")
 
 
 // MARK: -

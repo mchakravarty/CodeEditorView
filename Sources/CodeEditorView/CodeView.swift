@@ -839,12 +839,12 @@ extension NSLayoutManager {
 
     let currentLineCharRange = text.lineRange(for: NSRange(location: charIndex, length: 0))
 
-    if currentLineCharRange.length > 0 {  // all, but the last line if it is empty
+    if currentLineCharRange.length > 0 {  // all, but the last line (if it is an empty line)
 
       let currentLineGlyphRange = glyphRange(forCharacterRange: currentLineCharRange, actualCharacterRange: nil)
       enumerateLineFragments(forGlyphRange: currentLineGlyphRange){ (rect, _, _, _, _) in block(rect) }
 
-    } else {                              // the last line if it is empty
+    } else {                              // the last line if it is an empty line
 
       block(extraLineFragmentRect)
 

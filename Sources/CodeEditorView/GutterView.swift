@@ -8,7 +8,7 @@
 import os
 
 
-private let logger = Logger(subsystem: "org.justtesting.CodeEditor", category: "GutterView")
+private let logger = Logger(subsystem: "org.justtesting.CodeEditorView", category: "GutterView")
 
 #if os(iOS)
 
@@ -142,7 +142,8 @@ extension GutterView {
   ///   - charRange: The invalidated range of characters. It will be trimmed to be within the valid character range of
   ///     the underlying text storage.
   ///
-  /// We invalidate the area corresponding to entire lines. This makes a difference in the presence of lines breaks.
+  /// We invalidate the area corresponding to entire paragraphs. This makes a difference in the presence of lines
+  /// breaks.
   ///
   func invalidateGutter(forCharRange charRange: NSRange) {
     let string        = textView.text as NSString,
@@ -157,7 +158,7 @@ extension GutterView {
         extendedCharRange   = string.paragraphRange(for: safeCharRange),
         glyphRange          = layoutManager.glyphRange(forCharacterRange: extendedCharRange, actualCharacterRange: nil),
         gutterRect          = gutterRectFrom(textRect: layoutManager.boundingRect(forGlyphRange: glyphRange,
-                                                                                 in: textContainer)),
+                                                                                  in: textContainer)),
         extendedGutterRect  = CGRect(origin: gutterRect.origin,   // everything below the change may need to be redrawn
                                      size: CGSize(width: gutterRect.size.width, height: CGFloat.greatestFiniteMagnitude))
     setNeedsDisplay(extendedGutterRect.intersection(documentVisibleRect))
