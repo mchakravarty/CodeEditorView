@@ -7,19 +7,13 @@
 
 import SwiftUI
 
-
-#if os(iOS)
-
-// MARK: -
-// MARK: UIKit version
-
 /// SwiftUI code editor based on TextKit.
 ///
 /// SwiftUI `Environment`:
 /// * Environment value `codeEditorTheme`: determines the code highlighting theme to use
 /// * Text-related values: affect the rendering of message views
 ///
-public struct CodeEditor: UIViewRepresentable {
+public struct CodeEditor {
   let language: LanguageConfiguration
 
   @Binding private var text:     String
@@ -43,6 +37,25 @@ public struct CodeEditor: UIViewRepresentable {
     self.language  = language
   }
 
+  public class _Coordinator {
+    @Binding var text: String
+
+    /// This is the last observed value of `messages`, to enable us to compute the difference in the next update.
+    ///
+    fileprivate var lastMessages: Set<Located<Message>> = Set()
+
+    init(_ text: Binding<String>) {
+      self._text = text
+    }
+  }
+}
+
+#if os(iOS)
+
+// MARK: -
+// MARK: UIKit version
+
+extension CodeEditor: UIViewRepresentable {
   public func makeUIView(context: Context) -> UITextView {
     let codeView = CodeView(frame: CGRect(x: 0, y: 0, width: 100, height: 40),
                             with: language, theme: context.environment[CodeEditorTheme])
@@ -73,59 +86,19 @@ public struct CodeEditor: UIViewRepresentable {
     return Coordinator($text)
   }
 
-  public final class Coordinator {
-    @Binding var text: String
-
-    /// This is the last observed value of `messages`, to enable us to compute the difference in the next update.
-    ///
-    fileprivate var lastMessages: Set<Located<Message>> = Set()
-
-    init(_ text: Binding<String>) {
-      self._text = text
-    }
-
+  public final class Coordinator: _Coordinator {
     func textDidChange(_ textView: UITextView) {
       self.text = textView.text
     }
   }
 }
 
-
 #elseif os(macOS)
 
 // MARK: -
 // MARK: AppKit version
 
-/// SwiftUI code editor based on TextKit
-///
-/// SwiftUI `Environment`:
-/// * Environment value `codeEditorTheme`: determines the code highlighting theme to use
-/// * Text-related values: affect the rendering of message views
-///
-public struct CodeEditor: NSViewRepresentable {
-  let language: LanguageConfiguration
-
-  @Binding private var text:     String
-  @Binding private var messages: Set<Located<Message>>
-
-  /// Creates a fully configured code editor.
-  ///
-  /// - Parameters:
-  ///   - text: Binding to the edited text.
-  ///   - messages: Binding to the messages reported at the appropriate lines of the edited text. NB: Messages
-  ///               processing and display is relatively expensive. Hence, there should only be a limited number of
-  ///               simultaneous messages and they shouldn't change to frequently.
-  ///   - language: Language configuration for highlighting and similar.
-  ///
-  public init(text: Binding<String>,
-              messages: Binding<Set<Located<Message>>>,
-              language: LanguageConfiguration = .none)
-  {
-    self._text     = text
-    self._messages = messages
-    self.language  = language
-  }
-
+extension CodeEditor: NSViewRepresentable {
   public func makeNSView(context: Context) -> NSScrollView {
 
     // Set up scroll view
@@ -174,28 +147,17 @@ public struct CodeEditor: NSViewRepresentable {
   }
 
   public func makeCoordinator() -> Coordinator {
-
     return Coordinator($text)
   }
 
-  public final class Coordinator {
-    @Binding fileprivate var text: String
-
-    /// This is the last observed value of `messages`, to enable us to compute the difference in the next update.
-    ///
-    fileprivate var lastMessages: Set<Located<Message>> = Set()
-
+  public final class Coordinator: _Coordinator {
     var liveScrollNotificationObserver: NSObjectProtocol?
 
-    init(_ text: Binding<String>) {
-      self._text = text
-    }
-
     deinit {
-      if let oberver = liveScrollNotificationObserver { NotificationCenter.default.removeObserver(oberver) }
+      if let observer = liveScrollNotificationObserver { NotificationCenter.default.removeObserver(observer) }
     }
 
-    fileprivate func textDidChange(_ textView: NSTextView) {
+    func textDidChange(_ textView: NSTextView) {
       self.text = textView.string
     }
   }
@@ -208,7 +170,6 @@ public struct CodeEditor: NSViewRepresentable {
 // MARK: Shared code
 
 extension CodeEditor {
-
   /// Update messages for a code view in the given context.
   ///
   private func updateMessages(in codeView: CodeView, with context: Context) {
@@ -237,7 +198,6 @@ public struct CodeEditorTheme: EnvironmentKey {
 }
 
 extension EnvironmentValues {
-
   /// The current code editor theme.
   ///
   public var codeEditorTheme: Theme {
