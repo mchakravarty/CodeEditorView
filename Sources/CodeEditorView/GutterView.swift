@@ -146,6 +146,8 @@ extension GutterView {
   /// breaks.
   ///
   func invalidateGutter(forCharRange charRange: NSRange) {
+    return
+    
     let string        = textView.text as NSString,
         safeCharRange = NSIntersectionRange(charRange, NSRange(location: 0, length: string.length))
 
@@ -172,6 +174,8 @@ extension GutterView {
           let textContainer = optTextContainer,
           let lineMap       = optLineMap
     else { return }
+
+    print("gutter draw \(isMinimapGutter ? "(minimap)" : "") \(rect); lines = \(lineMap.lines.count)")
 
     theme.backgroundColour.setFill()
     OSBezierPath(rect: rect).fill()
@@ -239,14 +243,20 @@ extension GutterView {
 
     #endif
 
+    // All visible glyphs and all visible characters that are in the text area to the right of the gutter view
+    let glyphRange = layoutManager.glyphRange(forBoundingRectWithoutAdditionalLayout: textRectFrom(gutterRect: rect),
+                                              in: textContainer),
+        charRange  = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+
+    // Bail out if there are no characters associated
+    if charRange.length < 1 { return }
+
     // Draw line numbers unless this is a gutter for a minimap
     if !isMinimapGutter {
 
-      // All visible glyphs and all visible characters that are in the text area to the right of the gutter view
-      let glyphRange = layoutManager.glyphRange(forBoundingRectWithoutAdditionalLayout: textRectFrom(gutterRect: rect),
-                                                in: textContainer),
-          charRange  = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil),
-          lineRange  = lineMap.linesOf(range: charRange)
+      let lineRange = lineMap.linesOf(range: charRange)
+
+      print("  gutter char range = \(charRange); line range = \(lineRange)")
 
       // Text attributes for the line numbers
       let lineNumberStyle = NSMutableParagraphStyle()
@@ -260,9 +270,6 @@ extension GutterView {
                                     .foregroundColor: theme.textColour,
                                     .paragraphStyle: lineNumberStyle,
                                     .kern: NSNumber(value: Float(-theme.fontSize / 11))]
-
-      // TODO: CodeEditor needs to be parameterised by message theme
-      let theme = Message.defaultTheme
 
       for line in lineRange {
 
@@ -323,7 +330,10 @@ extension GutterView {
   /// vertical extension.
   ///
   private func textRectFrom(gutterRect: CGRect) -> CGRect {
+    let containerWidth = optTextContainer?.size.width ?? 0
     return CGRect(origin: CGPoint(x: frame.size.width, y: gutterRect.origin.y - textView.textContainerOrigin.y),
-                  size: CGSize(width: optTextContainer?.size.width ?? 0, height: gutterRect.size.height))
+                  size: CGSize(width:
+                                containerWidth - frame.size.width,
+                               height: gutterRect.size.height))
   }
 }

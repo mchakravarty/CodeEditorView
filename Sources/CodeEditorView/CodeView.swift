@@ -174,6 +174,11 @@ class CodeView: NSTextView {
   var documentVisibleBox: NSBox?
   var minimapDividerView: NSBox?
 
+  /// Contains the line on which the insertion point was located, the last time the selection range got set (if the
+  /// selection was an insetion point at all; i.e., it's length was 0).
+  ///
+  var oldLastLineOfInsertionPoint: Int? = 1
+
   /// The current highlighting theme
   ///
   var theme: Theme {
@@ -323,42 +328,52 @@ class CodeView: NSTextView {
                                   affinity: NSSelectionAffinity,
                                   stillSelecting stillSelectingFlag: Bool)
   {
-    let oldInsertionPoint = insertionPoint,
-        oldSelectedRanges = selectedRanges
+    let oldSelectedRanges = selectedRanges
     super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelectingFlag)
     minimapView?.selectedRanges = selectedRanges    // minimap mirrors the selection of the main code view
 
-    // To get the correct background colour for the (old and/or new) current line, we need to invalidate the line 
-    // region.
-    let oldLineRange = oldInsertionPoint.flatMap{ (
-      textStorage?.string as NSString?)?.lineRange(for: NSRange(location: $0, length: 0))
-    }
-    let newLineRange = insertionPoint.flatMap{ (
-      textStorage?.string as NSString?)?.lineRange(for: NSRange(location: $0, length: 0))
-    }
-    if oldLineRange != newLineRange {
+    let lineOfInsertionPoint = insertionPoint.flatMap{ optLineMap?.lineOf(index: $0) }
 
-      if let range = oldLineRange
+    // If the insertion point changed lines, we need to redraw at the old and new location to fix the line highlighting.
+    // NB: We retain the last line and not the character index as the latter may be inaccurate due to editing that let
+    //     to the selected range change.
+    if lineOfInsertionPoint != oldLastLineOfInsertionPoint {
+
+      if let oldLine      = oldLastLineOfInsertionPoint,
+         let oldLineRange = optLineMap?.lookup(line: oldLine)?.range
       {
-        layoutManager?.enumerateFragmentRects(forLineContaining: range.location){ fragmentRect in
 
-          self.setNeedsDisplay(self.lineBackgroundRect(fragmentRect))   // need to invalidate the whole background (incl message views)
+        // We need to invalidate the whole background (incl message views); hence, we need to employ
+        // `lineBackgroundRect(_:)`, which is why `NSLayoutManager.invalidateDisplay(forCharacterRange:)` is not
+        // sufficient.
+        layoutManager?.enumerateFragmentRects(forLineContaining: oldLineRange.location){ fragmentRect in
+
+          self.setNeedsDisplay(self.lineBackgroundRect(fragmentRect))
         }
-        minimapGutterView?.optLayoutManager?.invalidateDisplay(forCharacterRange: range)
+        minimapGutterView?.optLayoutManager?.invalidateDisplay(forCharacterRange: oldLineRange)
+
       }
-      if let range = newLineRange
+      if let newLine      = lineOfInsertionPoint,
+         let newLineRange = optLineMap?.lookup(line: newLine)?.range
       {
-        layoutManager?.enumerateFragmentRects(forLineContaining: range.location){ fragmentRect in
 
-          self.setNeedsDisplay(self.lineBackgroundRect(fragmentRect))   // need to invalidate the whole background (incl message views)
+        // We need to invalidate the whole background (incl message views); hence, we need to employ
+        // `lineBackgroundRect(_:)`, which is why `NSLayoutManager.invalidateDisplay(forCharacterRange:)` is not
+        // sufficient.
+        layoutManager?.enumerateFragmentRects(forLineContaining: newLineRange.location){ fragmentRect in
+
+          self.setNeedsDisplay(self.lineBackgroundRect(fragmentRect))
         }
-        minimapGutterView?.optLayoutManager?.invalidateDisplay(forCharacterRange: range)
-      }
+        minimapGutterView?.optLayoutManager?.invalidateDisplay(forCharacterRange: newLineRange)
 
+      }
     }
+    oldLastLineOfInsertionPoint = lineOfInsertionPoint
 
     // NB: This needs to happen after calling `super`, as it depends on the correctly set new set of ranges.
     DispatchQueue.main.async {
+
+      // Needed as the selection affects line number highlighting.
       self.gutterView?.invalidateGutter(forCharRange: combinedRanges(ranges: oldSelectedRanges + ranges))
       self.minimapGutterView?.invalidateGutter(forCharRange: combinedRanges(ranges: oldSelectedRanges + ranges))
     }
