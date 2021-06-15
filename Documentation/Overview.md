@@ -48,6 +48,8 @@ Initially, the summary is displayed inline. Once the user clicks or taps on the 
 
 New messages are reported by adding them to the set. Similarily, they can be removed the message set to retract them. The code editor will also automatically remove any messages on lines that have been edited.
 
+More details about messages support are in [Messages](Messages.md).
+
 ### Locations
 
 Messages are `Located` by way of a generic wrapper:
