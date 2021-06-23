@@ -404,7 +404,7 @@ class CodeView: NSTextView {
       let glyphRange = layoutManager.glyphRange(forBoundingRect: messageView.value.lineFragementRect, in: textContainer),
           index      = layoutManager.characterIndexForGlyph(at: glyphRange.location)
 
-// This seems like a worthwhile optimisatio, but sometimes we are called in a situation, where `charRange` computes
+// This seems like a worthwhile optimisation, but sometimes we are called in a situation, where `charRange` computes
 // to be the empty range although the whole visible area is being redrawn.
 //      if charRange.contains(index) {
 
@@ -536,15 +536,17 @@ class CodeView: NSTextView {
     // expessions. This is necessary as the minimap will otherwise be partially cut off by the enclosing clip view.
     // If we want an Xcode-like behaviour, where the minimap sticks to the top, it probably would need to be a floating
     // view outside of the clip view.
-    minimapView?.frame.origin.y = min(max(documentVisibleRect.origin.y * scrollFactor, 0),
-                                      frame.size.height - (minimapView?.frame.size.height ?? 0))
+    let newOriginY = floor(min(max(documentVisibleRect.origin.y * scrollFactor, 0),
+                               frame.size.height - (minimapView?.frame.size.height ?? 0)))
+    if minimapView?.frame.origin.y != newOriginY { minimapView?.frame.origin.y = newOriginY }  // don't update frames in vain
 
     let minimapVisibleY      = (visibleRect.origin.y / frame.size.height) * minimapHeight,
-        minimapVisibleHeight = documentVisibleRect.size.height * minimapHeight / frame.size.height
-    documentVisibleBox?.frame = CGRect(x: 0,
-                                       y: minimapVisibleY,
-                                       width: minimapView?.bounds.size.width ?? 0,
-                                       height: minimapVisibleHeight)
+        minimapVisibleHeight = documentVisibleRect.size.height * minimapHeight / frame.size.height,
+        documentVisibleFrame = CGRect(x: 0,
+                                      y: minimapVisibleY,
+                                      width: minimapView?.bounds.size.width ?? 0,
+                                      height: minimapVisibleHeight).integral
+    if documentVisibleBox?.frame != documentVisibleFrame { documentVisibleBox?.frame = documentVisibleFrame }
   }
 
 }
