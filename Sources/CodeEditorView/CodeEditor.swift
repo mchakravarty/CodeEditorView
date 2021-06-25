@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+
 /// SwiftUI code editor based on TextKit.
 ///
 /// SwiftUI `Environment`:
@@ -14,7 +15,26 @@ import SwiftUI
 /// * Text-related values: affect the rendering of message views
 ///
 public struct CodeEditor {
+
+  /// Specification of the editor layout.
+  ///
+  public struct LayoutConfiguration {
+
+    /// Show the minimap if possible. (Currently only supported on macOS.)
+    ///
+    public let showMinimap: Bool
+
+    /// Creates a layout configuration.
+    ///
+    /// - Parameter showMinimap: Whether to show the minimap if possible.
+    ///
+    public init(showMinimap: Bool) {
+      self.showMinimap = showMinimap
+    }
+  }
+
   let language: LanguageConfiguration
+  let layout  : LayoutConfiguration
 
   @Binding private var text:     String
   @Binding private var messages: Set<Located<Message>>
