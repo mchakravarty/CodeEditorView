@@ -271,6 +271,9 @@ extension GutterView {
                                     .paragraphStyle: lineNumberStyle,
                                     .kern: NSNumber(value: Float(-theme.fontSize / 11))]
 
+      // TODO: CodeEditor needs to be parameterised by message theme
+      let theme = Message.defaultTheme
+
       for line in lineRange {
 
         // NB: We adjust the range, so that in case of a trailing empty line that last line break is not included in

@@ -75,9 +75,10 @@ class CodeView: UITextView {
 
   /// Designated initializer for code views with a gutter.
   ///
-  init(frame: CGRect, with language: LanguageConfiguration, theme: Theme) {
+  init(frame: CGRect, with language: LanguageConfiguration, viewLayout: CodeEditor.LayoutConfiguration, theme: Theme) {
 
-    self.theme = theme
+    self.viewLayout = viewLayout
+    self.theme      = theme
 
     // Use custom components that are gutter-aware and support code-specific editing actions and highlighting.
     let codeLayoutManager = CodeLayoutManager(),
