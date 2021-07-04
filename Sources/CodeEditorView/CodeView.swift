@@ -247,6 +247,7 @@ class CodeView: NSTextView {
     isAutomaticDataDetectionEnabled      = false
     isAutomaticSpellingCorrectionEnabled = false
     isAutomaticTextReplacementEnabled    = false
+    usesFontPanel                        = false
 
     // Line wrapping
     isHorizontallyResizable             = false
