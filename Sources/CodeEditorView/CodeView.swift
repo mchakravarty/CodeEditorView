@@ -61,6 +61,14 @@ class CodeView: UITextView {
     }
   }
 
+  /// The current view layout.
+  ///
+  var viewLayout: CodeEditor.LayoutConfiguration {
+    didSet {
+      // Nothing to do, but that may change in the future
+    }
+  }
+
   /// Keeps track of the set of message views.
   ///
   var messageViews: MessageViews = [:]
@@ -197,15 +205,22 @@ class CodeView: NSTextView {
     }
   }
 
+  /// The current view layout.
+  ///
+  var viewLayout: CodeEditor.LayoutConfiguration {
+    didSet { tile() }
+  }
+
   /// Keeps track of the set of message views.
   ///
   var messageViews: MessageViews = [:]
 
-  /// Designated initializer for code views with a gutter.
+  /// Designated initialiser for code views with a gutter.
   ///
-  init(frame: CGRect, with language: LanguageConfiguration, theme: Theme) {
+  init(frame: CGRect, with language: LanguageConfiguration, viewLayout: CodeEditor.LayoutConfiguration, theme: Theme) {
 
-    self.theme = theme
+    self.theme      = theme
+    self.viewLayout = viewLayout
 
     // Use custom components that are gutter-aware and support code-specific editing actions and highlighting.
     let codeLayoutManager = CodeLayoutManager(),
@@ -446,7 +461,8 @@ class CodeView: NSTextView {
     }
   }
 
-  /// Position and size the gutter and minimap and set the text container sizes and exclusion paths.
+  /// Position and size the gutter and minimap and set the text container sizes and exclusion paths. Take the current
+  /// view layout in `viewLayout` into account.
   ///
   /// * The main text view contains three subviews: (1) the main gutter on its left side, (2) the minimap on its right
   ///   side, and (3) a divide in between the code view and the minimap gutter.
@@ -482,18 +498,26 @@ class CodeView: NSTextView {
                                       size: CGSize(width: minimapGutterWidth, height: frame.height)),
         widthWithoutGutters  = frame.width - gutterWidth - minimapGutterWidth
                                            - minLineFragmentPadding * 2 + minimapFontWidth * 2 - dividerWidth,
-        numberOfCharacters   = codeWidthInCharacters(for: widthWithoutGutters , with: theFont),
+        numberOfCharacters   = codeWidthInCharacters(for: widthWithoutGutters,
+                                                     with: theFont,
+                                                     withMinimap: viewLayout.showMinimap),
         minimapWidth         = minimapGutterWidth + minimapFontWidth * 2 + numberOfCharacters * minimapFontWidth,
-        codeViewWidth        = frame.width - minimapWidth - dividerWidth,
+        codeViewWidth        = viewLayout.showMinimap ? frame.width - minimapWidth - dividerWidth : frame.width,
         padding              = codeViewWidth - (gutterWidth + ceil(numberOfCharacters * fontWidth)),
         minimapX             = floor(frame.width - minimapWidth),
         minimapRect          = CGRect(x: minimapX, y: 0, width: minimapWidth, height: frame.height),
         minimapExclusionPath = OSBezierPath(rect: minimapGutterRect),
         minimapDividerRect   = CGRect(x: minimapX - dividerWidth, y: 0, width: dividerWidth, height: frame.height)
 
-    minimapDividerView?.frame = minimapDividerRect
-    minimapView?.frame        = minimapRect
-    minimapGutterView?.frame  = minimapGutterRect
+    minimapDividerView?.isHidden = !viewLayout.showMinimap
+    minimapView?.isHidden        = !viewLayout.showMinimap
+    if viewLayout.showMinimap {
+
+      minimapDividerView?.frame = minimapDividerRect
+      minimapView?.frame        = minimapRect
+      minimapGutterView?.frame  = minimapGutterRect
+
+    }
 
     minSize = CGSize(width: 0, height: documentVisibleRect.height)
     maxSize = CGSize(width: codeViewWidth, height: CGFloat.greatestFiniteMagnitude)
@@ -521,6 +545,8 @@ class CodeView: NSTextView {
   /// Sets the scrolling position of the minimap in dependence of the scroll position of the main code view.
   ///
   func adjustScrollPositionOfMinimap() {
+    guard viewLayout.showMinimap else { return }
+
     let codeViewHeight = frame.size.height,
         minimapHeight  = minimapView?.frame.size.height ?? 0,
         visibleHeight  = documentVisibleRect.size.height

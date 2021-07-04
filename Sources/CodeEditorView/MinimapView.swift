@@ -278,10 +278,11 @@ class MinimapTypeSetter: NSATSTypesetter {
 /// - Parameters:
 ///   - width: Overall width available for main and minimap code view *without* gutter and padding.
 ///   - font: The fixed pitch font of the main text view.
+///   - withMinimap: Determines whether to include the presence of a minimap into the calculation.
 /// - Returns: The width of the code view in number of characters.
 ///
-func codeWidthInCharacters(for width: CGFloat, with font: NSFont) -> CGFloat {
-  let minimapCharWidth = minimapFontSize(for: font.pointSize) / 2
+func codeWidthInCharacters(for width: CGFloat, with font: NSFont, withMinimap: Bool) -> CGFloat {
+  let minimapCharWidth = withMinimap ? minimapFontSize(for: font.pointSize) / 2 : 0
   return floor(width / (font.maximumAdvancement.width + minimapCharWidth))
 }
 
