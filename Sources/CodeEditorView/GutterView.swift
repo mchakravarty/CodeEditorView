@@ -146,7 +146,6 @@ extension GutterView {
   /// breaks.
   ///
   func invalidateGutter(forCharRange charRange: NSRange) {
-    return
     
     let string        = textView.text as NSString,
         safeCharRange = NSIntersectionRange(charRange, NSRange(location: 0, length: string.length))
