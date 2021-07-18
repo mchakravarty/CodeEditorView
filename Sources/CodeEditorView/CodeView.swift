@@ -44,9 +44,13 @@ typealias MessageViews = [LineInfo.MessageBundle.ID: MessageInfo]
 ///
 class CodeView: UITextView {
 
-  fileprivate var gutterView:          GutterView?
-  fileprivate var codeViewDelegate:    CodeViewDelegate?
-  fileprivate var codeStorageDelegate: CodeStorageDelegate?
+  // Delegates
+  fileprivate var codeViewDelegate:           CodeViewDelegate
+  fileprivate var codeStorageDelegate:        CodeStorageDelegate
+  fileprivate let codeLayoutManagerDelegate = CodeLayoutManagerDelegate
+
+  // Subviews
+  fileprivate var gutterView: GutterView?
 
   /// The current highlighting theme
   ///
@@ -81,12 +85,16 @@ class CodeView: UITextView {
     self.theme      = theme
 
     // Use custom components that are gutter-aware and support code-specific editing actions and highlighting.
-    let codeLayoutManager = CodeLayoutManager(),
-        codeContainer     = CodeContainer(),
-        codeStorage       = CodeStorage(theme: theme)
+    let codeLayoutManager         = CodeLayoutManager(),
+        codeContainer             = CodeContainer(),
+        codeStorage               = CodeStorage(theme: theme)
     codeStorage.addLayoutManager(codeLayoutManager)
     codeContainer.layoutManager = codeLayoutManager
     codeLayoutManager.addTextContainer(codeContainer)
+    codeLayoutManager.delegate = codeLayoutManagerDelegate
+
+    codeViewDelegate    = CodeViewDelegate(codeView: self)
+    codeStorageDelegate = CodeStorageDelegate(with: language)
 
     super.init(frame: frame, textContainer: codeContainer)
     codeContainer.textView = self
@@ -103,12 +111,10 @@ class CodeView: UITextView {
     smartInsertDeleteType  = .no
 
     // Add the view delegate
-    codeViewDelegate = CodeViewDelegate(codeView: self)
-    delegate         = codeViewDelegate
+    delegate = codeViewDelegate
 
     // Add a text storage delegate that maintains a line map
-    self.codeStorageDelegate = CodeStorageDelegate(with: language)
-    codeStorage.delegate     = self.codeStorageDelegate
+    codeStorage.delegate = self.codeStorageDelegate
 
     // Add a gutter view
     let gutterWidth = ceil(theme.fontSize) * 3,
@@ -173,8 +179,9 @@ class CodeViewDelegate: NSObject, UITextViewDelegate {
 class CodeView: NSTextView {
 
   // Delegates
-  var codeViewDelegate:    CodeViewDelegate?
-  var codeStorageDelegate: CodeStorageDelegate?
+  fileprivate let codeViewDelegate =          CodeViewDelegate()
+  fileprivate let codeLayoutManagerDelegate = CodeLayoutManagerDelegate()
+  fileprivate var codeStorageDelegate:        CodeStorageDelegate
 
   // Subviews
   var gutterView:         GutterView?
@@ -230,6 +237,9 @@ class CodeView: NSTextView {
     codeStorage.addLayoutManager(codeLayoutManager)
     codeContainer.layoutManager = codeLayoutManager
     codeLayoutManager.addTextContainer(codeContainer)
+    codeLayoutManager.delegate = codeLayoutManagerDelegate
+
+    codeStorageDelegate  = CodeStorageDelegate(with: language)
 
     super.init(frame: frame, textContainer: codeContainer)
 
@@ -263,11 +273,9 @@ class CodeView: NSTextView {
     isIncrementalSearchingEnabled = true
 
     // Add the view delegate
-    codeViewDelegate = CodeViewDelegate()
-    delegate         = codeViewDelegate
+    delegate = codeViewDelegate
 
     // Add a text storage delegate that maintains a line map
-    codeStorageDelegate  = CodeStorageDelegate(with: language)
     codeStorage.delegate = codeStorageDelegate
 
     // Add a gutter view
@@ -668,7 +676,7 @@ extension CodeView {
   /// Adds a new message to the set of messages for this code view.
   ///
   func report(message: Located<Message>) {
-    guard let messageBundle = codeStorageDelegate?.add(message: message) else { return }
+    guard let messageBundle = codeStorageDelegate.add(message: message) else { return }
 
     updateMessageView(for: messageBundle, at: message.location.line)
   }
@@ -676,7 +684,7 @@ extension CodeView {
   /// Removes a given message. If it doesn't exist, do nothing. This function is quite expensive.
   ///
   func retract(message: Message) {
-    guard let (messageBundle, line) = codeStorageDelegate?.remove(message: message) else { return }
+    guard let (messageBundle, line) = codeStorageDelegate.remove(message: message) else { return }
 
     updateMessageView(for: messageBundle, at: line)
   }
@@ -685,7 +693,7 @@ extension CodeView {
   /// the two special cases, where we create a new view or we remove a view for good (as its last message was deleted).
   ///
   private func updateMessageView(for messageBundle: LineInfo.MessageBundle, at line: Int) {
-    guard let charRange = codeStorageDelegate?.lineMap.lookup(line: line)?.range else { return }
+    guard let charRange = codeStorageDelegate.lineMap.lookup(line: line)?.range else { return }
 
     removeMessageViews(withIDs: [messageBundle.id])
 
@@ -723,8 +731,6 @@ extension CodeView {
   ///     to be removed.
   ///
   func retractMessages(onLines lines: Range<Int>? = nil) {
-    guard let codeStorageDelegate = codeStorageDelegate else { return }
-
     var messageIds: [LineInfo.MessageBundle.ID] = []
 
     // Remove all message bundles in the line map and collect their ids for subsequent view removal.
@@ -847,6 +853,18 @@ class CodeLayoutManager: NSLayoutManager {
       codeView.removeMessageViews(withIDs: codeStorageDelegate.lastEvictedMessageIDs)
 
     }
+  }
+}
+
+class CodeLayoutManagerDelegate: NSObject, NSLayoutManagerDelegate {
+
+  func layoutManager(_ layoutManager: NSLayoutManager,
+                     didCompleteLayoutFor textContainer: NSTextContainer?,
+                     atEnd layoutFinishedFlag: Bool)
+  {
+    guard let layoutManager = layoutManager as? CodeLayoutManager else { return }
+
+    if layoutFinishedFlag { layoutManager.gutterView?.layoutFinished() }
   }
 }
 

@@ -98,6 +98,10 @@ class GutterView: NSView {
   ///
   let isMinimapGutter: Bool
 
+  /// Dirty rectangle whose drawing has been delayed as the code layout wasn't finished yet.
+  ///
+  var pendingDrawRect: NSRect?
+
   /// Create and configure a gutter view for the given text view. This will also set the appropiate exclusion path for
   /// text container.
   ///
@@ -131,7 +135,6 @@ extension GutterView {
   var optTextContainer: NSTextContainer?   { textView.optTextContainer }
   var optLineMap:       LineMap<LineInfo>? { textView.optLineMap }
 
-
   // MARK: -
   // MARK: Gutter notifications
 
@@ -160,11 +163,19 @@ extension GutterView {
         glyphRange          = layoutManager.glyphRange(forCharacterRange: extendedCharRange, actualCharacterRange: nil),
         gutterRect          = gutterRectFrom(textRect: layoutManager.boundingRect(forGlyphRange: glyphRange,
                                                                                   in: textContainer)),
-        extendedGutterRect  = CGRect(origin: gutterRect.origin,   // everything below the change may need to be redrawn
-                                     size: CGSize(width: gutterRect.size.width, height: CGFloat.greatestFiniteMagnitude))
-//    setNeedsDisplay(extendedGutterRect.intersection(documentVisibleRect))
     setNeedsDisplay(gutterRect.intersection(documentVisibleRect))
-    print("* requesting display of charRange = \(charRange); rect = \(gutterRect.intersection(documentVisibleRect))")
+  }
+
+  /// Trigger drawing any pending gutter draw rectangle.
+  ///
+  func layoutFinished() {
+
+    if let rect = pendingDrawRect {
+
+      setNeedsDisplay(rect)
+      pendingDrawRect = nil
+
+    }
   }
 
   // MARK: -
@@ -184,12 +195,10 @@ extension GutterView {
                                                                                                    length: 0))
     {
 
-      DispatchQueue.main.async { self.setNeedsDisplay(rect) }
+      pendingDrawRect = rect.union(pendingDrawRect ?? NSRect.null)
       return
 
     }
-
-    print("gutter draw \(isMinimapGutter ? "(minimap)" : "") rect = \(rect); lines = \(lineMap.lines.count)")
 
     theme.backgroundColour.setFill()
     OSBezierPath(rect: rect).fill()
@@ -267,8 +276,6 @@ extension GutterView {
 
       let lineRange = lineMap.linesOf(range: charRange)
 
-      print("  gutter char range = \(charRange); line range = \(lineRange)")
-
       // Text attributes for the line numbers
       let lineNumberStyle = NSMutableParagraphStyle()
       lineNumberStyle.alignment = .right
@@ -312,8 +319,6 @@ extension GutterView {
         }
 
         #endif
-
-        print("  Line \(line) covering lineCharRange = \(lineCharRange) at rect = \(gutterRect)")
 
         ("\(line)" as NSString).draw(in: gutterRect, withAttributes: attributes)
       }
