@@ -131,6 +131,23 @@ public struct LanguageConfiguration {
   ///
   public let reservedIdentifiers: [String]
 
+  public init(stringRegexp: String?,
+              characterRegexp: String?,
+              numberRegexp: String?,
+              singleLineComment: String?,
+              nestedComment: LanguageConfiguration.BracketPair?,
+              identifierRegexp: String?,
+              reservedIdentifiers: [String])
+  {
+    self.stringRegexp         = stringRegexp
+    self.characterRegexp      = characterRegexp
+    self.numberRegexp         = numberRegexp
+    self.singleLineComment    = singleLineComment
+    self.nestedComment        = nestedComment
+    self.identifierRegexp     = identifierRegexp
+    self.reservedIdentifiers  = reservedIdentifiers
+  }
+
   /// Yields the lexeme of the given token under this language configuration if the token has got a unique lexeme.
   ///
   func lexeme(of token: Token) -> String? {

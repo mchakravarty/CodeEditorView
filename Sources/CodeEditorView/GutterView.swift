@@ -146,7 +146,6 @@ extension GutterView {
   /// breaks.
   ///
   func invalidateGutter(forCharRange charRange: NSRange) {
-    return
     
     let string        = textView.text as NSString,
         safeCharRange = NSIntersectionRange(charRange, NSRange(location: 0, length: string.length))
@@ -270,6 +269,9 @@ extension GutterView {
                                     .foregroundColor: theme.textColour,
                                     .paragraphStyle: lineNumberStyle,
                                     .kern: NSNumber(value: Float(-theme.fontSize / 11))]
+
+      // TODO: CodeEditor needs to be parameterised by message theme
+      let theme = Message.defaultTheme
 
       for line in lineRange {
 
