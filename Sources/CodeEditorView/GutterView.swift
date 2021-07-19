@@ -162,7 +162,7 @@ extension GutterView {
         extendedCharRange   = string.paragraphRange(for: safeCharRange),
         glyphRange          = layoutManager.glyphRange(forCharacterRange: extendedCharRange, actualCharacterRange: nil),
         gutterRect          = gutterRectFrom(textRect: layoutManager.boundingRect(forGlyphRange: glyphRange,
-                                                                                  in: textContainer)),
+                                                                                  in: textContainer))
     setNeedsDisplay(gutterRect.intersection(documentVisibleRect))
   }
 
