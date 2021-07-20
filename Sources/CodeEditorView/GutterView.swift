@@ -150,20 +150,30 @@ extension GutterView {
   ///
   func invalidateGutter(forCharRange charRange: NSRange) {
 
-    let string        = textView.text as NSString,
-        safeCharRange = NSIntersectionRange(charRange, NSRange(location: 0, length: string.length))
-
     guard let layoutManager = optLayoutManager,
-          let textContainer = optTextContainer,
-          safeCharRange.length > 0
+          let textContainer = optTextContainer
     else { return }
 
-    let documentVisibleRect = textView.documentVisibleRect,
-        extendedCharRange   = string.paragraphRange(for: safeCharRange),
-        glyphRange          = layoutManager.glyphRange(forCharacterRange: extendedCharRange, actualCharacterRange: nil),
-        gutterRect          = gutterRectFrom(textRect: layoutManager.boundingRect(forGlyphRange: glyphRange,
-                                                                                  in: textContainer))
-    setNeedsDisplay(gutterRect.intersection(documentVisibleRect))
+    let string = textView.text as NSString
+
+    let textRect: NSRect
+
+    if charRange.location == string.length {   // special case: insertion point on trailing empty line
+
+      textRect = layoutManager.extraLineFragmentRect
+
+    } else {
+
+      // We call `paragraphRange(for:_)` safely by boxing `charRange` to the allowed range.
+      let extendedCharRange   = string.paragraphRange(for: NSIntersectionRange(charRange,
+                                                                               NSRange(location: 0,
+                                                                                       length: string.length))),
+          glyphRange          = layoutManager.glyphRange(forCharacterRange: extendedCharRange,
+                                                         actualCharacterRange: nil)
+      textRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+
+    }
+    setNeedsDisplay(gutterRectFrom(textRect: textRect))
   }
 
   /// Trigger drawing any pending gutter draw rectangle.

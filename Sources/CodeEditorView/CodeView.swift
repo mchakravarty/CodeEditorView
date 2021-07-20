@@ -164,7 +164,11 @@ class CodeViewDelegate: NSObject, UITextViewDelegate {
 
     selectionDidChange?(textView)
 
-    codeView.gutterView?.invalidateGutter(forCharRange: NSUnionRange(codeView.selectedRange, oldSelectedRange))
+    // NB: Invalidation of the two ranges needs to happen separately. If we were to union them, an insertion point
+    //     (range length = 0) at the start of a line would be absorbed into the previous line, which results in a lack
+    //     of invalidation of the line on which the insertion point is located.
+    codeView.gutterView?.invalidateGutter(forCharRange: codeView.selectedRange)
+    codeView.gutterView?.invalidateGutter(forCharRange: oldSelectedRange)
     oldSelectedRange = textView.selectedRange
   }
 }
@@ -399,8 +403,13 @@ class CodeView: NSTextView {
     DispatchQueue.main.async {
 
       // Needed as the selection affects line number highlighting.
-      self.gutterView?.invalidateGutter(forCharRange: combinedRanges(ranges: oldSelectedRanges + ranges))
-      self.minimapGutterView?.invalidateGutter(forCharRange: combinedRanges(ranges: oldSelectedRanges + ranges))
+      // NB: Invalidation of the old and new ranges needs to happen separately. If we were to union them, an insertion
+      //     point (range length = 0) at the start of a line would be absorbed into the previous line, which results in
+      //     a lack of invalidation of the line on which the insertion point is located.
+      self.gutterView?.invalidateGutter(forCharRange: combinedRanges(ranges: oldSelectedRanges))
+      self.gutterView?.invalidateGutter(forCharRange: combinedRanges(ranges: ranges))
+      self.minimapGutterView?.invalidateGutter(forCharRange: combinedRanges(ranges: oldSelectedRanges))
+      self.minimapGutterView?.invalidateGutter(forCharRange: combinedRanges(ranges: ranges))
     }
 
     collapseMessageViews()
