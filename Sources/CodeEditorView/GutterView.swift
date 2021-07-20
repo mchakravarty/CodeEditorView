@@ -44,6 +44,10 @@ class GutterView: UIView {
   ///
   let isMinimapGutter: Bool = false
 
+  /// Dirty rectangle whose drawing has been delayed as the code layout wasn't finished yet.
+  ///
+  var pendingDrawRect: CGRect?
+
   /// Create and configure a gutter view for the given text view. This will also set the appropiate exclusion path for
   /// text container.
   ///
@@ -156,7 +160,7 @@ extension GutterView {
 
     let string = textView.text as NSString
 
-    let textRect: NSRect
+    let textRect: CGRect
 
     if charRange.location == string.length {   // special case: insertion point on trailing empty line
 
@@ -205,7 +209,7 @@ extension GutterView {
                                                                                                    length: 0))
     {
 
-      pendingDrawRect = rect.union(pendingDrawRect ?? NSRect.null)
+      pendingDrawRect = rect.union(pendingDrawRect ?? CGRect.null)
       return
 
     }
@@ -308,10 +312,6 @@ extension GutterView {
         //     the second to last line (as otherwise, the bounding rect will contain both the second to last and last
         //     line together).
         let lineCharRange     = lineMap.lines[line].range,
-            adjustedLineRange = line == lineMap.lines.count - 1 ? NSRange(location: lineCharRange.location,
-                                                                          length: lineCharRange.length - 1)
-                                                                : lineCharRange,
-//            lineGlyphRange    = layoutManager.glyphRange(forCharacterRange: adjustedLineRange, actualCharacterRange: nil),
             lineGlyphRange    = layoutManager.glyphRange(forCharacterRange: lineCharRange, actualCharacterRange: nil),
             lineGlyphRect     = layoutManager.boundingRect(forGlyphRange: lineGlyphRange, in: textContainer),
             gutterRect        = gutterRectForLineNumbersFrom(textRect: lineGlyphRect)

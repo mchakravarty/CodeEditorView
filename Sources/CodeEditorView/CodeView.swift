@@ -45,9 +45,9 @@ typealias MessageViews = [LineInfo.MessageBundle.ID: MessageInfo]
 class CodeView: UITextView {
 
   // Delegates
-  fileprivate var codeViewDelegate:           CodeViewDelegate
+  fileprivate var codeViewDelegate:           CodeViewDelegate?
   fileprivate var codeStorageDelegate:        CodeStorageDelegate
-  fileprivate let codeLayoutManagerDelegate = CodeLayoutManagerDelegate
+  fileprivate let codeLayoutManagerDelegate = CodeLayoutManagerDelegate()
 
   // Subviews
   fileprivate var gutterView: GutterView?
@@ -93,7 +93,6 @@ class CodeView: UITextView {
     codeLayoutManager.addTextContainer(codeContainer)
     codeLayoutManager.delegate = codeLayoutManagerDelegate
 
-    codeViewDelegate    = CodeViewDelegate(codeView: self)
     codeStorageDelegate = CodeStorageDelegate(with: language)
 
     super.init(frame: frame, textContainer: codeContainer)
@@ -111,7 +110,8 @@ class CodeView: UITextView {
     smartInsertDeleteType  = .no
 
     // Add the view delegate
-    delegate = codeViewDelegate
+    codeViewDelegate = CodeViewDelegate(codeView: self)
+    delegate         = codeViewDelegate
 
     // Add a text storage delegate that maintains a line map
     codeStorage.delegate = self.codeStorageDelegate
