@@ -44,6 +44,10 @@ class GutterView: UIView {
   ///
   let isMinimapGutter: Bool = false
 
+  /// Dirty rectangle whose drawing has been delayed as the code layout wasn't finished yet.
+  ///
+  var pendingDrawRect: CGRect?
+
   /// Create and configure a gutter view for the given text view. This will also set the appropiate exclusion path for
   /// text container.
   ///
@@ -98,6 +102,10 @@ class GutterView: NSView {
   ///
   let isMinimapGutter: Bool
 
+  /// Dirty rectangle whose drawing has been delayed as the code layout wasn't finished yet.
+  ///
+  var pendingDrawRect: NSRect?
+
   /// Create and configure a gutter view for the given text view. This will also set the appropiate exclusion path for
   /// text container.
   ///
@@ -131,38 +139,57 @@ extension GutterView {
   var optTextContainer: NSTextContainer?   { textView.optTextContainer }
   var optLineMap:       LineMap<LineInfo>? { textView.optLineMap }
 
-
   // MARK: -
   // MARK: Gutter notifications
 
-  /// Notifies the gutter view that a range of characters will be redrawn by the layout manager or that there selection
-  /// status changes; thus, the corresponding gutter area might require redrawing, too.
+  /// Notifies the gutter view that a range of characters will be redrawn by the layout manager or that there are
+  /// selection status changes; thus, the corresponding gutter area might require redrawing, too.
   ///
   /// - Parameters:
   ///   - charRange: The invalidated range of characters. It will be trimmed to be within the valid character range of
   ///     the underlying text storage.
   ///
-  /// We invalidate the area corresponding to entire paragraphs. This makes a difference in the presence of lines
+  /// We invalidate the area corresponding to entire paragraphs. This makes a difference in the presence of line
   /// breaks.
   ///
   func invalidateGutter(forCharRange charRange: NSRange) {
-    
-    let string        = textView.text as NSString,
-        safeCharRange = NSIntersectionRange(charRange, NSRange(location: 0, length: string.length))
 
     guard let layoutManager = optLayoutManager,
-          let textContainer = optTextContainer,
-          safeCharRange.length > 0
+          let textContainer = optTextContainer
     else { return }
 
-    let documentVisibleRect = textView.documentVisibleRect,
-        extendedCharRange   = string.paragraphRange(for: safeCharRange),
-        glyphRange          = layoutManager.glyphRange(forCharacterRange: extendedCharRange, actualCharacterRange: nil),
-        gutterRect          = gutterRectFrom(textRect: layoutManager.boundingRect(forGlyphRange: glyphRange,
-                                                                                  in: textContainer)),
-        extendedGutterRect  = CGRect(origin: gutterRect.origin,   // everything below the change may need to be redrawn
-                                     size: CGSize(width: gutterRect.size.width, height: CGFloat.greatestFiniteMagnitude))
-    setNeedsDisplay(extendedGutterRect.intersection(documentVisibleRect))
+    let string = textView.text as NSString
+
+    let textRect: CGRect
+
+    if charRange.location == string.length {   // special case: insertion point on trailing empty line
+
+      textRect = layoutManager.extraLineFragmentRect
+
+    } else {
+
+      // We call `paragraphRange(for:_)` safely by boxing `charRange` to the allowed range.
+      let extendedCharRange   = string.paragraphRange(for: NSIntersectionRange(charRange,
+                                                                               NSRange(location: 0,
+                                                                                       length: string.length))),
+          glyphRange          = layoutManager.glyphRange(forCharacterRange: extendedCharRange,
+                                                         actualCharacterRange: nil)
+      textRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+
+    }
+    setNeedsDisplay(gutterRectFrom(textRect: textRect))
+  }
+
+  /// Trigger drawing any pending gutter draw rectangle.
+  ///
+  func layoutFinished() {
+
+    if let rect = pendingDrawRect {
+
+      setNeedsDisplay(rect)
+      pendingDrawRect = nil
+
+    }
   }
 
   // MARK: -
@@ -174,7 +201,18 @@ extension GutterView {
           let lineMap       = optLineMap
     else { return }
 
-    print("gutter draw \(isMinimapGutter ? "(minimap)" : "") \(rect); lines = \(lineMap.lines.count)")
+    // This is not particularily nice, but there is no point in trying to draw the gutter, before the layout manager
+    // has finished laying out the *entire* text. Given that all we got here is a rectangle, we can't even figure out
+    // reliably whether enough text has been laid out to draw that part of the gutter that is being requested. Hence,
+    // we defer drawing the gutter until all characters have been laid out.
+    if layoutManager.firstUnlaidCharacterIndex() < NSMaxRange(lineMap.lines.last?.range ?? NSRange(location: 0,
+                                                                                                   length: 0))
+    {
+
+      pendingDrawRect = rect.union(pendingDrawRect ?? CGRect.null)
+      return
+
+    }
 
     theme.backgroundColour.setFill()
     OSBezierPath(rect: rect).fill()
@@ -247,15 +285,10 @@ extension GutterView {
                                               in: textContainer),
         charRange  = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
 
-    // Bail out if there are no characters associated
-    if charRange.length < 1 { return }
-
     // Draw line numbers unless this is a gutter for a minimap
     if !isMinimapGutter {
 
       let lineRange = lineMap.linesOf(range: charRange)
-
-      print("  gutter char range = \(charRange); line range = \(lineRange)")
 
       // Text attributes for the line numbers
       let lineNumberStyle = NSMutableParagraphStyle()
@@ -278,11 +311,8 @@ extension GutterView {
         // NB: We adjust the range, so that in case of a trailing empty line that last line break is not included in
         //     the second to last line (as otherwise, the bounding rect will contain both the second to last and last
         //     line together).
-        let lineRange         = lineMap.lines[line].range,
-            adjustedLineRange = line < lineMap.lines.count - 1 ? NSRange(location: lineRange.location,
-                                                                         length: lineRange.length - 1)
-                                                               : lineRange,
-            lineGlyphRange    = layoutManager.glyphRange(forCharacterRange: adjustedLineRange, actualCharacterRange: nil),
+        let lineCharRange     = lineMap.lines[line].range,
+            lineGlyphRange    = layoutManager.glyphRange(forCharacterRange: lineCharRange, actualCharacterRange: nil),
             lineGlyphRect     = layoutManager.boundingRect(forGlyphRange: lineGlyphRange, in: textContainer),
             gutterRect        = gutterRectForLineNumbersFrom(textRect: lineGlyphRect)
 

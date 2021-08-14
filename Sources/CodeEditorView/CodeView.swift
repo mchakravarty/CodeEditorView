@@ -44,9 +44,13 @@ typealias MessageViews = [LineInfo.MessageBundle.ID: MessageInfo]
 ///
 class CodeView: UITextView {
 
-  fileprivate var gutterView:          GutterView?
-  fileprivate var codeViewDelegate:    CodeViewDelegate?
-  fileprivate var codeStorageDelegate: CodeStorageDelegate?
+  // Delegates
+  fileprivate var codeViewDelegate:           CodeViewDelegate?
+  fileprivate var codeStorageDelegate:        CodeStorageDelegate
+  fileprivate let codeLayoutManagerDelegate = CodeLayoutManagerDelegate()
+
+  // Subviews
+  fileprivate var gutterView: GutterView?
 
   /// The current highlighting theme
   ///
@@ -61,23 +65,35 @@ class CodeView: UITextView {
     }
   }
 
+  /// The current view layout.
+  ///
+  var viewLayout: CodeEditor.LayoutConfiguration {
+    didSet {
+      // Nothing to do, but that may change in the future
+    }
+  }
+
   /// Keeps track of the set of message views.
   ///
   var messageViews: MessageViews = [:]
 
   /// Designated initializer for code views with a gutter.
   ///
-  init(frame: CGRect, with language: LanguageConfiguration, theme: Theme) {
+  init(frame: CGRect, with language: LanguageConfiguration, viewLayout: CodeEditor.LayoutConfiguration, theme: Theme) {
 
-    self.theme = theme
+    self.viewLayout = viewLayout
+    self.theme      = theme
 
     // Use custom components that are gutter-aware and support code-specific editing actions and highlighting.
-    let codeLayoutManager = CodeLayoutManager(),
-        codeContainer     = CodeContainer(),
-        codeStorage       = CodeStorage(theme: theme)
+    let codeLayoutManager         = CodeLayoutManager(),
+        codeContainer             = CodeContainer(),
+        codeStorage               = CodeStorage(theme: theme)
     codeStorage.addLayoutManager(codeLayoutManager)
     codeContainer.layoutManager = codeLayoutManager
     codeLayoutManager.addTextContainer(codeContainer)
+    codeLayoutManager.delegate = codeLayoutManagerDelegate
+
+    codeStorageDelegate = CodeStorageDelegate(with: language)
 
     super.init(frame: frame, textContainer: codeContainer)
     codeContainer.textView = self
@@ -98,8 +114,7 @@ class CodeView: UITextView {
     delegate         = codeViewDelegate
 
     // Add a text storage delegate that maintains a line map
-    self.codeStorageDelegate = CodeStorageDelegate(with: language)
-    codeStorage.delegate     = self.codeStorageDelegate
+    codeStorage.delegate = self.codeStorageDelegate
 
     // Add a gutter view
     let gutterWidth = ceil(theme.fontSize) * 3,
@@ -149,7 +164,11 @@ class CodeViewDelegate: NSObject, UITextViewDelegate {
 
     selectionDidChange?(textView)
 
-    codeView.gutterView?.invalidateGutter(forCharRange: NSUnionRange(codeView.selectedRange, oldSelectedRange))
+    // NB: Invalidation of the two ranges needs to happen separately. If we were to union them, an insertion point
+    //     (range length = 0) at the start of a line would be absorbed into the previous line, which results in a lack
+    //     of invalidation of the line on which the insertion point is located.
+    codeView.gutterView?.invalidateGutter(forCharRange: codeView.selectedRange)
+    codeView.gutterView?.invalidateGutter(forCharRange: oldSelectedRange)
     oldSelectedRange = textView.selectedRange
   }
 }
@@ -164,8 +183,9 @@ class CodeViewDelegate: NSObject, UITextViewDelegate {
 class CodeView: NSTextView {
 
   // Delegates
-  var codeViewDelegate:    CodeViewDelegate?
-  var codeStorageDelegate: CodeStorageDelegate?
+  fileprivate let codeViewDelegate =          CodeViewDelegate()
+  fileprivate let codeLayoutManagerDelegate = CodeLayoutManagerDelegate()
+  fileprivate var codeStorageDelegate:        CodeStorageDelegate
 
   // Subviews
   var gutterView:         GutterView?
@@ -197,15 +217,22 @@ class CodeView: NSTextView {
     }
   }
 
+  /// The current view layout.
+  ///
+  var viewLayout: CodeEditor.LayoutConfiguration {
+    didSet { tile() }
+  }
+
   /// Keeps track of the set of message views.
   ///
   var messageViews: MessageViews = [:]
 
-  /// Designated initializer for code views with a gutter.
+  /// Designated initialiser for code views with a gutter.
   ///
-  init(frame: CGRect, with language: LanguageConfiguration, theme: Theme) {
+  init(frame: CGRect, with language: LanguageConfiguration, viewLayout: CodeEditor.LayoutConfiguration, theme: Theme) {
 
-    self.theme = theme
+    self.theme      = theme
+    self.viewLayout = viewLayout
 
     // Use custom components that are gutter-aware and support code-specific editing actions and highlighting.
     let codeLayoutManager = CodeLayoutManager(),
@@ -214,6 +241,9 @@ class CodeView: NSTextView {
     codeStorage.addLayoutManager(codeLayoutManager)
     codeContainer.layoutManager = codeLayoutManager
     codeLayoutManager.addTextContainer(codeContainer)
+    codeLayoutManager.delegate = codeLayoutManagerDelegate
+
+    codeStorageDelegate  = CodeStorageDelegate(with: language)
 
     super.init(frame: frame, textContainer: codeContainer)
 
@@ -232,6 +262,7 @@ class CodeView: NSTextView {
     isAutomaticDataDetectionEnabled      = false
     isAutomaticSpellingCorrectionEnabled = false
     isAutomaticTextReplacementEnabled    = false
+    usesFontPanel                        = false
 
     // Line wrapping
     isHorizontallyResizable             = false
@@ -246,11 +277,9 @@ class CodeView: NSTextView {
     isIncrementalSearchingEnabled = true
 
     // Add the view delegate
-    codeViewDelegate = CodeViewDelegate()
-    delegate         = codeViewDelegate
+    delegate = codeViewDelegate
 
     // Add a text storage delegate that maintains a line map
-    codeStorageDelegate  = CodeStorageDelegate(with: language)
     codeStorage.delegate = codeStorageDelegate
 
     // Add a gutter view
@@ -374,8 +403,13 @@ class CodeView: NSTextView {
     DispatchQueue.main.async {
 
       // Needed as the selection affects line number highlighting.
-      self.gutterView?.invalidateGutter(forCharRange: combinedRanges(ranges: oldSelectedRanges + ranges))
-      self.minimapGutterView?.invalidateGutter(forCharRange: combinedRanges(ranges: oldSelectedRanges + ranges))
+      // NB: Invalidation of the old and new ranges needs to happen separately. If we were to union them, an insertion
+      //     point (range length = 0) at the start of a line would be absorbed into the previous line, which results in
+      //     a lack of invalidation of the line on which the insertion point is located.
+      self.gutterView?.invalidateGutter(forCharRange: combinedRanges(ranges: oldSelectedRanges))
+      self.gutterView?.invalidateGutter(forCharRange: combinedRanges(ranges: ranges))
+      self.minimapGutterView?.invalidateGutter(forCharRange: combinedRanges(ranges: oldSelectedRanges))
+      self.minimapGutterView?.invalidateGutter(forCharRange: combinedRanges(ranges: ranges))
     }
 
     collapseMessageViews()
@@ -446,7 +480,8 @@ class CodeView: NSTextView {
     }
   }
 
-  /// Position and size the gutter and minimap and set the text container sizes and exclusion paths.
+  /// Position and size the gutter and minimap and set the text container sizes and exclusion paths. Take the current
+  /// view layout in `viewLayout` into account.
   ///
   /// * The main text view contains three subviews: (1) the main gutter on its left side, (2) the minimap on its right
   ///   side, and (3) a divide in between the code view and the minimap gutter.
@@ -482,18 +517,26 @@ class CodeView: NSTextView {
                                       size: CGSize(width: minimapGutterWidth, height: frame.height)),
         widthWithoutGutters  = frame.width - gutterWidth - minimapGutterWidth
                                            - minLineFragmentPadding * 2 + minimapFontWidth * 2 - dividerWidth,
-        numberOfCharacters   = codeWidthInCharacters(for: widthWithoutGutters , with: theFont),
+        numberOfCharacters   = codeWidthInCharacters(for: widthWithoutGutters,
+                                                     with: theFont,
+                                                     withMinimap: viewLayout.showMinimap),
         minimapWidth         = minimapGutterWidth + minimapFontWidth * 2 + numberOfCharacters * minimapFontWidth,
-        codeViewWidth        = frame.width - minimapWidth - dividerWidth,
+        codeViewWidth        = viewLayout.showMinimap ? frame.width - minimapWidth - dividerWidth : frame.width,
         padding              = codeViewWidth - (gutterWidth + ceil(numberOfCharacters * fontWidth)),
         minimapX             = floor(frame.width - minimapWidth),
         minimapRect          = CGRect(x: minimapX, y: 0, width: minimapWidth, height: frame.height),
         minimapExclusionPath = OSBezierPath(rect: minimapGutterRect),
         minimapDividerRect   = CGRect(x: minimapX - dividerWidth, y: 0, width: dividerWidth, height: frame.height)
 
-    minimapDividerView?.frame = minimapDividerRect
-    minimapView?.frame        = minimapRect
-    minimapGutterView?.frame  = minimapGutterRect
+    minimapDividerView?.isHidden = !viewLayout.showMinimap
+    minimapView?.isHidden        = !viewLayout.showMinimap
+    if viewLayout.showMinimap {
+
+      minimapDividerView?.frame = minimapDividerRect
+      minimapView?.frame        = minimapRect
+      minimapGutterView?.frame  = minimapGutterRect
+
+    }
 
     minSize = CGSize(width: 0, height: documentVisibleRect.height)
     maxSize = CGSize(width: codeViewWidth, height: CGFloat.greatestFiniteMagnitude)
@@ -521,6 +564,8 @@ class CodeView: NSTextView {
   /// Sets the scrolling position of the minimap in dependence of the scroll position of the main code view.
   ///
   func adjustScrollPositionOfMinimap() {
+    guard viewLayout.showMinimap else { return }
+
     let codeViewHeight = frame.size.height,
         minimapHeight  = minimapView?.frame.size.height ?? 0,
         visibleHeight  = documentVisibleRect.size.height
@@ -640,7 +685,7 @@ extension CodeView {
   /// Adds a new message to the set of messages for this code view.
   ///
   func report(message: Located<Message>) {
-    guard let messageBundle = codeStorageDelegate?.add(message: message) else { return }
+    guard let messageBundle = codeStorageDelegate.add(message: message) else { return }
 
     updateMessageView(for: messageBundle, at: message.location.line)
   }
@@ -648,7 +693,7 @@ extension CodeView {
   /// Removes a given message. If it doesn't exist, do nothing. This function is quite expensive.
   ///
   func retract(message: Message) {
-    guard let (messageBundle, line) = codeStorageDelegate?.remove(message: message) else { return }
+    guard let (messageBundle, line) = codeStorageDelegate.remove(message: message) else { return }
 
     updateMessageView(for: messageBundle, at: line)
   }
@@ -657,7 +702,7 @@ extension CodeView {
   /// the two special cases, where we create a new view or we remove a view for good (as its last message was deleted).
   ///
   private func updateMessageView(for messageBundle: LineInfo.MessageBundle, at line: Int) {
-    guard let charRange = codeStorageDelegate?.lineMap.lookup(line: line)?.range else { return }
+    guard let charRange = codeStorageDelegate.lineMap.lookup(line: line)?.range else { return }
 
     removeMessageViews(withIDs: [messageBundle.id])
 
@@ -695,8 +740,6 @@ extension CodeView {
   ///     to be removed.
   ///
   func retractMessages(onLines lines: Range<Int>? = nil) {
-    guard let codeStorageDelegate = codeStorageDelegate else { return }
-
     var messageIds: [LineInfo.MessageBundle.ID] = []
 
     // Remove all message bundles in the line map and collect their ids for subsequent view removal.
@@ -819,6 +862,18 @@ class CodeLayoutManager: NSLayoutManager {
       codeView.removeMessageViews(withIDs: codeStorageDelegate.lastEvictedMessageIDs)
 
     }
+  }
+}
+
+class CodeLayoutManagerDelegate: NSObject, NSLayoutManagerDelegate {
+
+  func layoutManager(_ layoutManager: NSLayoutManager,
+                     didCompleteLayoutFor textContainer: NSTextContainer?,
+                     atEnd layoutFinishedFlag: Bool)
+  {
+    guard let layoutManager = layoutManager as? CodeLayoutManager else { return }
+
+    if layoutFinishedFlag { layoutManager.gutterView?.layoutFinished() }
   }
 }
 

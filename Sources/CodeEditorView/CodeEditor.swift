@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+
 /// SwiftUI code editor based on TextKit.
 ///
 /// SwiftUI `Environment`:
@@ -14,7 +15,28 @@ import SwiftUI
 /// * Text-related values: affect the rendering of message views
 ///
 public struct CodeEditor {
+
+  /// Specification of the editor layout.
+  ///
+  public struct LayoutConfiguration: Equatable {
+
+    /// Show the minimap if possible. (Currently only supported on macOS.)
+    ///
+    public let showMinimap: Bool
+
+    /// Creates a layout configuration.
+    ///
+    /// - Parameter showMinimap: Whether to show the minimap if possible. It may not be possible on all supported OSes.
+    ///
+    public init(showMinimap: Bool) {
+      self.showMinimap = showMinimap
+    }
+
+    public static let standard = LayoutConfiguration(showMinimap: true)
+  }
+
   let language: LanguageConfiguration
+  let layout  : LayoutConfiguration
 
   @Binding private var text:     String
   @Binding private var messages: Set<Located<Message>>
@@ -27,14 +49,17 @@ public struct CodeEditor {
   ///               processing and display is relatively expensive. Hence, there should only be a limited number of
   ///               simultaneous messages and they shouldn't change to frequently.
   ///   - language: Language configuration for highlighting and similar.
+  ///   - layout: Layout configuration determining the visible elements of the editor view.
   ///
-  public init(text: Binding<String>,
+  public init(text:     Binding<String>,
               messages: Binding<Set<Located<Message>>>,
-              language: LanguageConfiguration = .none)
+              language: LanguageConfiguration = .none,
+              layout:   LayoutConfiguration = .standard)
   {
     self._text     = text
     self._messages = messages
     self.language  = language
+    self.layout    = layout
   }
 
   public class _Coordinator {
@@ -58,7 +83,9 @@ public struct CodeEditor {
 extension CodeEditor: UIViewRepresentable {
   public func makeUIView(context: Context) -> UITextView {
     let codeView = CodeView(frame: CGRect(x: 0, y: 0, width: 100, height: 40),
-                            with: language, theme: context.environment[CodeEditorTheme])
+                            with: language,
+                            viewLayout: layout,
+                            theme: context.environment[CodeEditorTheme])
 
     codeView.text = text
     if let delegate = codeView.delegate as? CodeViewDelegate {
@@ -77,9 +104,10 @@ extension CodeEditor: UIViewRepresentable {
     
     let theme = context.environment[CodeEditorTheme]
 
-    if text != textView.text { textView.text = text }  // Hoping for the string comparison fast path...
     updateMessages(in: codeView, with: context)
+    if text != textView.text { textView.text = text }  // Hoping for the string comparison fast path...
     if theme.id != codeView.theme.id { codeView.theme = theme }
+    if layout != codeView.viewLayout { codeView.viewLayout = layout }
   }
 
   public func makeCoordinator() -> Coordinator {
@@ -110,7 +138,9 @@ extension CodeEditor: NSViewRepresentable {
 
     // Set up text view with gutter
     let codeView = CodeView(frame: CGRect(x: 0, y: 0, width: 100, height: 40),
-                            with: language, theme: context.environment[CodeEditorTheme])
+                            with: language,
+                            viewLayout: layout,
+                            theme: context.environment[CodeEditorTheme])
     codeView.isVerticallyResizable   = true
     codeView.isHorizontallyResizable = false
     codeView.autoresizingMask        = .width
@@ -144,6 +174,7 @@ extension CodeEditor: NSViewRepresentable {
     updateMessages(in: codeView, with: context)
     if text != codeView.string { codeView.string = text }  // Hoping for the string comparison fast path...
     if theme.id != codeView.theme.id { codeView.theme = theme }
+    if layout != codeView.viewLayout { codeView.viewLayout = layout }
   }
 
   public func makeCoordinator() -> Coordinator {
