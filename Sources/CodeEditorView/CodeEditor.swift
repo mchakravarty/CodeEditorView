@@ -140,7 +140,7 @@ extension CodeEditor: NSViewRepresentable {
     let codeView = CodeView(frame: CGRect(x: 0, y: 0, width: 100, height: 40),
                             with: language,
                             viewLayout: layout,
-                            theme: context.environment[CodeEditorTheme])
+                            theme: context.environment.codeEditorTheme)
     codeView.isVerticallyResizable   = true
     codeView.isHorizontallyResizable = false
     codeView.autoresizingMask        = .width
@@ -169,8 +169,8 @@ extension CodeEditor: NSViewRepresentable {
 
   public func updateNSView(_ nsView: NSScrollView, context: Context) {
     guard let codeView = nsView.documentView as? CodeView else { return }
-
-    let theme = context.environment[CodeEditorTheme]
+    
+    let theme = context.environment.codeEditorTheme
     updateMessages(in: codeView, with: context)
     if text != codeView.string { codeView.string = text }  // Hoping for the string comparison fast path...
     if theme.id != codeView.theme.id { codeView.theme = theme }
