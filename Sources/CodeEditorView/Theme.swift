@@ -12,63 +12,94 @@ import SwiftUI
 /// A code highlighting theme. Different syntactic elements are purely distinguished by colour.
 ///
 public struct Theme: Identifiable {
-  public var id = UUID()
+  public let id = UUID()
 
   /// The name of the font to use.
   ///
-  let fontName: String
+  public var fontName: String
 
   /// The point size of the font to use.
   ///
-  let fontSize: CGFloat
+  public var fontSize: CGFloat
 
   /// The default foreground text colour.
   ///
-  let textColour: OSColor
+  public var textColour: OSColor
 
   /// The colour for (all kinds of) comments.
   ///
-  let commentColour: OSColor
+  public var commentColour: OSColor
 
   /// The colour for string literals.
   ///
-  let stringColour: OSColor
+  public var stringColour: OSColor
 
   /// The colour for character literals.
   ///
-  let characterColour: OSColor
+  public var characterColour: OSColor
 
   /// The colour for number literals.
   ///
-  let numberColour: OSColor
+  public var numberColour: OSColor
 
   /// The colour for identifiers.
   ///
-  let identifierColour: OSColor
+  public var identifierColour: OSColor
 
   /// The colour for keywords.
   ///
-  let keywordColour: OSColor
+  public var keywordColour: OSColor
 
   /// The background colour.
   ///
-  let backgroundColour: OSColor
+  public var backgroundColour: OSColor
 
   /// The colour of the current line highlight.
   ///
-  let currentLineColour: OSColor
+  public var currentLineColour: OSColor
 
   /// The colour to use for the selection highlight.
   ///
-  let selectionColour: OSColor
+  public var selectionColour: OSColor
 
   /// The cursor colour.
   ///
-  let cursorColour: OSColor
+  public var cursorColour: OSColor
 
   /// The colour to use if invisibles are drawn.
   ///
-  let invisiblesColour: OSColor
+  public var invisiblesColour: OSColor
+
+  public init(fontName: String,
+              fontSize: CGFloat,
+              textColour: OSColor,
+              commentColour: OSColor,
+              stringColour: OSColor,
+              characterColour: OSColor,
+              numberColour: OSColor,
+              identifierColour: OSColor,
+              keywordColour: OSColor,
+              backgroundColour: OSColor,
+              currentLineColour: OSColor,
+              selectionColour: OSColor,
+              cursorColour: OSColor,
+              invisiblesColour: OSColor)
+  {
+    self.fontName = fontName
+    self.fontSize = fontSize
+    self.textColour = textColour
+    self.commentColour = commentColour
+    self.stringColour = stringColour
+    self.characterColour = characterColour
+    self.numberColour = numberColour
+    self.identifierColour = identifierColour
+    self.keywordColour = keywordColour
+    self.backgroundColour = backgroundColour
+    self.currentLineColour = currentLineColour
+    self.selectionColour = selectionColour
+    self.cursorColour = cursorColour
+    self.invisiblesColour = invisiblesColour
+  }
 }
 
 /// A theme catalog indexing themes by name

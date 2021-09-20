@@ -12,9 +12,9 @@ import SwiftUI
 
 import UIKit
 
-typealias OSFont       = UIFont
-typealias OSColor      = UIColor
-typealias OSBezierPath = UIBezierPath
+public typealias OSFont       = UIFont
+public typealias OSColor      = UIColor
+public typealias OSBezierPath = UIBezierPath
 
 let labelColor = UIColor.label
 
@@ -34,9 +34,9 @@ extension UIColor {
 
 import AppKit
 
-typealias OSFont       = NSFont
-typealias OSColor      = NSColor
-typealias OSBezierPath = NSBezierPath
+public typealias OSFont       = NSFont
+public typealias OSColor      = NSColor
+public typealias OSBezierPath = NSBezierPath
 
 let labelColor = NSColor.labelColor
 
