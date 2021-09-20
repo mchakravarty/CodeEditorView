@@ -102,7 +102,7 @@ extension CodeEditor: UIViewRepresentable {
   public func updateUIView(_ textView: UITextView, context: Context) {
     guard let codeView = textView as? CodeView else { return }
     
-    let theme = context.environment.codeEditorTheme]
+    let theme = context.environment.codeEditorTheme
 
     updateMessages(in: codeView, with: context)
     if text != textView.text { textView.text = text }  // Hoping for the string comparison fast path...
