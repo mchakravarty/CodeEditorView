@@ -317,6 +317,35 @@ extension EnvironmentValues {
   }
 }
 
+extension CodeEditor.Location: RawRepresentable {
+
+  public init?(rawValue: String) {
+
+    func parseNSRange(lexeme: String) -> NSRange? {
+      let components = lexeme.components(separatedBy: ":")
+      guard components.count == 2,
+            let location = Int(components[0]),
+            let length   = Int(components[1])
+      else { return nil }
+      return NSRange(location: location, length: length)
+    }
+
+    let components = rawValue.components(separatedBy: "|")
+    if components.count == 2 {
+
+      selections             = components[0].components(separatedBy: ";").compactMap{ parseNSRange(lexeme: $0) }
+      verticalScrollFraction = CGFloat(Double(components[1]) ?? 0)
+
+    } else { self = CodeEditor.Location() }
+  }
+
+  public var rawValue: String {
+    let selectionsString             = selections.map{ "\($0.location):\($0.length)" }.joined(separator: ";"),
+        verticalScrollFractionString = String(describing: verticalScrollFraction)
+    return selectionsString + "|" + verticalScrollFractionString
+  }
+}
+
 
 // MARK: -
 // MARK: Previews
