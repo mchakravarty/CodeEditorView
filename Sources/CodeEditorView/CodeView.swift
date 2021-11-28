@@ -145,6 +145,7 @@ class CodeViewDelegate: NSObject, UITextViewDelegate {
   //
   var textDidChange:      ((UITextView) -> ())?
   var selectionDidChange: ((UITextView) -> ())?
+  var didScroll:          ((UIScrollView) -> ())?
 
   /// Caching the last set selected range.
   ///
@@ -171,6 +172,8 @@ class CodeViewDelegate: NSObject, UITextViewDelegate {
     codeView.gutterView?.invalidateGutter(forCharRange: oldSelectedRange)
     oldSelectedRange = textView.selectedRange
   }
+
+  func scrollViewDidScroll(_ scrollView: UIScrollView) { didScroll?(scrollView) }
 }
 
 #elseif os(macOS)
