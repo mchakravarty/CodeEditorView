@@ -317,7 +317,7 @@ extension EnvironmentValues {
   }
 }
 
-extension CodeEditor.Location: RawRepresentable {
+extension CodeEditor.Location: RawRepresentable, Codable {
 
   public init?(rawValue: String) {
 
