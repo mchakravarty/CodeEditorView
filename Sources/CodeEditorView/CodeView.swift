@@ -606,8 +606,6 @@ class CodeViewDelegate: NSObject, NSTextViewDelegate {
   var textDidChange:      ((NSTextView) -> ())?
   var selectionDidChange: ((NSTextView) -> ())?
 
-
-  // MARK: -
   // MARK: NSTextViewDelegate protocol
 
   func textDidChange(_ notification: Notification) {
