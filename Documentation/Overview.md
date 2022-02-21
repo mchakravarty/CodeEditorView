@@ -18,7 +18,7 @@ struct ContentView: View {
   @SceneStorage("editPosition") private var editPosition: CodeEditor.Position = CodeEditor.Position()
 
   var body: some View {
-    CodeEditor(text: $text, position: $editLocation, messages: $messages, language: .swift)
+    CodeEditor(text: $text, position: $editPosition, messages: $messages, language: .swift)
       .environment(\.codeEditorTheme,
                    colorScheme == .dark ? Theme.defaultDark : Theme.defaultLight)
   }

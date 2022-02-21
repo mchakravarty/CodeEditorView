@@ -20,12 +20,13 @@ Typical usage of the view is as follows.
 ```swift
 struct ContentView: View {
   @State private var text:     String                = "My awesome code..."
-  @State private var messages: Set<Located<Message>> = Set ()
+  @State private var position: CodeEditor.Position  = CodeEditor.Position()
+  @State private var messages: Set<Located<Message>> = Set()
 
   @Environment(\.colorScheme) private var colorScheme: ColorScheme
 
   var body: some View {
-    CodeEditor(text: $text, messages: $messages, language: .swift)
+    CodeEditor(text: $text, position: $position, messages: $messages, language: .swift)
       .environment(\.codeEditorTheme,
                    colorScheme == .dark ? Theme.defaultDark : Theme.defaultLight)
   }
@@ -50,6 +51,6 @@ I consider this to be pre-release quality. It is sufficient to start building so
 
 ## License
 
-Copyright 2021 Manuel M. T. Chakravarty. 
+Copyright [2021..2022] Manuel M. T. Chakravarty. 
 
 Distributed under the Apache-2.0 license — see the [license file](LICENSE) for details.
