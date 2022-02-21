@@ -15,10 +15,10 @@ struct ContentView: View {
 
   @Environment(\.colorScheme) private var colorScheme: ColorScheme
 
-  @SceneStorage("editLocation") private var editLocation: CodeEditor.Location = CodeEditor.Location()
+  @SceneStorage("editPosition") private var editPosition: CodeEditor.Position = CodeEditor.Position()
 
   var body: some View {
-    CodeEditor(text: $text, location: $editLocation, messages: $messages, language: .swift)
+    CodeEditor(text: $text, position: $editLocation, messages: $messages, language: .swift)
       .environment(\.codeEditorTheme,
                    colorScheme == .dark ? Theme.defaultDark : Theme.defaultLight)
   }
@@ -28,11 +28,11 @@ struct ContentView: View {
 The view receives here four arguments:
 
 1. a binding to a `String` that contains the edited text,
-2. a binding to the current edit location (i.e., selection and scroll position),
+2. a binding to the current edit position (i.e., selection and scroll position),
 3. a binding to a set of the currently reported `Messages` pertaining to individual lines of the edited text, and
 4. a language configuration that controls language-specific editing suppport such as syntax highlighting.
 
-The binding to the edit location and the language configuartion are optional. Moreover, there is a fifth optional argument that we are not using here, namely, the layout used for the code editor view.
+The binding to the edit position and the language configuration are optional. Moreover, there is a fifth optional argument that we are not using here, namely, the layout used for the code editor view.
 
 Moreover, a `CodeEditor` honours the `codeEditorTheme` environment variable, which determines the theme to use for syntax highlighting.
 
