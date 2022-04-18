@@ -279,6 +279,9 @@ class CodeView: NSTextView {
     usesFindBar                   = true
     isIncrementalSearchingEnabled = true
 
+    // Enable undo support
+    allowsUndo = true
+
     // Add the view delegate
     delegate = codeViewDelegate
 
