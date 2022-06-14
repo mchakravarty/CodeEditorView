@@ -4,7 +4,7 @@ The `CodeEditorView` Swift package provides a SwiftUI view implementing a rich c
 
 ## Screenshots of the demo app
 
-This is the default dark theme on macOS. Like in Xcode, messages have got an inline view on the right hand side of the screen, which pops up into a larger overlay to display more information. The minimap on the right provides an outline of the edited text.
+This is the default dark theme on macOS. Like in Xcode, messages have got an inline view on the right-hand side of the screen, which pops up into a larger overlay to display more information. The minimap on the right provides an outline of the edited text.
 
 <img src="app-demo-images/macOS-dark-example.png">
 
@@ -46,7 +46,7 @@ For more information, see the [package documentation](Documentation/Overview.md)
 
 ## Status
 
-I consider this to be pre-release quality. It is sufficient to start building something on it, but it is not yet ready for production. While the `CodeEditor` view already supports quite a bit of advanced functionality (such as the inline messages and minimap), other components are still quite simple, such as the range of tokens covered by the language configuration. Moreover, performance is still an issue that needs to be addressed. The core archtecture, such as the incremental tokenisation for syntax highlighting, is designed to handle larger files smoothly, but the overall implementation still needs some performance debugging.
+I consider this to be pre-release quality. It is sufficient to start building something on it, but it is not yet ready for production. While the `CodeEditor` view already supports quite a bit of advanced functionality (such as the inline messages and minimap), other components are still quite simple, such as the range of tokens covered by the language configuration. Moreover, performance is still an issue that needs to be addressed. The core architecture, such as the incremental tokenisation for syntax highlighting, is designed to handle larger files smoothly, but the overall implementation still needs some performance debugging.
 
 
 ## License
