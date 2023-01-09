@@ -42,7 +42,7 @@ typealias MessageViews = [LineInfo.MessageBundle.ID: MessageInfo]
 
 /// `UITextView` with a gutter
 ///
-class CodeView: UITextView {
+final class CodeView: UITextView {
 
   // Delegates
   fileprivate var codeViewDelegate:           CodeViewDelegate?
@@ -183,7 +183,7 @@ class CodeViewDelegate: NSObject, UITextViewDelegate {
 
 /// `NSTextView` with a gutter
 ///
-class CodeView: NSTextView {
+final class CodeView: NSTextView {
 
   // Delegates
   fileprivate let codeViewDelegate =          CodeViewDelegate()
