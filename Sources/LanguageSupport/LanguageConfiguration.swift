@@ -27,7 +27,7 @@ public struct LanguageConfiguration {
 
   /// Supported flavours of tokens
   ///
-  enum Token {
+  public enum Token {
     case roundBracketOpen
     case roundBracketClose
     case squareBracketOpen
@@ -43,21 +43,21 @@ public struct LanguageConfiguration {
     case identifier
     case keyword
 
-    var isOpenBracket: Bool {
+    public var isOpenBracket: Bool {
       switch self {
       case .roundBracketOpen, .squareBracketOpen, .curlyBracketOpen, .nestedCommentOpen: return true
       default:                                                                           return false
       }
     }
 
-    var isCloseBracket: Bool {
+    public var isCloseBracket: Bool {
       switch self {
       case .roundBracketClose, .squareBracketClose, .curlyBracketClose, .nestedCommentClose: return true
       default:                                                                               return false
       }
     }
 
-    var matchingBracket: Token? {
+    public var matchingBracket: Token? {
       switch self {
       case .roundBracketOpen:   return .roundBracketClose
       case .squareBracketOpen:  return .squareBracketClose
@@ -71,7 +71,7 @@ public struct LanguageConfiguration {
       }
     }
 
-    var isComment: Bool {
+    public var isComment: Bool {
       switch self {
       case .singleLineComment:  return true
       case .nestedCommentOpen:  return true
@@ -83,15 +83,15 @@ public struct LanguageConfiguration {
 
   /// Tokeniser state
   ///
-  enum State: TokeniserState {
+  public enum State: TokeniserState {
     case tokenisingCode
     case tokenisingComment(Int)   // the argument gives the comment nesting depth > 0
 
-    enum Tag: Hashable { case tokenisingCode; case tokenisingComment }
+    public enum Tag: Hashable { case tokenisingCode; case tokenisingComment }
 
-    typealias StateTag = Tag
+    public typealias StateTag = Tag
 
-    var tag: Tag {
+    public var tag: Tag {
       switch self {
       case .tokenisingCode:       return .tokenisingCode
       case .tokenisingComment(_): return .tokenisingComment
@@ -150,7 +150,7 @@ public struct LanguageConfiguration {
 
   /// Yields the lexeme of the given token under this language configuration if the token has got a unique lexeme.
   ///
-  func lexeme(of token: Token) -> String? {
+  public func lexeme(of token: Token) -> String? {
     switch token {
     case .roundBracketOpen:   return "("
     case .roundBracketClose:  return ")"
@@ -337,7 +337,7 @@ extension LanguageConfiguration {
     }
   }
 
-  var tokenDictionary: TokenDictionary<LanguageConfiguration.Token, LanguageConfiguration.State> {
+  public var tokenDictionary: TokenDictionary<LanguageConfiguration.Token, LanguageConfiguration.State> {
 
     var tokenDictionary = TokenDictionary<LanguageConfiguration.Token, LanguageConfiguration.State>()
 

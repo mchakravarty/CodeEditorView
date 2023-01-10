@@ -6,14 +6,12 @@
 //  This file contains `NSTextStorage` extensions for code editing.
 
 #if os(iOS)
-
 import UIKit
-
 #elseif os(macOS)
-
 import AppKit
-
 #endif
+
+import LanguageSupport
 
 
 // MARK: -

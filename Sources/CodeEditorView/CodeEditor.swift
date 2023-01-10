@@ -7,6 +7,8 @@
 
 import SwiftUI
 
+import LanguageSupport
+
 
 /// SwiftUI code editor based on TextKit.
 ///

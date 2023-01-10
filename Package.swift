@@ -11,6 +11,9 @@ let package = Package(
   ],
   products: [
     .library(
+      name: "LanguageSupport",
+      targets: ["LanguageSupport"]),
+    .library(
       name: "CodeEditorView",
       targets: ["CodeEditorView"]),
   ],
@@ -20,8 +23,11 @@ let package = Package(
   ],
   targets: [
     .target(
-      name: "CodeEditorView",
+      name: "LanguageSupport",
       dependencies: []),
+    .target(
+      name: "CodeEditorView",
+      dependencies: ["LanguageSupport"]),
     .testTarget(
       name: "CodeEditorTests",
       dependencies: ["CodeEditorView"]),

@@ -9,6 +9,8 @@
 
 import SwiftUI
 
+import LanguageSupport
+
 
 // MARK: -
 // MARK: Message info

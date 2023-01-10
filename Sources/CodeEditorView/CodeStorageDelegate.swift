@@ -15,6 +15,8 @@ import UIKit
 import AppKit
 #endif
 
+import LanguageSupport
+
 
 // MARK: -
 // MARK: Visual debugging support
