@@ -196,7 +196,7 @@ extension LanguageConfiguration {
   public static let hexponentLit = "[pP](?:[+-])?" + decimalLit
 
   // Identifier components following the Swift 5.4 reference
-  public static let identifierHeadCharSwift
+  public static let identifierHeadChar
     = "["
     + "[a-zA-Z_]"
     + "[\u{00A8}\u{00AA}\u{00AD}\u{00AF}\u{00B2}–\u{00B5}\u{00B7}–\u{00BA}]"
@@ -214,7 +214,7 @@ extension LanguageConfiguration {
     + "[\u{90000}–\u{9FFFD}\u{A0000}–\u{AFFFD}\u{B0000}–\u{BFFFD}\u{C0000}–\u{CFFFD}]"
     + "[\u{D0000}–\u{DFFFD}\u{E0000}–\u{EFFFD}]"
     + "]"
-  public static let identifierBodyCharSwift
+  public static let identifierBodyChar
     = "["
     + "[0-9]"
     + "[\u{0300}–\u{036F}\u{1DC0}–\u{1DFF}\u{20D0}–\u{20FF}\u{FE20}–\u{FE2F}]"
@@ -224,93 +224,9 @@ extension LanguageConfiguration {
   ///
   public static func group(_ regexp: String) -> String { "(?:" + regexp + ")" }
 
-  /// COmpose an array of regular expressions as alternatives.
+  /// Compose an array of regular expressions as alternatives.
   ///
   public static func alternatives(_ alts: [String]) -> String { alts.map{ group($0) }.joined(separator: "|") }
-}
-
-
-private let haskellReservedIds =
-  ["case", "class", "data", "default", "deriving", "do", "else", "foreign", "if", "import", "in", "infix", "infixl",
-   "infixr", "instance", "let", "module", "newtype", "of", "then", "type", "where"]
-
-extension LanguageConfiguration {
-
-  /// Language configuration for Haskell (including GHC extensions)
-  ///
-  public static let haskell = LanguageConfiguration(stringRegexp: "\"(?:\\\\\"|[^\"])*+\"",
-                                                    characterRegexp: "'(?:\\\\'|[^']|\\\\[^']*+)'",
-                                                    numberRegexp:
-                                                      optNegation +
-                                                      group(alternatives([
-                                                        "0[bB]" + binaryLit,
-                                                        "0[oO]" + octalLit,
-                                                        "0[xX]" + hexalLit,
-                                                        "0[xX]" + hexalLit + "\\." + hexalLit + hexponentLit + "?",
-                                                        decimalLit + "\\." + decimalLit + exponentLit + "?",
-                                                        decimalLit + exponentLit,
-                                                        decimalLit
-                                                      ])),
-                                                    singleLineComment: "--",
-                                                    nestedComment: (open: "{-", close: "-}"),
-                                                    identifierRegexp:
-                                                      identifierHeadCharSwift +
-                                                      group(alternatives([
-                                                        identifierHeadCharSwift,
-                                                        identifierBodyCharSwift,
-                                                        "'"
-                                                      ])) + "*",
-                                                    reservedIdentifiers: haskellReservedIds)
-
-}
-
-private let swiftReservedIds =
-  ["actor", "associatedtype", "async", "await", "as", "break", "case", "catch", "class", "continue", "default", "defer",
-   "deinit", "do", "else", "enum", "extension", "fallthrough", "fileprivate", "for", "func", "guard", "if", "import",
-   "init", "inout", "internal", "in", "is", "let", "operator", "precedencegroup", "private", "protocol", "public",
-   "repeat", "rethrows", "return", "self", "static", "struct", "subscript", "super", "switch", "throws", "throw", "try",
-   "typealias", "var", "where", "while"]
-
-extension LanguageConfiguration {
-
-  /// Language configuration for Swift
-  ///
-  public static let swift = LanguageConfiguration(stringRegexp: "\"(?:\\\\\"|[^\"])*+\"",
-                                                  characterRegexp: nil,
-                                                  numberRegexp:
-                                                    optNegation +
-                                                    group(alternatives([
-                                                      "0b" + binaryLit,
-                                                      "0o" + octalLit,
-                                                      "0x" + hexalLit,
-                                                      "0x" + hexalLit + "\\." + hexalLit + hexponentLit + "?",
-                                                      decimalLit + "\\." + decimalLit + exponentLit + "?",
-                                                      decimalLit + exponentLit,
-                                                      decimalLit
-                                                    ])),
-                                                  singleLineComment: "//",
-                                                  nestedComment: (open: "/*", close: "*/"),
-                                                  identifierRegexp:
-                                                    alternatives([
-                                                      identifierHeadCharSwift +
-                                                        group(alternatives([
-                                                          identifierHeadCharSwift,
-                                                          identifierBodyCharSwift,
-                                                        ])) + "*",
-                                                      "`" + identifierHeadCharSwift +
-                                                        group(alternatives([
-                                                          identifierHeadCharSwift,
-                                                          identifierBodyCharSwift,
-                                                        ])) + "*`",
-                                                      "\\\\$" + decimalLit,
-                                                      "\\\\$" + identifierHeadCharSwift +
-                                                        group(alternatives([
-                                                          identifierHeadCharSwift,
-                                                          identifierBodyCharSwift,
-                                                        ])) + "*"
-                                                    ]),
-                                                  reservedIdentifiers: swiftReservedIds)
-
 }
 
 extension LanguageConfiguration {
