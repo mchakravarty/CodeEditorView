@@ -61,18 +61,22 @@ Messages are `Located` by way of a generic wrapper:
 
 ```swift
 struct Located<Entity> {
-  let location: Location
+  let location: FileLocation
   let entity:   Entity
 }
 
-struct Location {
-  let file:   FilePath
-  let line:   Int
-  let column: Int
+struct TextLocation {
+  let line:   Int   // starts from line 1
+  let column: Int   // starts from column 1
+}
+
+struct FileLocation {
+  let file:     FilePath
+  let location: TextLocation
 }
 ```
 
-`Location.line` determines the line at which a message is going to be displayed. During editing, messages stick to the lines at which they are reported. For example, if the user adds additional lines before the line at which a message got reported, the message will stick to its original line moving down with it. Note however, that the `Located` wrapper does not get updated in that process, it always specifices the initial line number at the time of reporting. Messages conform to `Identifable` to enable distinguishing between them independently of the reporting location.
+`TextLocation.line` determines the line at which a message is going to be displayed. During editing, messages stick to the lines at which they are reported. For example, if the user adds additional lines before the line at which a message got reported, the message will stick to its original line moving down with it. Note however, that the `Located` wrapper does not get updated in that process, it always specifices the initial line number at the time of reporting. Messages conform to `Identifable` to enable distinguishing between them independently of the reporting location.
 
 ### Categories
 
