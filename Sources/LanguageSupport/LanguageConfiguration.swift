@@ -103,6 +103,10 @@ public struct LanguageConfiguration {
   ///
   public typealias BracketPair = (open: String, close: String)
 
+  /// The name of the language.
+  ///
+  public let name: String
+
   /// Regular expression matching strings
   ///
   public let stringRegexp: String?
@@ -135,7 +139,8 @@ public struct LanguageConfiguration {
   ///
   public let languageService: LanguageServiceBuilder?
 
-  public init(stringRegexp: String?,
+  public init(name: String,
+              stringRegexp: String?,
               characterRegexp: String?,
               numberRegexp: String?,
               singleLineComment: String?,
@@ -144,6 +149,7 @@ public struct LanguageConfiguration {
               reservedIdentifiers: [String],
               languageService: LanguageServiceBuilder? = nil)
   {
+    self.name                 = name
     self.stringRegexp         = stringRegexp
     self.characterRegexp      = characterRegexp
     self.numberRegexp         = numberRegexp
@@ -180,7 +186,8 @@ extension LanguageConfiguration {
 
   /// Empty language configuration
   ///
-  public static let none = LanguageConfiguration(stringRegexp: nil,
+  public static let none = LanguageConfiguration(name: "Text",
+                                                 stringRegexp: nil,
                                                  characterRegexp: nil,
                                                  numberRegexp: nil,
                                                  singleLineComment: nil,

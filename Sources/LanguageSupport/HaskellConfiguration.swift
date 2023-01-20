@@ -17,7 +17,8 @@ extension LanguageConfiguration {
   /// Language configuration for Haskell (including GHC extensions)
   ///
   public static func haskell(_ languageService: LanguageServiceBuilder? = nil) -> LanguageConfiguration {
-    return LanguageConfiguration(stringRegexp: "\"(?:\\\\\"|[^\"])*+\"",
+    return LanguageConfiguration(name: "Haskell",
+                                 stringRegexp: "\"(?:\\\\\"|[^\"])*+\"",
                                  characterRegexp: "'(?:\\\\'|[^']|\\\\[^']*+)'",
                                  numberRegexp:
                                   optNegation +

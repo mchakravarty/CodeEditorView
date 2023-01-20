@@ -20,7 +20,8 @@ extension LanguageConfiguration {
   /// Language configuration for Swift
   ///
   public static func swift(_ languageService: LanguageServiceBuilder? = nil) -> LanguageConfiguration {
-    return LanguageConfiguration(stringRegexp: "\"(?:\\\\\"|[^\"])*+\"",
+    return LanguageConfiguration(name: "Swift",
+                                 stringRegexp: "\"(?:\\\\\"|[^\"])*+\"",
                                  characterRegexp: nil,
                                  numberRegexp:
                                   optNegation +
