@@ -8,6 +8,8 @@
 
 import Foundation
 
+import LanguageSupport
+
 
 // MARK: -
 // MARK: The protocol
@@ -60,6 +62,12 @@ extension TextView {
   ///
   var optLineMap: LineMap<LineInfo>? {
     return (optCodeStorage?.delegate as? CodeStorageDelegate)?.lineMap
+  }
+
+  /// The text view's language service.
+  ///
+  var optLanguageService: LanguageService? {
+    return (optCodeStorage?.delegate as? CodeStorageDelegate)?.languageService
   }
 }
 

@@ -97,8 +97,9 @@ struct LineInfo {
 
 class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
 
-  let language:          LanguageConfiguration
-  private let tokeniser: Tokeniser<LanguageConfiguration.Token, LanguageConfiguration.State>? // cache the tokeniser
+  let              language:        LanguageConfiguration
+  private      let tokeniser:       Tokeniser<LanguageConfiguration.Token, LanguageConfiguration.State>? // cache the tokeniser
+  private(set) var languageService: LanguageService?  // instantiated language service if available
 
   private(set) var lineMap = LineMap<LineInfo>(string: "")
 
@@ -121,6 +122,7 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
     self.language  = language
     self.tokeniser = NSMutableAttributedString.tokeniser(for: language.tokenDictionary)
     super.init()
+    self.languageService = language.languageService.map{ $0(lineMapLocationConverter) }
   }
 
   func textStorage(_ textStorage: NSTextStorage,
@@ -174,6 +176,60 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
     }
     processingOneCharacterEdit = nil
   }
+}
+
+
+// MARK: -
+// MARK: Location conversion
+
+extension CodeStorageDelegate {
+
+  /// This class serves as a location converter on the basis of the line map of an encapsulated storage delegate.
+  ///
+  final class LineMapLocationConverter: LocationConverter {
+    private weak var codeStorageDelegate: CodeStorageDelegate?
+
+    enum ConversionError: Error {
+      case lineMapUnavailable
+      case locationOutOfBounds
+      case lineOutOfBounds
+    }
+
+    /// Location converter on the basis of the line map of the given storage delegate.
+    ///
+    /// - Parameter codeStorageDelegate: The code storage delegate whose line map ought to serve as the basis for the
+    ///   conversion.
+    ///
+    init(codeStorageDelegate: CodeStorageDelegate) {
+      self.codeStorageDelegate = codeStorageDelegate
+    }
+
+    func textLocation(from location: Int) -> Result<TextLocation, Error> {
+      guard let lineMap = codeStorageDelegate?.lineMap else { return .failure(ConversionError.lineMapUnavailable) }
+
+      if let line    = lineMap.lineOf(index: location),
+         let oneLine = lineMap.lookup(line: line)
+      {
+
+        return .success(TextLocation(line: line, column: location - oneLine.range.location + 1))
+
+      } else { return .failure(ConversionError.locationOutOfBounds) }
+    }
+
+    func location(from textLocation: TextLocation) -> Result<Int, Error> {
+      guard let lineMap = codeStorageDelegate?.lineMap else { return .failure(ConversionError.lineMapUnavailable) }
+
+      if let oneLine = lineMap.lookup(line: textLocation.line) {
+
+        return .success(oneLine.range.location + textLocation.column - 1)
+
+      } else { return .failure(ConversionError.lineOutOfBounds) }
+    }
+  }
+
+  /// Yield a location converter for the text maintained by the present code storage delegate.
+  ///
+  var lineMapLocationConverter: LineMapLocationConverter { LineMapLocationConverter(codeStorageDelegate: self) }
 }
 
 

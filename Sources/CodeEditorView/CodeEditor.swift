@@ -402,6 +402,6 @@ struct CodeEditor_Previews: PreviewProvider {
     CodeEditor(text: .constant("-- Hello World!"),
                position: .constant(CodeEditor.Position()),
                messages: .constant(Set()),
-               language: .haskell)
+               language: .haskell())
   }
 }

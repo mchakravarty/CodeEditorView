@@ -19,40 +19,42 @@ extension LanguageConfiguration {
 
   /// Language configuration for Swift
   ///
-  public static let swift = LanguageConfiguration(stringRegexp: "\"(?:\\\\\"|[^\"])*+\"",
-                                                  characterRegexp: nil,
-                                                  numberRegexp:
-                                                    optNegation +
-                                                    group(alternatives([
-                                                      "0b" + binaryLit,
-                                                      "0o" + octalLit,
-                                                      "0x" + hexalLit,
-                                                      "0x" + hexalLit + "\\." + hexalLit + hexponentLit + "?",
-                                                      decimalLit + "\\." + decimalLit + exponentLit + "?",
-                                                      decimalLit + exponentLit,
-                                                      decimalLit
-                                                    ])),
-                                                  singleLineComment: "//",
-                                                  nestedComment: (open: "/*", close: "*/"),
-                                                  identifierRegexp:
-                                                    alternatives([
-                                                      identifierHeadChar +
-                                                        group(alternatives([
-                                                          identifierHeadChar,
-                                                          identifierBodyChar,
-                                                        ])) + "*",
-                                                      "`" + identifierHeadChar +
-                                                        group(alternatives([
-                                                          identifierHeadChar,
-                                                          identifierBodyChar,
-                                                        ])) + "*`",
-                                                      "\\\\$" + decimalLit,
-                                                      "\\\\$" + identifierHeadChar +
-                                                        group(alternatives([
-                                                          identifierHeadChar,
-                                                          identifierBodyChar,
-                                                        ])) + "*"
-                                                    ]),
-                                                  reservedIdentifiers: swiftReservedIds)
-
+  public static func swift(_ languageService: LanguageServiceBuilder? = nil) -> LanguageConfiguration {
+    return LanguageConfiguration(stringRegexp: "\"(?:\\\\\"|[^\"])*+\"",
+                                 characterRegexp: nil,
+                                 numberRegexp:
+                                  optNegation +
+                                 group(alternatives([
+                                  "0b" + binaryLit,
+                                  "0o" + octalLit,
+                                  "0x" + hexalLit,
+                                  "0x" + hexalLit + "\\." + hexalLit + hexponentLit + "?",
+                                  decimalLit + "\\." + decimalLit + exponentLit + "?",
+                                  decimalLit + exponentLit,
+                                  decimalLit
+                                 ])),
+                                 singleLineComment: "//",
+                                 nestedComment: (open: "/*", close: "*/"),
+                                 identifierRegexp:
+                                  alternatives([
+                                    identifierHeadChar +
+                                    group(alternatives([
+                                      identifierHeadChar,
+                                      identifierBodyChar,
+                                    ])) + "*",
+                                    "`" + identifierHeadChar +
+                                    group(alternatives([
+                                      identifierHeadChar,
+                                      identifierBodyChar,
+                                    ])) + "*`",
+                                    "\\\\$" + decimalLit,
+                                    "\\\\$" + identifierHeadChar +
+                                    group(alternatives([
+                                      identifierHeadChar,
+                                      identifierBodyChar,
+                                    ])) + "*"
+                                  ]),
+                                 reservedIdentifiers: swiftReservedIds,
+                                 languageService: languageService)
+  }
 }

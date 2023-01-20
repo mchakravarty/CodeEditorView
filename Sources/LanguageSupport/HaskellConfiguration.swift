@@ -16,28 +16,30 @@ extension LanguageConfiguration {
 
   /// Language configuration for Haskell (including GHC extensions)
   ///
-  public static let haskell = LanguageConfiguration(stringRegexp: "\"(?:\\\\\"|[^\"])*+\"",
-                                                    characterRegexp: "'(?:\\\\'|[^']|\\\\[^']*+)'",
-                                                    numberRegexp:
-                                                      optNegation +
-                                                      group(alternatives([
-                                                        "0[bB]" + binaryLit,
-                                                        "0[oO]" + octalLit,
-                                                        "0[xX]" + hexalLit,
-                                                        "0[xX]" + hexalLit + "\\." + hexalLit + hexponentLit + "?",
-                                                        decimalLit + "\\." + decimalLit + exponentLit + "?",
-                                                        decimalLit + exponentLit,
-                                                        decimalLit
-                                                      ])),
-                                                    singleLineComment: "--",
-                                                    nestedComment: (open: "{-", close: "-}"),
-                                                    identifierRegexp:
-                                                      identifierHeadChar +
-                                                      group(alternatives([
-                                                        identifierHeadChar,
-                                                        identifierBodyChar,
-                                                        "'"
-                                                      ])) + "*",
-                                                    reservedIdentifiers: haskellReservedIds)
-
+  public static func haskell(_ languageService: LanguageServiceBuilder? = nil) -> LanguageConfiguration {
+    return LanguageConfiguration(stringRegexp: "\"(?:\\\\\"|[^\"])*+\"",
+                                 characterRegexp: "'(?:\\\\'|[^']|\\\\[^']*+)'",
+                                 numberRegexp:
+                                  optNegation +
+                                 group(alternatives([
+                                  "0[bB]" + binaryLit,
+                                  "0[oO]" + octalLit,
+                                  "0[xX]" + hexalLit,
+                                  "0[xX]" + hexalLit + "\\." + hexalLit + hexponentLit + "?",
+                                  decimalLit + "\\." + decimalLit + exponentLit + "?",
+                                  decimalLit + exponentLit,
+                                  decimalLit
+                                 ])),
+                                 singleLineComment: "--",
+                                 nestedComment: (open: "{-", close: "-}"),
+                                 identifierRegexp:
+                                  identifierHeadChar +
+                                 group(alternatives([
+                                  identifierHeadChar,
+                                  identifierBodyChar,
+                                  "'"
+                                 ])) + "*",
+                                 reservedIdentifiers: haskellReservedIds,
+                                 languageService: languageService)
+  }
 }

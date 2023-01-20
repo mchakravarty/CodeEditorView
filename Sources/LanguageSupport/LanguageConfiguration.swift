@@ -8,7 +8,7 @@
 //  code in the respective languages, such as comment syntax, bracketing syntax, and syntax highlighting
 //  characteristics.
 //
-//  We adapt a two-stage approach to syntax highlighting. In the first stage, basic context-free syntactic constructs
+//  We adopt a two-stage approach to syntax highlighting. In the first stage, basic context-free syntactic constructs
 //  are being highlighted. In the second stage, contextual highlighting is performed on top of the highlighting from
 //  stage one. The second stage relies on information from a code analysis subsystem, such as SourceKit.
 //
@@ -131,13 +131,18 @@ public struct LanguageConfiguration {
   ///
   public let reservedIdentifiers: [String]
 
+  /// Dynamic language service that provides advanced syntactic as well as semantic information.
+  ///
+  public let languageService: LanguageServiceBuilder?
+
   public init(stringRegexp: String?,
               characterRegexp: String?,
               numberRegexp: String?,
               singleLineComment: String?,
               nestedComment: LanguageConfiguration.BracketPair?,
               identifierRegexp: String?,
-              reservedIdentifiers: [String])
+              reservedIdentifiers: [String],
+              languageService: LanguageServiceBuilder? = nil)
   {
     self.stringRegexp         = stringRegexp
     self.characterRegexp      = characterRegexp
@@ -146,6 +151,7 @@ public struct LanguageConfiguration {
     self.nestedComment        = nestedComment
     self.identifierRegexp     = identifierRegexp
     self.reservedIdentifiers  = reservedIdentifiers
+    self.languageService      = languageService
   }
 
   /// Yields the lexeme of the given token under this language configuration if the token has got a unique lexeme.

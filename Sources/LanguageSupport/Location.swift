@@ -31,6 +31,13 @@ public struct TextLocation {
   }
 }
 
+/// Protocol for a service converting between index positions in a string and text locations in line-column format.
+///
+public protocol LocationConverter {
+  func textLocation(from location: Int) -> Result<TextLocation, Error>
+  func location(from textLocation: TextLocation) -> Result<Int, Error>
+}
+
 /// Location in a named text file in terms of a line-column position, where the line and column count starts at 1.
 ///
 public struct FileLocation {
