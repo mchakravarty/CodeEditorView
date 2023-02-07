@@ -6,8 +6,8 @@ import PackageDescription
 let package = Package(
   name: "CodeEditorView",
   platforms: [
-    .macOS(.v11),
-    .iOS(.v14)
+    .macOS(.v12),
+    .iOS(.v15)
   ],
   products: [
     .library(
@@ -18,8 +18,12 @@ let package = Package(
       targets: ["CodeEditorView"]),
   ],
   dependencies: [
-      // Dependencies declare other packages that this package depends on.
-      // .package(url: /* package url */, from: "1.0.0"),
+    .package(
+      url: "https://github.com/ChimeHQ/Rearrange",
+      .upToNextMajor(from: "1.5.3")),
+    .package(
+      url: "https://github.com/ChimeHQ/TextViewPlus",
+    .upToNextMajor(from: "1.0.5")),
   ],
   targets: [
     .target(
@@ -27,7 +31,11 @@ let package = Package(
       dependencies: []),
     .target(
       name: "CodeEditorView",
-      dependencies: ["LanguageSupport"]),
+      dependencies: [
+        "LanguageSupport",
+        "Rearrange",
+        .product(name: "TextViewPlus", package: "TextViewPlus", condition: .when(platforms: [.macOS])),
+      ]),
     .testTarget(
       name: "CodeEditorTests",
       dependencies: ["CodeEditorView"]),

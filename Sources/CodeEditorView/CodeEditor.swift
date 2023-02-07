@@ -10,6 +10,9 @@ import SwiftUI
 import LanguageSupport
 
 
+// MARK: -
+// MARK: Basic shared definition
+
 /// SwiftUI code editor based on TextKit.
 ///
 /// SwiftUI `Environment`:
@@ -64,8 +67,18 @@ public struct CodeEditor {
     }
   }
 
-  let language: LanguageConfiguration
-  let layout  : LayoutConfiguration
+  /// Collects all currently available code actions.
+  ///
+  public struct Actions {
+
+    /// Display semantic information about the current selection.
+    ///
+    public var info: (() -> Void)?
+  }
+
+  let language:   LanguageConfiguration
+  let layout  :   LayoutConfiguration
+  let setActions: ((Actions) -> Void)?
 
   @Binding private var text:     String
   @Binding private var position: Position
@@ -81,23 +94,30 @@ public struct CodeEditor {
   ///               simultaneous messages and they shouldn't change to frequently.
   ///   - language: Language configuration for highlighting and similar.
   ///   - layout: Layout configuration determining the visible elements of the editor view.
+  ///   - setActions: Function that the code editor uses to update the context about the available code editing
+  ///       actions. Some actions can be temporarily unavailable and the context can use that, e.g., to enable and
+  ///       disable corresponding menu or toolbar options.
   ///
-  public init(text:     Binding<String>,
-              position: Binding<Position>,
-              messages: Binding<Set<Located<Message>>>,
-              language: LanguageConfiguration = .none,
-              layout:   LayoutConfiguration = .standard)
+  public init(text:       Binding<String>,
+              position:   Binding<Position>,
+              messages:   Binding<Set<Located<Message>>>,
+              language:   LanguageConfiguration = .none,
+              layout:     LayoutConfiguration = .standard,
+              setActions: ((Actions) -> Void)? = nil)
   {
-    self._text     = text
-    self._position = position
-    self._messages = messages
-    self.language  = language
-    self.layout    = layout
+    self._text      = text
+    self._position  = position
+    self._messages  = messages
+    self.language   = language
+    self.layout     = layout
+    self.setActions = setActions
   }
 
   public class _Coordinator {
     @Binding fileprivate var text:     String
     @Binding fileprivate var position: Position
+
+    fileprivate let setActions: ((Actions) -> Void)?
 
     /// In order to avoid update cycles, where view code tries to update SwiftUI state variables (such as the view's
     /// bindings) during a SwiftUI view update, we use `updatingView` as a flag that indicates whether the view is
@@ -109,9 +129,18 @@ public struct CodeEditor {
     ///
     fileprivate var lastMessages: Set<Located<Message>> = Set()
 
-    init(_ text: Binding<String>, _ position: Binding<Position>) {
-      self._text     = text
-      self._position = position
+    /// The current set of code actions, which, on setting, are directly propagated to the context.
+    ///
+    fileprivate var actions: Actions = Actions() {
+      didSet {
+        setActions?(actions)
+      }
+    }
+
+    init(text: Binding<String>, position: Binding<Position>, setAction: ((Actions) -> Void)?) {
+      self._text      = text
+      self._position  = position
+      self.setActions = setAction
     }
   }
 }
@@ -152,6 +181,9 @@ extension CodeEditor: UIViewRepresentable {
     // Report the initial message set
     DispatchQueue.main.async { updateMessages(in: codeView, with: context) }
 
+    // Set the initial actions
+    context.coordinator.actions = Actions(info: codeView.infoAction)
+
     return codeView
   }
 
@@ -175,7 +207,7 @@ extension CodeEditor: UIViewRepresentable {
   }
 
   public func makeCoordinator() -> Coordinator {
-    return Coordinator($text, $position)
+    return Coordinator(text: $text, position: $position, setAction: setActions)
   }
 
   public final class Coordinator: _Coordinator {
@@ -264,6 +296,9 @@ extension CodeEditor: NSViewRepresentable {
     // Report the initial message set
     DispatchQueue.main.async{ updateMessages(in: codeView, with: context) }
 
+    // Set the initial actions
+    context.coordinator.actions = Actions(info: codeView.infoAction)
+
     return scrollView
   }
 
@@ -287,7 +322,7 @@ extension CodeEditor: NSViewRepresentable {
   }
 
   public func makeCoordinator() -> Coordinator {
-    return Coordinator($text, $position)
+    return Coordinator(text: $text, position: $position, setAction: setActions)
   }
 
   public final class Coordinator: _Coordinator {
@@ -327,6 +362,9 @@ extension CodeEditor: NSViewRepresentable {
 // MARK: Shared code
 
 extension CodeEditor {
+
+  // MARK: Messages
+
   /// Update messages for a code view in the given context.
   ///
   private func updateMessages(in codeView: CodeView, with context: Context) {
@@ -348,6 +386,9 @@ extension CodeEditor {
   }
 }
 
+
+// MARK: Themes
+
 /// Environment key for the current code editor theme.
 ///
 public struct CodeEditorTheme: EnvironmentKey {
@@ -355,6 +396,7 @@ public struct CodeEditorTheme: EnvironmentKey {
 }
 
 extension EnvironmentValues {
+
   /// The current code editor theme.
   ///
   public var codeEditorTheme: Theme {
@@ -362,6 +404,9 @@ extension EnvironmentValues {
     set { self[CodeEditorTheme.self] = newValue }
   }
 }
+
+
+// MARK: Positions
 
 extension CodeEditor.Position: RawRepresentable, Codable {
 

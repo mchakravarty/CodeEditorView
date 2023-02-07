@@ -200,7 +200,7 @@ final class CodeView: NSTextView {
   var minimapDividerView: NSBox?
 
   /// Contains the line on which the insertion point was located, the last time the selection range got set (if the
-  /// selection was an insetion point at all; i.e., it's length was 0).
+  /// selection was an insertion point at all; i.e., it's length was 0).
   ///
   var oldLastLineOfInsertionPoint: Int? = 1
 
@@ -231,6 +231,10 @@ final class CodeView: NSTextView {
   /// Keeps track of the set of message views.
   ///
   var messageViews: MessageViews = [:]
+
+  /// Holds the info popover if there is one.
+  ///
+  var infoPopover: InfoPopover?
 
   /// Designated initialiser for code views with a gutter.
   ///
