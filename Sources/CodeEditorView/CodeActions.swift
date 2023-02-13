@@ -33,10 +33,13 @@ final class InfoPopover: NSPopover {
   ///
   /// - Parameter view: the view displaying the queried code information.
   ///
-  init(displaying view: any View) {
+  init(displaying view: any View, width: CGFloat) {
     super.init()
-    contentViewController = NSHostingController(rootView: AnyView(view))
-    behavior              = .transient
+    let rootView = ScrollView(.vertical){ AnyView(view).padding() }
+                     .frame(width: width, alignment: .topLeading)
+    contentViewController = NSHostingController(rootView: rootView)
+    contentViewController?.preferredContentSize = CGSize(width: width, height: width * 1.1)
+    behavior = .transient
   }
 
   required init?(coder: NSCoder) {
@@ -60,8 +63,9 @@ extension CodeView {
 
     self.infoPopover = infoPopover
 
-    let screenRect  = firstRect(forCharacterRange: range, actualRange: nil),
-        windowRect  = window!.convertFromScreen(screenRect)
+    let screenRect         = firstRect(forCharacterRange: range, actualRange: nil),
+        nonEmptyScreenRect = NSRect(origin: screenRect.origin, size: CGSize(width: 1, height: 1)),
+        windowRect         = window!.convertFromScreen(nonEmptyScreenRect)
 
     infoPopover.show(relativeTo: convert(windowRect, from: nil), of: self, preferredEdge: .maxY)
   }
@@ -69,12 +73,14 @@ extension CodeView {
   func infoAction() {
     guard let languageService = optLanguageService else { return }
 
+    let width = min((window?.frame.width ?? 250) * 0.75, 500)
+
     let range = selectedRange()
     Task {
       do {
         if let info = try await languageService.info(at: range.location) {
 
-          show(infoPopover: InfoPopover(displaying: info.view), for: info.anchor ?? range)
+          show(infoPopover: InfoPopover(displaying: info.view, width: width), for: info.anchor ?? range)
 
         }
       } catch let error { logger.error("Info action failed: \(error.localizedDescription)") }
