@@ -1,0 +1,23 @@
+{
+  "pins" : [
+    {
+      "identity" : "rearrange",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ChimeHQ/Rearrange",
+      "state" : {
+        "revision" : "8f97f721d8a08c6e01ab9f7460e53819bef72dfa",
+        "version" : "1.5.3"
+      }
+    },
+    {
+      "identity" : "textviewplus",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ChimeHQ/TextViewPlus",
+      "state" : {
+        "revision" : "dcd2e33c3d0a8305bbf9728716633d7f97fbe748",
+        "version" : "1.0.5"
+      }
+    }
+  ],
+  "version" : 2
+}
