@@ -1,7 +1,7 @@
 #  Documentation of the SwiftUI view `CodeEditor`
 
 
-`CodeEditor` is a SwiftUI view implementing a general-purpose code editor. It works on macOS (from 11.0) and on iOS (from 14.0). As far as prossible, it tries to provide the same functionality on macOS and iOS, but this is not always possible because the iOS version of TextKit does miss some of the APIs exposed on macOS, such as the type setter API. The currently most significant omission on iOS is the minimap.
+`CodeEditor` is a SwiftUI view implementing a general-purpose code editor. It works on macOS (from 12.0) and on iOS (from 15.0). As far as prossible, it tries to provide the same functionality on macOS and iOS, but this is not always possible because the iOS version of TextKit does miss some of the APIs exposed on macOS, such as the type setter API. The currently most significant omission on iOS is the minimap.
 
 
 ## The main view

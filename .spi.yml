@@ -1,4 +1,4 @@
 version: 1
 builder:
   configs:
-    - documentation_targets: [CodeEditorView]
+    - documentation_targets: [LanguageSupport, CodeEditorView]
