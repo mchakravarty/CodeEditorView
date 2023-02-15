@@ -153,7 +153,7 @@ class MinimapTypeSetter: NSATSTypesetter {
 
             let glyphIndex = remainingGlyphRange.location + glyphs - 1
 
-            var actualGlyphRange = NSRange(location: 0, length: 0)
+            var actualGlyphRange = NSRange.zero
             let charIndex = characterRange(forGlyphRange: NSRange(location: glyphIndex, length: 1),
                                            actualGlyphRange: &actualGlyphRange)
             if actualGlyphRange.location < glyphIndex { continue }  // we are not yet at a character boundary
@@ -239,7 +239,7 @@ class MinimapTypeSetter: NSATSTypesetter {
 
     endParagraph()
 
-    return NSMaxRange(paragraphSeparatorGlyphRange)
+    return paragraphSeparatorGlyphRange.max
   }
 
   // Adjust the height of the fragment rectangles for empty lines.

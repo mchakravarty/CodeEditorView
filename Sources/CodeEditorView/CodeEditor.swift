@@ -7,6 +7,8 @@
 
 import SwiftUI
 
+import Rearrange
+
 import LanguageSupport
 
 
@@ -63,7 +65,7 @@ public struct CodeEditor {
     }
 
     public init() {
-      self.init(selections: [NSRange(location: 0, length: 0)], verticalScrollFraction: 0)
+      self.init(selections: [.zero], verticalScrollFraction: 0)
     }
   }
 
@@ -169,7 +171,7 @@ extension CodeEditor: UIViewRepresentable {
       delegate.didScroll = context.coordinator.scrollPositionDidChange
 
     }
-    codeView.selectedRange = position.selections.first ?? NSRange(location: 0, length: 0)
+    codeView.selectedRange = position.selections.first ?? .zero
 
     // We can't set the scroll position right away as the views are not properly sized yet. Thus, this needs to be
     // delayed.
@@ -192,7 +194,7 @@ extension CodeEditor: UIViewRepresentable {
     context.coordinator.updatingView = true
 
     let theme     = context.environment.codeEditorTheme,
-        selection = position.selections.first ?? NSRange(location: 0, length: 0)
+        selection = position.selections.first ?? .zero
 
     updateMessages(in: codeView, with: context)
     if text != textView.text { textView.text = text }  // Hoping for the string comparison fast path...

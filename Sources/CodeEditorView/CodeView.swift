@@ -9,6 +9,8 @@
 
 import SwiftUI
 
+import Rearrange
+
 import LanguageSupport
 
 
@@ -438,7 +440,7 @@ final class CodeView: NSTextView {
         charRange  = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
 
     // If the selection is an insertion point, highlight the corresponding line
-    if let location = insertionPoint, charRange.contains(location) || location == NSMaxRange(charRange) {
+    if let location = insertionPoint, charRange.contains(location) || location == charRange.max {
 
       drawBackgroundHighlight(in: rect, forLineContaining: location, withColour: theme.currentLineColour)
 
@@ -938,7 +940,7 @@ extension NSLayoutManager {
 ///
 private func combinedRanges(ranges: [NSValue]) -> NSRange {
   let actualranges = ranges.compactMap{ $0 as? NSRange }
-  return actualranges.dropFirst().reduce(actualranges.first ?? NSRange(location: 0, length: 0)) {
+  return actualranges.dropFirst().reduce(actualranges.first ?? .zero) {
     NSUnionRange($0, $1)
   }
 }

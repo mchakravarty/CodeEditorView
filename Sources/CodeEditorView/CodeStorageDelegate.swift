@@ -15,6 +15,8 @@ import UIKit
 import AppKit
 #endif
 
+import Rearrange
+
 import LanguageSupport
 
 
@@ -309,7 +311,7 @@ extension CodeStorageDelegate {
 
           case .singleLineComment:  // set comment attribute from token start token to the end of this line
             let commentStart = token.range.location,
-                commentRange = NSRange(location: commentStart, length: NSMaxRange(lineRange) - commentStart)
+                commentRange = NSRange(location: commentStart, length: lineRange.max - commentStart)
             textStorage.addAttribute(.comment, value: CommentStyle.singleLineComment, range: commentRange)
             break tokenLoop   // the rest of the tokens are ignored as they are commented out and we'll rescan on change
 
@@ -327,7 +329,7 @@ extension CodeStorageDelegate {
               {
                 textStorage.addAttribute(.comment,
                                          value: CommentStyle.nestedComment,
-                                         range: NSRange(location: start, length: NSMaxRange(token.range) - start))
+                                         range: NSRange(location: start, length: token.range.max - start))
                 lastCommentStart = nil
               }
             }
@@ -342,7 +344,7 @@ extension CodeStorageDelegate {
 
           textStorage.addAttribute(.comment,
                                    value: CommentStyle.nestedComment,
-                                   range: NSRange(location: start, length: NSMaxRange(lineRange) - start))
+                                   range: NSRange(location: start, length: lineRange.max - start))
 
         }
 
@@ -472,7 +474,7 @@ extension CodeStorageDelegate {
 
     // The just entered character is right after the previous token and it doesn't belong to a token overlapping with
     // the previous token
-    if let previousToken = previousTypedToken, NSMaxRange(previousToken.range) == index,
+    if let previousToken = previousTypedToken, previousToken.range.max == index,
        !overlapping(previousToken, currentTypedToken) {
 
       let completingString: String?

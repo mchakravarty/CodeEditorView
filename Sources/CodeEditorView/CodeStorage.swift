@@ -278,7 +278,7 @@ extension CodeStorage {
     if bracketToken.type.isOpenBracket {
 
       // searching to the right
-      searchRange = NSRange(location: location + 1, length: max(NSMaxRange(range) - location - 1, 0))
+      searchRange = NSRange(location: location + 1, length: max(range.max - location - 1, 0))
 
     } else {
 

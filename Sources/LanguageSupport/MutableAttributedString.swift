@@ -13,6 +13,8 @@ import UIKit
 import AppKit
 #endif
 
+import Rearrange
+
 
 private let logger = Logger(subsystem: "org.justtesting.CodeEditorView", category: "MutableAttributedString")
 
@@ -203,8 +205,8 @@ extension NSMutableAttributedString {
       else { break }  // no more match => stop
 
       // The next lexeme we look for from just after the one we just found
-      currentRange = NSRange(location: NSMaxRange(result.range),
-                             length: currentRange.length - NSMaxRange(result.range) + currentRange.location)
+      currentRange = NSRange(location: result.range.max,
+                             length: currentRange.length - result.range.max + currentRange.location)
 
       // If a matching group in the regexp matched, select the action of the correpsonding pattern.
       var tokenAction: TokenAction<TokenType, StateType>?

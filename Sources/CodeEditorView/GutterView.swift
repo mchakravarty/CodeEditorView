@@ -7,6 +7,8 @@
 
 import os
 
+import Rearrange
+
 
 private let logger = Logger(subsystem: "org.justtesting.CodeEditorView", category: "GutterView")
 
@@ -169,9 +171,7 @@ extension GutterView {
     } else {
 
       // We call `paragraphRange(for:_)` safely by boxing `charRange` to the allowed range.
-      let extendedCharRange   = string.paragraphRange(for: NSIntersectionRange(charRange,
-                                                                               NSRange(location: 0,
-                                                                                       length: string.length))),
+      let extendedCharRange   = string.paragraphRange(for: charRange.clamped(to: string.length)),
           glyphRange          = layoutManager.glyphRange(forCharacterRange: extendedCharRange,
                                                          actualCharacterRange: nil)
       textRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
@@ -205,8 +205,7 @@ extension GutterView {
     // has finished laying out the *entire* text. Given that all we got here is a rectangle, we can't even figure out
     // reliably whether enough text has been laid out to draw that part of the gutter that is being requested. Hence,
     // we defer drawing the gutter until all characters have been laid out.
-    if layoutManager.firstUnlaidCharacterIndex() < NSMaxRange(lineMap.lines.last?.range ?? NSRange(location: 0,
-                                                                                                   length: 0))
+    if layoutManager.firstUnlaidCharacterIndex() < (lineMap.lines.last?.range ?? .zero).max
     {
 
       pendingDrawRect = rect.union(pendingDrawRect ?? CGRect.null)

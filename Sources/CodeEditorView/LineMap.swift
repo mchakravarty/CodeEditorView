@@ -19,7 +19,7 @@ struct LineMap<LineInfo> {
   /// One entry per line of the underlying string, where `lineMap[0]` is always `NSRange(location: 0, length: 0)` with
   /// no extra info.
   ///
-  var lines: [OneLine] = [(range: NSRange(location: 0, length: 0), info: nil)]
+  var lines: [OneLine] = [(range: .zero, info: nil)]
 
   /// MARK: -
   /// MARK: Initialisation
@@ -45,9 +45,9 @@ struct LineMap<LineInfo> {
   /// Return the character range covered by the given range of lines. Safely handles out of bounds situations.
   ///
   func charRangeOf(lines: Range<Int>) -> NSRange {
-    let startRange = lookup(line: lines.first ?? 1)?.range ?? NSRange(location: 0, length: 0),
-        endRange   = lookup(line: lines.last ?? 1)?.range ?? NSRange(location: 0, length: 0)
-    return NSRange(location: startRange.location, length: NSMaxRange(endRange) - startRange.location)
+    let startRange = lookup(line: lines.first ?? 1)?.range ?? .zero,
+        endRange   = lookup(line: lines.last ?? 1)?.range ?? .zero
+    return NSRange(location: startRange.location, length: endRange.max - startRange.location)
   }
 
   /// Determine the line that contains the characters at the given string index. (Safe to be called with an out of
@@ -99,7 +99,7 @@ struct LineMap<LineInfo> {
   ///               map.
   ///
   func lineOf(index: Int) -> Int? {
-    if let lastLine = lines.last, NSMaxRange(lastLine.range) == index { return lines.count - 1 }
+    if let lastLine = lines.last, lastLine.range.max == index { return lines.count - 1 }
     else { return lineContaining(index: index) }
   }
 
@@ -119,7 +119,7 @@ struct LineMap<LineInfo> {
   func linesContaining(range: NSRange) -> Range<Int> {
     let
       start         = range.location < 0 ? 0 : range.location,
-      end           = range.length <= 0 ? start : NSMaxRange(range) - 1,
+      end           = range.length <= 0 ? start : range.max - 1,
       startLine     = lineOf(index: start),
       endLine       = lineContaining(index: end),
       lastLine      = lines.count - 1,
@@ -156,7 +156,7 @@ struct LineMap<LineInfo> {
     let lastLine      = lines.count - 1,
         lastLineRange = lines[lastLine].range
 
-    if NSMaxRange(range) == lastLineRange.location && lastLineRange.length == 0 {
+    if range.max == lastLineRange.location && lastLineRange.length == 0 {
 
       // Range reaches to the end of text => extend 'endLine' to 'lastLine'
       return Range<Int>(linesContaining(range: range).startIndex...lastLine)
@@ -181,10 +181,13 @@ struct LineMap<LineInfo> {
     // edited range ends on a newline, this may insert a new line break, which means, line *after* the new line break
     // also belongs to the affected lines.
     //
-    let oldStringRange = NSRange(location: 0, length: NSMaxRange(lines.last?.range ?? NSRange(location: 0, length: 0)))
+    let oldStringRange = NSRange(location: 0, length: (lines.last?.range ?? .zero).max)
 
-    return linesOf(range: extend(range: NSRange(location: editedRange.location,
-                                                length: editedRange.length - delta), clippingTo: oldStringRange))
+    if let shiftedRange = editedRange.shifted(endBy: -delta) {
+
+      return linesOf(range: extend(range: shiftedRange, clippingTo: oldStringRange))
+
+    } else { return 0..<0 }
   }
 
   // MARK: -
@@ -231,7 +234,7 @@ struct LineMap<LineInfo> {
 
     // If the newly inserted text ends on a new line, we need to remove the empty trailing line in the new lines array
     // unless the range of those lines extends until the end of the string.
-    let dropEmptyNewLine = newLines.last?.range.length == 0 && NSMaxRange(newLinesRange) < string.count,
+    let dropEmptyNewLine = newLines.last?.range.length == 0 && newLinesRange.max < string.count,
         adjustedNewLines = dropEmptyNewLine ? newLines.dropLast() : newLines
 
     lines.replaceSubrange(oldLinesRange, with: adjustedNewLines)
@@ -266,7 +269,7 @@ struct LineMap<LineInfo> {
 
       let currentRange = nsString.lineRange(for: NSRange(location: currentIndex, length: 0))
       resultingLines.append((range: currentRange, info: nil))
-      currentIndex = NSMaxRange(currentRange)
+      currentIndex = currentRange.max
 
     }
 
@@ -286,7 +289,7 @@ struct LineMap<LineInfo> {
   ///
   private func extend(range: NSRange, clippingTo stringRange: NSRange) -> NSRange {
     return
-      range.location == NSMaxRange(stringRange)
+      range.location == stringRange.max
       ? NSRange(location: range.location, length: 0)
       : NSIntersectionRange(NSRange(location: range.location, length: range.length + 1), stringRange)
   }
