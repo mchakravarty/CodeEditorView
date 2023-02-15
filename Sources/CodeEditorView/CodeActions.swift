@@ -17,6 +17,13 @@ private let logger = Logger(subsystem: "co.applicative.notebook", category: "Cod
 // MARK: -
 // MARK: UIKit version
 
+extension CodeView {
+
+  // TODO: Code actions still need to be implemented for iOS
+  func infoAction() {
+  }
+}
+
 
 #elseif os(macOS)
 

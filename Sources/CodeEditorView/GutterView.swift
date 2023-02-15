@@ -21,8 +21,8 @@ import UIKit
 
 private typealias FontDescriptor = UIFontDescriptor
 
-private let fontDescriptorFeatureIdentifier = FontDescriptor.FeatureKey.featureIdentifier
-private let fontDescriptorTypeIdentifier    = FontDescriptor.FeatureKey.typeIdentifier
+private let fontDescriptorFeatureIdentifier = FontDescriptor.FeatureKey.type
+private let fontDescriptorTypeIdentifier    = FontDescriptor.FeatureKey.selector
 
 private let lineNumberColour = UIColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 0.5)
 
