@@ -31,15 +31,22 @@ public struct CodeEditor {
     ///
     public let showMinimap: Bool
 
+    /// Determines whether line of text may extend beyond the width of the text area or are getting wrapped.
+    ///
+    public let wrapText: Bool
+
     /// Creates a layout configuration.
     ///
-    /// - Parameter showMinimap: Whether to show the minimap if possible. It may not be possible on all supported OSes.
+    /// - Parameters:
+    ///   - showMinimap: Whether to show the minimap if possible. It may not be possible on all supported OSes.
+    ///   - wrapText: Whether lines of text may extend beyond the width of the text area or are getting wrapped.
     ///
-    public init(showMinimap: Bool) {
+    public init(showMinimap: Bool, wrapText: Bool) {
       self.showMinimap = showMinimap
+      self.wrapText    = wrapText
     }
 
-    public static let standard = LayoutConfiguration(showMinimap: true)
+    public static let standard = LayoutConfiguration(showMinimap: true, wrapText: true)
   }
 
   /// Specification of a text editing position; i.e., text selection and scroll position.

@@ -21,9 +21,6 @@ let package = Package(
     .package(
       url: "https://github.com/ChimeHQ/Rearrange",
       .upToNextMajor(from: "1.5.3")),
-    .package(
-      url: "https://github.com/ChimeHQ/TextViewPlus",
-    .upToNextMajor(from: "1.0.5")),
   ],
   targets: [
     .target(
@@ -34,7 +31,6 @@ let package = Package(
       dependencies: [
         "LanguageSupport",
         "Rearrange",
-        .product(name: "TextViewPlus", package: "TextViewPlus", condition: .when(platforms: [.macOS])),
       ]),
     .testTarget(
       name: "CodeEditorTests",

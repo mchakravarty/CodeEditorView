@@ -134,7 +134,9 @@ class MinimapTypeSetter: NSATSTypesetter {
         // Determine how many glyphs we can fit into the `lineFragementRect`; must be at least one to make progress
         var numberOfGlyphs:       Int,
             lineGlyphRangeLength: Int
-        var numberOfGlyphsThatFit = max(Int(floor(lineFragementRectEffectiveWidth / fontWidth)), 1)
+        var numberOfGlyphsThatFit = lineFragmentRect.size.width == CGFloat.greatestFiniteMagnitude
+                                    ? Int.max   // this is the case where we do not wrap lines
+                                    : max(Int(floor(lineFragementRectEffectiveWidth / fontWidth)), 1)
 
         // Add any elastic glyphs that follow (they can be compacted)
         while numberOfGlyphsThatFit < remainingGlyphRange.length
