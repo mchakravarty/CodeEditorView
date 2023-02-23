@@ -25,7 +25,9 @@ let package = Package(
   targets: [
     .target(
       name: "LanguageSupport",
-      dependencies: []),
+      dependencies: [
+        "Rearrange",
+      ]),
     .target(
       name: "CodeEditorView",
       dependencies: [
