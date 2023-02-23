@@ -296,18 +296,18 @@ final class CodeView: NSTextView {
     // Add a text storage delegate that maintains a line map
     codeStorage.delegate = codeStorageDelegate
 
-    // Add a gutter view
+    // Create the main gutter view
     let gutterView = GutterView(frame: CGRect.zero,
                                 textView: self,
                                 theme: theme,
                                 getMessageViews: { self.messageViews },
                                 isMinimapGutter: false)
-    gutterView.autoresizingMask = .none
-    addSubview(gutterView)
+    gutterView.autoresizingMask  = .none
     self.gutterView              = gutterView
     codeLayoutManager.gutterView = gutterView
+    // NB: The gutter view is floating. We cannot add it now, as we don't have an `enclosingScrollView` yet.
 
-    // Add the minimap with its own gutter, but sharing the code storage with the code view
+    // Create the minimap with its own gutter, but sharing the code storage with the code view
     //
     let minimapLayoutManager = MinimapLayoutManager(),
         minimapView          = MinimapView(),
@@ -319,9 +319,11 @@ final class CodeView: NSTextView {
         minimapDividerView   = NSBox()
     minimapView.codeView = self
 
-    minimapDividerView.boxType = .separator
-    addSubview(minimapDividerView)
+    minimapDividerView.boxType     = .custom
+    minimapDividerView.fillColor   = theme.backgroundColour.blended(withFraction: 0.15, of: .systemGray)!
+    minimapDividerView.borderWidth = 0
     self.minimapDividerView = minimapDividerView
+    // NB: The divider view is floating. We cannot add it now, as we don't have an `enclosingScrollView` yet.
 
     minimapView.textContainer?.replaceLayoutManager(minimapLayoutManager)
     codeStorage.addLayoutManager(minimapLayoutManager)
@@ -335,8 +337,8 @@ final class CodeView: NSTextView {
     minimapView.textContainer?.widthTracksTextView  = true
     minimapView.textContainer?.heightTracksTextView = false
     minimapView.textContainer?.lineBreakMode        = .byWordWrapping
-    addSubview(minimapView)
     self.minimapView = minimapView
+    // NB: The minimap view is floating. We cannot add it now, as we don't have an `enclosingScrollView` yet.
 
     minimapView.addSubview(minimapGutterView)
     self.minimapGutterView = minimapGutterView
@@ -350,7 +352,7 @@ final class CodeView: NSTextView {
     minimapView.addSubview(documentVisibleBox)
     self.documentVisibleBox = documentVisibleBox
 
-    tile()
+    // NB: We tile on teh first `layout()`.
   }
 
   required init?(coder: NSCoder) {
@@ -478,15 +480,18 @@ final class CodeView: NSTextView {
   }
 
   /// Compute the background rect from a line's fragement rect. On lines that contain a message view, the fragment
-  /// rect doesn't cover the entire background.
+  /// rect doesn't cover the entire background. We, moreover, need to account for the space between the text container's
+  /// right hand side and the divider of the minimap (if the minimap is visible).
   ///
   private func lineBackgroundRect(_ lineFragementRect: CGRect) -> CGRect {
 
     if let codeContainer = textContainer as? CodeContainer {
 
-      let totalWidth = codeContainer.size.width + codeContainer.excessWidth
-      return CGRect(origin: lineFragementRect.origin,
-                    size: CGSize(width: totalWidth - lineFragementRect.minX, height: lineFragementRect.height))
+      // We start at x = 0 as it looks nicer in case we overscoll when horizontal scrolling is enabled (i.e., when lines
+      // are not wrapped).
+      return CGRect(origin: CGPoint(x: 0, y: lineFragementRect.origin.y) ,
+                    size: CGSize(width: codeContainer.size.width + codeContainer.excessWidth,
+                                 height: lineFragementRect.height))
 
     } else {
 
@@ -511,6 +516,11 @@ final class CodeView: NSTextView {
   private func tile() {
     guard let codeContainer = optTextContainer as? CodeContainer else { return }
 
+    // Add the floating views if they are not yet in the view hierachy.
+    if let view = gutterView, view.superview == nil { enclosingScrollView?.addFloatingSubview(view, for: .horizontal) }
+    if let view = minimapDividerView, view.superview == nil { enclosingScrollView?.addFloatingSubview(view, for: .horizontal) }
+    if let view = minimapView, view.superview == nil { enclosingScrollView?.addFloatingSubview(view, for: .horizontal) }
+
     // Compute size of the main view gutter
     //
     let theFont                 = font ?? NSFont.systemFont(ofSize: 0),
@@ -534,15 +544,16 @@ final class CodeView: NSTextView {
         minimapExtras        = minimapGutterWidth + minimapFontWidth * 2 + dividerWidth,
         minimapFactor        = viewLayout.showMinimap ? CGFloat(1) : CGFloat(0),
         gutterWithPadding    = gutterWidth + lineFragmentPadding * 2,
-        widthWithoutGutters  = frame.width - gutterWithPadding - minimapExtras * minimapFactor,
+        visibleWidth         = enclosingScrollView?.contentSize.width ?? frame.width,
+        widthWithoutGutters  = visibleWidth - gutterWithPadding - minimapExtras * minimapFactor,
         numberOfCharacters   = codeWidthInCharacters(for: widthWithoutGutters,
                                                      with: theFont,
                                                      withMinimap: viewLayout.showMinimap),
         minimapWidth         = numberOfCharacters * minimapFontWidth + minimapGutterWidth + minimapFontWidth * 2,
-        codeViewWidth        = frame.width - (minimapWidth + dividerWidth) * minimapFactor,
+        codeViewWidth        = visibleWidth - (minimapWidth + dividerWidth) * minimapFactor,
         excess               = widthWithoutGutters - ceil(numberOfCharacters * fontWidth)
                                                    - (numberOfCharacters * minimapFontWidth) * minimapFactor,
-        minimapX             = floor(frame.width - minimapWidth),
+        minimapX             = floor(visibleWidth - minimapWidth),
         minimapRect          = CGRect(x: minimapX, y: 0, width: minimapWidth, height: frame.height),
         minimapExclusionPath = OSBezierPath(rect: minimapGutterRect),
         minimapDividerRect   = CGRect(x: minimapX - dividerWidth, y: 0, width: dividerWidth, height: frame.height)
@@ -554,11 +565,12 @@ final class CodeView: NSTextView {
       minimapDividerView?.frame = minimapDividerRect
       minimapView?.frame        = minimapRect
       minimapGutterView?.frame  = minimapGutterRect
+      minimapView?.minSize      = CGSize(width: minimapRect.size.width, height: visibleRect.height)
 
     }
 
-    minSize = CGSize(width: 0, height: documentVisibleRect.height)
-    maxSize = CGSize(width: codeViewWidth, height: CGFloat.greatestFiniteMagnitude)
+    minSize = CGSize(width: gutterWithPadding + fontWidth * 20, height: documentVisibleRect.height)
+    maxSize = CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
 
     // Set the text container area of the main text view to reach up to the minimap
     // NB: We use the `excessWidth` to capture the slack that arises when the window width admits a fractional
@@ -572,6 +584,10 @@ final class CodeView: NSTextView {
     codeContainer.exclusionPaths      = [gutterExclusionPath]
     codeContainer.excessWidth         = excess
 
+    enclosingScrollView?.hasHorizontalScroller = !viewLayout.wrapText
+    isHorizontallyResizable                    = !viewLayout.wrapText
+    if !isHorizontallyResizable { frame.size.width = visibleWidth }
+
     // Set the text container area of the minimap text view
     minimapView?.textContainer?.exclusionPaths      = [minimapExclusionPath]
     minimapView?.textContainer?.size                = CGSize(width: viewLayout.wrapText ? minimapWidth
@@ -581,35 +597,40 @@ final class CodeView: NSTextView {
 
     // NB: We can't set the height of the box highlighting the document visible area here as it depends on the document
     //     and minimap height, which requires document layout to be completed. Hence, we delay that.
+    needsDisplay = true
     DispatchQueue.main.async { self.adjustScrollPositionOfMinimap() }
   }
 
   /// Sets the scrolling position of the minimap in dependence of the scroll position of the main code view.
   ///
   func adjustScrollPositionOfMinimap() {
-    guard viewLayout.showMinimap else { return }
+    guard viewLayout.showMinimap
+            && layoutManager?.hasUnlaidCharacters == false
+            && minimapView?.layoutManager?.hasUnlaidCharacters == false
+    else { return }
 
     let codeViewHeight = frame.size.height,
-        minimapHeight  = minimapView?.frame.size.height ?? 0,
+        codeHeight     = boundingRect()?.height ?? 0,
+        minimapHeight  = minimapView?.boundingRect()?.height ?? 0,
         visibleHeight  = documentVisibleRect.size.height
 
     let scrollFactor: CGFloat
-    if minimapHeight < visibleHeight { scrollFactor = 1 } else {
+    if minimapHeight < visibleHeight || codeHeight <= visibleHeight { scrollFactor = 1 }
+    else {
 
-      scrollFactor = 1 - (minimapHeight - visibleHeight) / (codeViewHeight - visibleHeight)
+      scrollFactor = 1 - (minimapHeight - visibleHeight) / (codeHeight - visibleHeight)
 
     }
 
     // We box the positioning of the minimap at the top and the bottom of the code view (with the `max` and `min`
     // expessions. This is necessary as the minimap will otherwise be partially cut off by the enclosing clip view.
-    // If we want an Xcode-like behaviour, where the minimap sticks to the top, it probably would need to be a floating
-    // view outside of the clip view.
+    // To get Xcode-like behaviour, where the minimap sticks to the top, it being a floating view is not sufficient.
     let newOriginY = floor(min(max(documentVisibleRect.origin.y * scrollFactor, 0),
-                               frame.size.height - (minimapView?.frame.size.height ?? 0)))
+                               codeViewHeight - minimapHeight))
     if minimapView?.frame.origin.y != newOriginY { minimapView?.frame.origin.y = newOriginY }  // don't update frames in vain
 
-    let minimapVisibleY      = (visibleRect.origin.y / frame.size.height) * minimapHeight,
-        minimapVisibleHeight = documentVisibleRect.size.height * minimapHeight / frame.size.height,
+    let minimapVisibleY      = documentVisibleRect.origin.y * minimapHeight / codeHeight,
+        minimapVisibleHeight = visibleHeight * minimapHeight / codeHeight,
         documentVisibleFrame = CGRect(x: 0,
                                       y: minimapVisibleY,
                                       width: minimapView?.bounds.size.width ?? 0,
@@ -648,6 +669,8 @@ class CodeViewDelegate: NSObject, NSTextViewDelegate {
 // MARK: Shared code
 
 extension CodeView {
+
+  // MARK: Message views
 
   /// Update the layout of the specified message view if its geometry got invalidated by
   /// `CodeTextContainer.lineFragmentRect(forProposedRect:at:writingDirection:remaining:)`.
@@ -808,6 +831,9 @@ extension CodeView {
 
 }
 
+
+// MARK: Code container
+
 class CodeContainer: NSTextContainer {
 
   #if os(iOS)
@@ -861,6 +887,9 @@ class CodeContainer: NSTextContainer {
   }
 }
 
+
+// MARK: Code layout manager
+
 /// Customised layout manager for code layout.
 ///
 class CodeLayoutManager: NSLayoutManager {
@@ -908,6 +937,9 @@ class CodeLayoutManagerDelegate: NSObject, NSLayoutManagerDelegate {
   }
 }
 
+
+// MARK: Selection change management
+
 /// Common code view actions triggered on a selection change.
 ///
 func selectionDidChange<TV: TextView>(_ textView: TV) {
@@ -929,31 +961,8 @@ func selectionDidChange<TV: TextView>(_ textView: TV) {
   }
 }
 
-extension NSLayoutManager {
 
-  /// Enumerate the fragment rectangles covering the characters located on the line with the given character index.
-  ///
-  /// - Parameters:
-  ///   - charIndex: The character index determining the line whose rectangles we want to enumerate.
-  ///   - block: Block that gets invoked once for every fragement rectangles on that line.
-  ///
-  func enumerateFragmentRects(forLineContaining charIndex: Int, using block: @escaping (CGRect) -> Void) {
-    guard let text = textStorage?.string as NSString? else { return }
-
-    let currentLineCharRange = text.lineRange(for: NSRange(location: charIndex, length: 0))
-
-    if currentLineCharRange.length > 0 {  // all, but the last line (if it is an empty line)
-
-      let currentLineGlyphRange = glyphRange(forCharacterRange: currentLineCharRange, actualCharacterRange: nil)
-      enumerateLineFragments(forGlyphRange: currentLineGlyphRange){ (rect, _, _, _, _) in block(rect) }
-
-    } else {                              // the last line if it is an empty line
-
-      block(extraLineFragmentRect)
-
-    }
-  }
-}
+// MARK: NSRange
 
 /// Combine selection ranges into the smallest ranges encompassing them all.
 ///

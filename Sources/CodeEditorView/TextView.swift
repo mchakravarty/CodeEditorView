@@ -69,6 +69,25 @@ extension TextView {
   var optLanguageService: LanguageService? {
     return (optCodeStorage?.delegate as? CodeStorageDelegate)?.languageService
   }
+
+  /// Determine the bounding rectangle for the charcters in the given range.
+  ///
+  /// - Parameter range: The range of chracters whose bounding rectangle we desire. If nil, the entire text is used.
+  /// - Returns: The bounding rectangle if the character range is valid. The coordinates are relative to the origin of
+  ///     the text view.
+  ///
+  func boundingRect(for range: NSRange? = nil) -> CGRect? {
+    guard let layoutManager = optLayoutManager,
+          let textContainer = optTextContainer,
+          let codeStorage   = optCodeStorage
+    else { return nil }
+
+    let glyphRange = layoutManager.glyphRange(forCharacterRange: range ?? NSRange(location: 0,
+                                                                                  length: codeStorage.length),
+                                              actualCharacterRange: nil),
+        rect       = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+    return rect.offsetBy(dx: textContainerOrigin.x, dy: textContainerOrigin.x)
+  }
 }
 
 

@@ -205,7 +205,7 @@ extension GutterView {
     // has finished laying out the *entire* text. Given that all we got here is a rectangle, we can't even figure out
     // reliably whether enough text has been laid out to draw that part of the gutter that is being requested. Hence,
     // we defer drawing the gutter until all characters have been laid out.
-    if layoutManager.firstUnlaidCharacterIndex() < (lineMap.lines.last?.range ?? .zero).max
+    if layoutManager.hasUnlaidCharacters
     {
 
       pendingDrawRect = rect.union(pendingDrawRect ?? CGRect.null)
