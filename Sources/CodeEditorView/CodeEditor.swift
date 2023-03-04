@@ -238,7 +238,7 @@ extension CodeEditor: UIViewRepresentable {
       guard !updatingView else { return }
 
       if abs(position.verticalScrollFraction - scrollView.verticalScrollFraction) > 0.0001 {
-        position.verticalScrollFraction = scrollView.verticalScrollFraction
+        Task { await position.verticalScrollFraction = scrollView.verticalScrollFraction }
       }
     }
   }
