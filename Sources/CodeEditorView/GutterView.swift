@@ -262,7 +262,8 @@ extension GutterView {
       // Highlight lines with messages
       for messageView in getMessageViews() {
 
-        let glyphRange = layoutManager.glyphRange(forBoundingRect: messageView.value.lineFragementRect, in: textContainer),
+        let glyphRange = layoutManager.glyphRange(forBoundingRectWithoutAdditionalLayout: messageView.value.lineFragementRect,
+                                                  in: textContainer),
             index      = layoutManager.characterIndexForGlyph(at: glyphRange.location)
         // TODO: should be filter by char range
         //      if charRange.contains(index) {
