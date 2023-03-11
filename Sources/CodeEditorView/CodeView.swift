@@ -334,7 +334,7 @@ final class CodeView: NSTextView {
     minimapView.isHorizontallyResizable             = false
     minimapView.isVerticallyResizable               = true
     minimapView.textContainerInset                  = CGSize(width: 0, height: 0)
-    minimapView.textContainer?.widthTracksTextView  = true
+    minimapView.textContainer?.widthTracksTextView  = false    // we need to be able to control the size (see `tile()`)
     minimapView.textContainer?.heightTracksTextView = false
     minimapView.textContainer?.lineBreakMode        = .byWordWrapping
     self.minimapView = minimapView
