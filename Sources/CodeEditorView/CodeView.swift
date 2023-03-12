@@ -74,6 +74,9 @@ final class CodeView: UITextView {
   var viewLayout: CodeEditor.LayoutConfiguration {
     didSet {
       // Nothing to do, but that may change in the future
+      textContainer.widthTracksTextView = viewLayout.wrapText
+      textContainer.size.width          = viewLayout.wrapText ? frame.size.width : CGFloat.greatestFiniteMagnitude
+      setNeedsLayout()
     }
   }
 
@@ -139,7 +142,7 @@ final class CodeView: UITextView {
   }
 
   override func layoutSubviews() {
-    gutterView?.frame.height = contentSize.height
+    gutterView?.frame.size.height = contentSize.height
   }
 }
 
@@ -939,9 +942,9 @@ class CodeLayoutManager: NSLayoutManager {
   // We add the area excluded to accomodate the gutter to the returned rectangle as text view otherwise pushes the used
   // area of the text container into the exluded area when the text view gets compressed below the width of the text
   // container includign the excluded area.
-  override func usedRect(for container: NSTextContainer) -> NSRect {
+  override func usedRect(for container: NSTextContainer) -> CGRect {
     let rect = super.usedRect(for: container)
-    return NSRect(origin: .zero, size: NSSize(width: rect.maxX, height: rect.height))
+    return CGRect(origin: .zero, size: CGSize(width: rect.maxX, height: rect.height))
   }
 }
 
