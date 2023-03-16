@@ -8,6 +8,12 @@
 import SwiftUI
 
 
+#if os(iOS)
+public typealias CETextView = UITextView
+#elseif os(macOS)
+public typealias CETextView = NSTextView
+#endif
+
 /// SwiftUI code editor based on TextKit.
 ///
 /// SwiftUI `Environment`:
@@ -64,6 +70,7 @@ public struct CodeEditor {
 
   let language: LanguageConfiguration
   let layout  : LayoutConfiguration
+  let customiser:((CETextView) -> Void)?
 
   @Binding private var text:     String
   @Binding private var position: Position
@@ -79,18 +86,21 @@ public struct CodeEditor {
   ///               simultaneous messages and they shouldn't change to frequently.
   ///   - language: Language configuration for highlighting and similar.
   ///   - layout: Layout configuration determining the visible elements of the editor view.
+  ///   - customiser: Optional block to customise the underlying textView. For example to disable editing or selection.
   ///
   public init(text:     Binding<String>,
               position: Binding<Position>,
               messages: Binding<Set<Located<Message>>>,
               language: LanguageConfiguration = .none,
-              layout:   LayoutConfiguration = .standard)
+              layout:   LayoutConfiguration = .standard,
+              customiser:((CETextView)->Void)? = nil)
   {
-    self._text     = text
-    self._position = position
-    self._messages = messages
-    self.language  = language
-    self.layout    = layout
+    self._text      = text
+    self._position  = position
+    self._messages  = messages
+    self.language   = language
+    self.layout     = layout
+    self.customiser = customiser
   }
 
   public class _Coordinator {
@@ -150,6 +160,9 @@ extension CodeEditor: UIViewRepresentable {
     // Report the initial message set
     DispatchQueue.main.async { updateMessages(in: codeView, with: context) }
 
+    //Allow the customiser to make any changes
+    customiser?(codeView)
+      
     return codeView
   }
 
@@ -262,6 +275,8 @@ extension CodeEditor: NSViewRepresentable {
     // Report the initial message set
     DispatchQueue.main.async{ updateMessages(in: codeView, with: context) }
 
+    customiser?(codeView)
+      
     return scrollView
   }
 
