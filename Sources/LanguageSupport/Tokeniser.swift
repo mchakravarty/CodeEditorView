@@ -1,10 +1,8 @@
 //
-//  MutableAttributedString.swift
+//  Tokeniser.swift
 //  
 //
 //  Created by Manuel M T Chakravarty on 03/11/2020.
-//
-//  Extensions to `NSMutableAttributedString`
 
 import os
 #if os(iOS)
@@ -16,7 +14,7 @@ import AppKit
 import Rearrange
 
 
-private let logger = Logger(subsystem: "org.justtesting.CodeEditorView", category: "MutableAttributedString")
+private let logger = Logger(subsystem: "org.justtesting.CodeEditorView", category: "Tokeniser")
 
 
 // MARK: -
@@ -84,7 +82,29 @@ public typealias TokenDictionary<TokenType, StateType: TokeniserState>
 ///
 /// The `TokenType` identifies the various tokens that can be recognised by the tokeniser.
 ///
-public struct Tokeniser<TokenType, StateType: TokeniserState> {
+public struct Tokeniser<TokenType: Equatable, StateType: TokeniserState> {
+
+  /// The tokens produced by the tokensier.
+  ///
+  public struct Token: Equatable {
+
+    /// The type of token matched.
+    ///
+    public let token: TokenType
+
+    /// The range in the tokenised string where the token occurred.
+    ///
+    public var range: NSRange
+
+    /// Produce a copy with an adjusted location of the token by shifting it by the given amount.
+    ///
+    /// - Parameter amount: The amount by which to shift the token. (Positive amounts shift to the right and negative
+    ///     ones to the left.)
+    ///
+    public func shifted(by amount: Int) -> Token {
+      return Token(token: token, range: NSRange(location: max(0, range.location + amount), length: range.length))
+    }
+  }
 
   /// Tokeniser for one state of the compound tokeniser
   ///
@@ -109,9 +129,6 @@ public struct Tokeniser<TokenType, StateType: TokeniserState> {
   /// Sub-tokeniser for all states of the compound tokeniser
   ///
   let states: [StateType.StateTag: State]
-}
-
-extension NSMutableAttributedString {
 
   /// Create a tokeniser from the given token dictionary.
   ///
@@ -131,8 +148,7 @@ extension NSMutableAttributedString {
   /// the token body— are marked with the same token attribute, but without being identified as a lexeme head. This
   /// distinction is crucial to be able to distinguish the boundaries of multiple successive tokens of the same type.
   ///
-  public static func tokeniser<TokenType, StateType: TokeniserState>(for tokenMap: TokenDictionary<TokenType, StateType>)
-  -> Tokeniser<TokenType, StateType>?
+  public init?(for tokenMap: TokenDictionary<TokenType, StateType>)
   {
     func tokeniser(for stateMap: [TokenPattern: TokenAction<TokenType, StateType>])
     throws -> Tokeniser<TokenType, StateType>.State
@@ -164,44 +180,43 @@ extension NSMutableAttributedString {
       let regexp = try NSRegularExpression(pattern: pattern, options: [])
       return Tokeniser.State(regexp: regexp,
                              stringTokenTypes: [String: TokenAction<TokenType, StateType>](stringTokenTypes){
-                              (left, right) in return left },
+        (left, right) in return left },
                              patternTokenTypes: patternTokenTypes)
     }
 
     do {
 
-      let states = try tokenMap.mapValues{ try tokeniser(for: $0) }
-      return Tokeniser(states: states)
+      states = try tokenMap.mapValues{ try tokeniser(for: $0) }
 
     } catch let err { logger.error("failed to compile regexp: \(err.localizedDescription)"); return nil }
   }
+}
+
+extension NSString {
 
   /// Parse the given range and set the corresponding token attribute values on all matching lexeme ranges.
   ///
   /// - Parameters:
-  ///   - attribute: The custom attribute key that identifies token attributes.
   ///   - tokeniser: Pre-compiled tokeniser.
   ///   - startState: Starting state of the tokeniser.
   ///   - range: The range in the receiver that is to be parsed and attributed.
   ///
   /// All previously existing occurences of `attribute` in the given range are removed.
   ///
-  public func tokeniseAndSetTokenAttribute<TokenType, StateType>(attribute: NSAttributedString.Key,
-                                                                 with tokeniser: Tokeniser<TokenType, StateType>,
-                                                                 state startState: StateType,
-                                                                 in range: NSRange)
+  public func tokenise<TokenType, StateType>(with tokeniser: Tokeniser<TokenType, StateType>,
+                                             state startState: StateType,
+                                             in range: NSRange?)
+  -> [Tokeniser<TokenType, StateType>.Token]
   {
     var state        = startState
-    var currentRange = range
-
-    // Clear existing attributes
-    removeAttribute(attribute, range: range)
+    var currentRange = range ?? NSRange(location: 0, length: length)
+    var tokens       = [] as [Tokeniser<TokenType, StateType>.Token]
 
     // Tokenise and set appropriate attributes
     while currentRange.length > 0 {
 
       guard let stateTokeniser = tokeniser.states[state.tag],
-            let result         = stateTokeniser.regexp.firstMatch(in: self.string, options: [], range: currentRange)
+            let result         = stateTokeniser.regexp.firstMatch(in: self as String, options: [], range: currentRange)
       else { break }  // no more match => stop
 
       // The next lexeme we look for from just after the one we just found
@@ -221,27 +236,18 @@ extension NSMutableAttributedString {
       // If it wasn't a matching group, it must be a simple string match
       if tokenAction == nil {                           // no capture group matched => we matched a simple string lexeme
 
-        tokenAction = stateTokeniser.stringTokenTypes[(self.string as NSString).substring(with: result.range)]
+        tokenAction = stateTokeniser.stringTokenTypes[substring(with: result.range)]
       }
 
       if let action = tokenAction, result.range.length > 0 {
 
-        // Set the token attribute on the lexeme, specially marking the first character of the lexeme.
-        self.addAttribute(attribute,
-                          value: TokenAttribute(isHead: true, token: action.token),
-                          range: NSRange(location: result.range.location, length: 1))
-        if result.range.length > 1 {
-
-          self.addAttribute(attribute,
-                            value: TokenAttribute(isHead: false, token: action.token),
-                            range: NSRange(location: result.range.location + 1, length: result.range.length - 1))
-
-        }
+        tokens.append(.init(token: action.token, range: result.range))
 
         // If there is an associated state transition function, apply it to the tokeniser state
         if let transition = action.transition { state = transition(state) }
 
       }
     }
+    return tokens
   }
 }

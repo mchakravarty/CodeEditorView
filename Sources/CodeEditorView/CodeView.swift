@@ -204,6 +204,9 @@ final class CodeView: NSTextView {
   var documentVisibleBox: NSBox?
   var minimapDividerView: NSBox?
 
+  // Notification observer
+  var frameChangedNotificationObserver: NSObjectProtocol?
+
   /// Contains the line on which the insertion point was located, the last time the selection range got set (if the
   /// selection was an insertion point at all; i.e., it's length was 0).
   ///
@@ -223,6 +226,7 @@ final class CodeView: NSTextView {
       minimapGutterView?.theme             = theme
       documentVisibleBox?.fillColor        = theme.textColour.withAlphaComponent(0.1)
       needsLayout = true
+      tile()
       setNeedsDisplay(visibleRect)
     }
   }
@@ -230,7 +234,10 @@ final class CodeView: NSTextView {
   /// The current view layout.
   ///
   var viewLayout: CodeEditor.LayoutConfiguration {
-    didSet { needsLayout = true }
+    didSet {
+      needsLayout = true
+      tile()
+    }
   }
 
   /// Keeps track of the set of message views.
@@ -355,25 +362,26 @@ final class CodeView: NSTextView {
     minimapView.addSubview(documentVisibleBox)
     self.documentVisibleBox = documentVisibleBox
 
-    // NB: We tile on teh first `layout()`.
+    maxSize = CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+
+    // We need to re-tile the subviews whenever the frame of the text view changes.
+    frameChangedNotificationObserver
+      = NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification,
+                                               object: self,
+                                               queue: .main){ _ in
+        self.tile()
+      }
   }
 
   required init?(coder: NSCoder) {
     fatalError("init(coder:) has not been implemented")
   }
 
-  override func layout() {
-
-    super.layout()
-
-    // Lay out the various subviews and text containers
-    tile()
-
-    // Redraw the visible part of the gutter
-    gutterView?.setNeedsDisplay(documentVisibleRect)
+  deinit {
+    if let observer = frameChangedNotificationObserver { NotificationCenter.default.removeObserver(observer) }
   }
 
-  override func setSelectedRanges(_ ranges: [NSValue],
+  override func setSelectedRanges(_ ranges: [NSValue], 
                                   affinity: NSSelectionAffinity,
                                   stillSelecting stillSelectingFlag: Bool)
   {
@@ -426,10 +434,10 @@ final class CodeView: NSTextView {
       // NB: Invalidation of the old and new ranges needs to happen separately. If we were to union them, an insertion
       //     point (range length = 0) at the start of a line would be absorbed into the previous line, which results in
       //     a lack of invalidation of the line on which the insertion point is located.
-      self.gutterView?.invalidateGutter(forCharRange: combinedRanges(ranges: oldSelectedRanges))
-      self.gutterView?.invalidateGutter(forCharRange: combinedRanges(ranges: ranges))
-      self.minimapGutterView?.invalidateGutter(forCharRange: combinedRanges(ranges: oldSelectedRanges))
-      self.minimapGutterView?.invalidateGutter(forCharRange: combinedRanges(ranges: ranges))
+      self.gutterView?.invalidateGutter(for: combinedRanges(ranges: oldSelectedRanges))
+      self.gutterView?.invalidateGutter(for: combinedRanges(ranges: ranges))
+      self.minimapGutterView?.invalidateGutter(for: combinedRanges(ranges: oldSelectedRanges))
+      self.minimapGutterView?.invalidateGutter(for: combinedRanges(ranges: ranges))
     }
 
     collapseMessageViews()
@@ -533,17 +541,11 @@ final class CodeView: NSTextView {
         fontWidth               = theFont.maximumAdvancement.width,  // NB: we deal only with fixed width fonts
         gutterWidthInCharacters = CGFloat(6),
         gutterWidth             = ceil(fontWidth * gutterWidthInCharacters),
-        gutterRect              = CGRect(origin: .zero, size: CGSize(width: gutterWidth, height: frame.height)).integral,
-        gutterExclusionPath     = OSBezierPath(rect: gutterRect),
+        gutterSize              = CGSize(width: gutterWidth, height: frame.height),
         lineFragmentPadding     = CGFloat(5)
 
-    let gutterFrameUpdate: Bool
-    if gutterView?.frame != gutterRect {
-
-      gutterView?.frame = gutterRect
-      gutterFrameUpdate = true
-
-    } else { gutterFrameUpdate = false }
+    let gutterWidthUpdate = gutterView?.frame.width != gutterWidth  // needed to avoid superflous exclusion path updates
+    if gutterView?.frame.size != gutterSize { gutterView?.frame = CGRect(origin: .zero, size: gutterSize) }
 
     // Compute sizes of the minimap text view and gutter
     //
@@ -571,7 +573,7 @@ final class CodeView: NSTextView {
 
     minimapDividerView?.isHidden = !viewLayout.showMinimap
     minimapView?.isHidden        = !viewLayout.showMinimap
-    if viewLayout.showMinimap {
+    if viewLayout.showMinimap && minimapView?.frame != minimapRect {
 
       minimapDividerView?.frame = minimapDividerRect
       minimapView?.frame        = minimapRect
@@ -579,9 +581,6 @@ final class CodeView: NSTextView {
       minimapView?.minSize      = CGSize(width: minimapRect.size.width, height: visibleRect.height)
 
     }
-
-    minSize = CGSize(width: ceil(gutterWithPadding + fontWidth * 20), height: documentVisibleRect.height)
-    maxSize = CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
 
     enclosingScrollView?.hasHorizontalScroller = !viewLayout.wrapText
     isHorizontallyResizable                    = !viewLayout.wrapText
@@ -591,27 +590,38 @@ final class CodeView: NSTextView {
     // NB: We use the `excess` width to capture the slack that arises when the window width admits a fractional
     //     number of characters. Adding the slack to the code view's text container size doesn't work as the line breaks
     //     of the minimap and main code view are then sometimes not entirely in sync.
-    textContainerInset = NSSize(width: 0, height: 0)
     let codeContainerWidth = viewLayout.wrapText ? floor(codeViewWidth - excess) : CGFloat.greatestFiniteMagnitude
     if codeContainer.size.width != codeContainerWidth {
       codeContainer.size = NSSize(width: codeContainerWidth, height: CGFloat.greatestFiniteMagnitude)
     }
-    // Never update the exclusion path in vain, as the update will invalidate the layout and can even lead to looping
-    // behaviour.
-    if gutterFrameUpdate { codeContainer.exclusionPaths = [gutterExclusionPath] }
+
+    // Never update the exclusion path in vain, as the update will invalidate the layout, which can lead to looping
+    // behaviour if done in vain. To minimise updates, we also do not fix the height of the exclusion, but leave it
+    // independent of the height of the container.
+    if gutterWidthUpdate {
+      codeContainer.exclusionPaths = [OSBezierPath(rect: CGRect(origin: .zero,
+                                                                size: CGSize(width: gutterWidth,
+                                                                             height: .greatestFiniteMagnitude)))]
+    }
+
     codeContainer.lineFragmentPadding = lineFragmentPadding
     codeContainer.excessWidth         = excess
 
     // Set the text container area of the minimap text view
-    minimapView?.textContainer?.exclusionPaths      = [minimapExclusionPath]
-    minimapView?.textContainer?.size                = CGSize(width: viewLayout.wrapText ? minimapWidth
-                                                                                        : CGFloat.greatestFiniteMagnitude,
-                                                             height: CGFloat.greatestFiniteMagnitude)
-    minimapView?.textContainer?.lineFragmentPadding = minimapFontWidth
+    let minimapTextContainerWidth = viewLayout.wrapText ? minimapWidth : CGFloat.greatestFiniteMagnitude
+    if minimapWidth != minimapView?.frame.width || minimapTextContainerWidth != minimapView?.textContainer?.size.width {
+
+      minimapView?.textContainer?.exclusionPaths      = [minimapExclusionPath]
+      minimapView?.textContainer?.size                = CGSize(width: minimapTextContainerWidth,
+                                                               height: CGFloat.greatestFiniteMagnitude)
+      minimapView?.textContainer?.lineFragmentPadding = minimapFontWidth
+
+    }
 
     // NB: We can't set the height of the box highlighting the document visible area here as it depends on the document
-    //     and minimap height, which requires document layout to be completed. Hence, we delay that.
-    DispatchQueue.main.async { self.adjustScrollPositionOfMinimap() }
+    //     and minimap height, which requires document layout to be completed. All this is set by
+    //     `adjustScrollPositionOfMinimap()`, which will be invoked in response to bounds changes of the text view
+    //     (which in turn are being triggered by layout).
 
     needsDisplay = true
   }
@@ -619,10 +629,28 @@ final class CodeView: NSTextView {
   /// Sets the scrolling position of the minimap in dependence of the scroll position of the main code view.
   ///
   func adjustScrollPositionOfMinimap() {
-    guard viewLayout.showMinimap
-            && layoutManager?.hasUnlaidCharacters == false
-            && minimapView?.layoutManager?.hasUnlaidCharacters == false
-    else { return }
+    guard viewLayout.showMinimap else { return }
+
+    guard layoutManager?.hasUnlaidCharacters == false
+    else {
+
+      if let codeLayoutManager = layoutManager as? CodeLayoutManager {
+        codeLayoutManager.registerPostLayout(action: adjustScrollPositionOfMinimap)
+      }
+      return
+
+    }
+    guard minimapView?.layoutManager?.hasUnlaidCharacters == false
+    else {
+
+      if let codeLayoutManager = minimapView?.layoutManager as? CodeLayoutManager {
+        codeLayoutManager.registerPostLayout(action: adjustScrollPositionOfMinimap)
+      }
+      return
+
+    }
+
+    print("adjustScrollPositionOfMinimap")
 
     let codeViewHeight = frame.size.height,
         codeHeight     = boundingRect()?.height ?? 0,
@@ -793,7 +821,7 @@ extension CodeView {
     // because the layout process for the text fills the `lineFragmentRect` property of the above `MessageInfo`.
     optLayoutManager?.invalidateLayout(forCharacterRange: charRange, actualCharacterRange: nil)
     self.optLayoutManager?.invalidateDisplay(forCharacterRange: charRange)
-    gutterView?.invalidateGutter(forCharRange: charRange)
+    gutterView?.invalidateGutter(for: charRange)
   }
 
   /// Remove the messages associated with a specified range of lines.
@@ -911,6 +939,10 @@ class CodeLayoutManager: NSLayoutManager {
 
   weak var gutterView: GutterView?
 
+  /// Action to execute when layout completes.
+  ///
+  var postLayoutAction: (() -> ())?
+
   override func processEditing(for textStorage: NSTextStorage,
                                edited editMask: TextStorageEditActions,
                                range newCharRange: NSRange,
@@ -922,12 +954,7 @@ class CodeLayoutManager: NSLayoutManager {
                          changeInLength: delta,
                          invalidatedRange: invalidatedCharRange)
 
-    // NB: Gutter drawing must be asynchronous, as the glyph generation that may be triggered in that process,
-    //     is not permitted until the enclosing editing block has completed; otherwise, we run into an internal
-    //     error in the layout manager.
-    if let gutterView = gutterView {
-      Dispatch.DispatchQueue.main.async { gutterView.invalidateGutter(forCharRange: invalidatedCharRange) }
-    }
+    gutterView?.invalidateGutter(for: invalidatedCharRange)
 
     // Remove all messages in the edited range.
     if let codeStorageDelegate = textStorage.delegate as? CodeStorageDelegate,
@@ -941,10 +968,21 @@ class CodeLayoutManager: NSLayoutManager {
 
   // We add the area excluded to accomodate the gutter to the returned rectangle as text view otherwise pushes the used
   // area of the text container into the exluded area when the text view gets compressed below the width of the text
-  // container includign the excluded area.
+  // container including the excluded area.
   override func usedRect(for container: NSTextContainer) -> CGRect {
     let rect = super.usedRect(for: container)
     return CGRect(origin: .zero, size: CGSize(width: rect.maxX, height: rect.height))
+  }
+
+  /// Add an action to be executed when layout finished.
+  ///
+  /// - Parameter action: The action that shoudl run after layout finished.
+  ///
+  /// NB: If multiple actions are registered, they are executed in the order in which they were registered.
+  ///
+  func registerPostLayout(action: @escaping () -> ()) {
+    let previousPostLayoutAction = postLayoutAction
+    postLayoutAction = { previousPostLayoutAction?(); action() }
   }
 }
 
@@ -956,7 +994,13 @@ class CodeLayoutManagerDelegate: NSObject, NSLayoutManagerDelegate {
   {
     guard let layoutManager = layoutManager as? CodeLayoutManager else { return }
 
-    if layoutFinishedFlag { layoutManager.gutterView?.layoutFinished() }
+    if layoutFinishedFlag {
+
+      layoutManager.gutterView?.layoutFinished()
+      layoutManager.postLayoutAction?()
+      layoutManager.postLayoutAction = nil
+
+    }
   }
 }
 
@@ -966,19 +1010,12 @@ class CodeLayoutManagerDelegate: NSObject, NSLayoutManagerDelegate {
 /// Common code view actions triggered on a selection change.
 ///
 func selectionDidChange<TV: TextView>(_ textView: TV) {
-  guard let layoutManager = textView.optLayoutManager,
-        let textContainer = textView.optTextContainer,
-        let codeStorage   = textView.optCodeStorage
-        else { return }
-
-  let visibleRect = textView.documentVisibleRect,
-      glyphRange  = layoutManager.glyphRange(forBoundingRectWithoutAdditionalLayout: visibleRect,
-                                             in: textContainer),
-      charRange   = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+  guard let codeStorage  = textView.optCodeStorage,
+        let visibleLines = textView.documentVisibleLines
+  else { return }
 
   if let location             = textView.insertionPoint,
-     location > 0,
-     let matchingBracketRange = codeStorage.matchingBracket(forLocationAt: location - 1, in: charRange)
+     let matchingBracketRange = codeStorage.matchingBracket(at: location, in: visibleLines)
   {
     textView.showFindIndicator(for: matchingBracketRange)
   }

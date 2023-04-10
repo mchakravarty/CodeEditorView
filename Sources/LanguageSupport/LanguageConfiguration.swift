@@ -27,7 +27,7 @@ public struct LanguageConfiguration {
 
   /// Supported flavours of tokens
   ///
-  public enum Token {
+  public enum Token: Equatable {
     case roundBracketOpen
     case roundBracketClose
     case squareBracketOpen
@@ -242,7 +242,29 @@ extension LanguageConfiguration {
   public static func alternatives(_ alts: [String]) -> String { alts.map{ group($0) }.joined(separator: "|") }
 }
 
+/// Tokeniser generated on the basis of a language configuration.
+///
+typealias LanguageConfigurationTokenDictionary = TokenDictionary<LanguageConfiguration.Token,
+                                                                  LanguageConfiguration.State>
+
+/// Tokeniser generated on the basis of a language configuration.
+///
+public typealias LanguageConfigurationTokeniser = Tokeniser<LanguageConfiguration.Token, LanguageConfiguration.State>
+
 extension LanguageConfiguration {
+
+  /// Tokeniser generated on the basis of a language configuration.
+  ///
+  public typealias Tokeniser = LanguageSupport.Tokeniser<LanguageConfiguration.Token, LanguageConfiguration.State>
+
+  /// Token dictionary generated on the basis of a language configuration.
+  ///
+  public typealias TokenDictionary = LanguageSupport.TokenDictionary<LanguageConfiguration.Token,
+                                                                      LanguageConfiguration.State>
+
+  /// Token action generated on the basis of a language configuration.
+  ///
+  public typealias TokenAction = LanguageSupport.TokenAction <LanguageConfiguration.Token, LanguageConfiguration.State>
 
   func token(_ token: LanguageConfiguration.Token)
     -> (token: LanguageConfiguration.Token, transition: ((LanguageConfiguration.State) -> LanguageConfiguration.State)?)
@@ -266,13 +288,13 @@ extension LanguageConfiguration {
     }
   }
 
-  public var tokenDictionary: TokenDictionary<LanguageConfiguration.Token, LanguageConfiguration.State> {
+  public var tokenDictionary: TokenDictionary {
 
-    var tokenDictionary = TokenDictionary<LanguageConfiguration.Token, LanguageConfiguration.State>()
+    var tokenDictionary = TokenDictionary()
 
     // Populate the token dictionary for the code state (tokenising plain code)
     //
-    var codeTokenDictionary = [TokenPattern: TokenAction<LanguageConfiguration.Token, LanguageConfiguration.State>]()
+    var codeTokenDictionary = [TokenPattern: TokenAction]()
 
     codeTokenDictionary.updateValue(token(.roundBracketOpen), forKey: .string("("))
     codeTokenDictionary.updateValue(token(.roundBracketClose), forKey: .string(")"))
@@ -301,7 +323,7 @@ extension LanguageConfiguration {
 
     // Populate the token dictionary for the comment state (tokenising within a nested comment)
     //
-    var commentTokenDictionary = [TokenPattern: TokenAction<LanguageConfiguration.Token, LanguageConfiguration.State>]()
+    var commentTokenDictionary = [TokenPattern: TokenAction]()
 
     if let lexemes = nestedComment {
       commentTokenDictionary.updateValue((token: .nestedCommentOpen, transition: incNestedComment),

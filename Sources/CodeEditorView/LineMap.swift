@@ -103,6 +103,24 @@ struct LineMap<LineInfo> {
     else { return lineContaining(index: index) }
   }
 
+  /// Determine the line that contains the cursor position specified by the given string index together with the line
+  /// position. (Safe to be called with an out of bounds index.)
+  ///
+  /// - Parameter index: The string index of the cursor position whose line we want to determine.
+  /// - Returns: The line containing the given cursor poisition together with line position if the index is within the
+  ///     bounds of the string or just beyond.
+  ///
+  /// - Complexity: This functions asymptotic complexity is logarithmic in the number of lines contained in the line
+  ///               map.
+  ///
+  func lineAndPositionOf(index: Int) -> (line: Int, position: Int)? {
+    guard let line  = lineOf(index: index),
+          let range = lookup(line: line)?.range
+    else { return nil }
+
+    return (line: line, position: index - range.location)
+  }
+
   /// Given a character range, return the smallest line range that includes the characters. Deal with out of bounds
   /// conditions by clipping to the front and end of the line range, respectively.
   ///
@@ -177,14 +195,12 @@ struct LineMap<LineInfo> {
   ///
   func linesAffected(by editedRange: NSRange, changeInLength delta: Int) -> Range<Int> {
 
-    // To compute the line range, we extend the character range by one extra character. This is crucial as, if the
-    // edited range ends on a newline, this may insert a new line break, which means, line *after* the new line break
-    // also belongs to the affected lines.
-    //
-    let oldStringRange = NSRange(location: 0, length: (lines.last?.range ?? .zero).max)
-
     if let shiftedRange = editedRange.shifted(endBy: -delta) {
 
+      // To compute the line range, we extend the character range by one extra character. This is crucial as, if the
+      // edited range ends on a newline, this may insert a new line break, which means, line *after* the new line break
+      // also belongs to the affected lines.
+      let oldStringRange = NSRange(location: 0, length: (lines.last?.range ?? .zero).max)
       return linesOf(range: extend(range: shiftedRange, clippingTo: oldStringRange))
 
     } else { return 0..<0 }
@@ -224,17 +240,17 @@ struct LineMap<LineInfo> {
     // edited range ends on a newline, this may insert a new line break, which means, we also need to update the line
     // *after* the new line break.
     //
-    let newStringRange = NSRange(location: 0, length: string.count),
-        nsString       = string as NSString,
-        oldLinesRange  = linesAffected(by: editedRange, changeInLength: delta),
-        newLinesRange  = nsString.lineRange(for: extend(range: editedRange,
-                                                        clippingTo: newStringRange)),
-        newLinesString = nsString.substring(with: newLinesRange),
-        newLines       = linesOf(string: newLinesString).map{ shift(line: $0, by: newLinesRange.location) }
+    let newStringRange      = NSRange(location: 0, length: string.count),
+        nsString            = string as NSString,
+        oldLinesRange       = linesAffected(by: editedRange, changeInLength: delta),  // NB: `linesAffected` extends itself
+        extendedEditedRange = extend(range: editedRange, clippingTo: newStringRange),
+        newLinesRange       = nsString.lineRange(for: extendedEditedRange),
+        newLinesString      = nsString.substring(with: newLinesRange),
+        newLines            = linesOf(string: newLinesString).map{ shift(line: $0, by: newLinesRange.location) }
 
     // If the newly inserted text ends on a new line, we need to remove the empty trailing line in the new lines array
-    // unless the range of those lines extends until the end of the string.
-    let dropEmptyNewLine = newLines.last?.range.length == 0 && newLinesRange.max < string.count,
+    // unless the range of those new lines extends until the end of the string.
+    let dropEmptyNewLine = newLines.last?.range.length == 0 && oldLinesRange.last != lines.count - 1,
         adjustedNewLines = dropEmptyNewLine ? newLines.dropLast() : newLines
 
     lines.replaceSubrange(oldLinesRange, with: adjustedNewLines)

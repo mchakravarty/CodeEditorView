@@ -42,22 +42,41 @@ class CodeStorage: NSTextStorage {
   #endif
 
   override func attributes(at location: Int, effectiveRange range: NSRangePointer?) -> [NSAttributedString.Key : Any] {
+
     var attributes       = textStorage.attributes(at: location, effectiveRange: range)
     var foregroundColour = theme.textColour
+    var tokenRange: NSRange
 
-    // Translate attributes indicating text highlighting to the foreground colour determined by the current theme.
-    if attributes[.comment] != nil { foregroundColour = theme.commentColour }
-    else if let tokenAttr = attributes[.token] as? TokenAttribute<LanguageConfiguration.Token> {
+    // Translate comment and token information to the appropriate foreground colour determined by the current theme.
+    if let commentRange = comment(at: location) {
 
-      switch tokenAttr.token {
-      case .string:     foregroundColour = theme.stringColour
-      case .character:  foregroundColour = theme.characterColour
-      case .number:     foregroundColour = theme.numberColour
-      case .identifier: foregroundColour = theme.identifierColour
-      case .keyword:    foregroundColour = theme.keywordColour
-      default: ()
+      tokenRange       = commentRange
+      foregroundColour = theme.commentColour
+
+    } else {
+
+      // NB: We always get a range, even if there is no token. In that case, the range is the space between the next
+      //     tokens (or a token and the line start or end).
+      let tokenWithEffectiveRange = token(at: location)
+      tokenRange = tokenWithEffectiveRange.effectiveRange
+
+      if let token = tokenWithEffectiveRange.token {
+
+        switch token.token {
+        case .string:     foregroundColour = theme.stringColour
+        case .character:  foregroundColour = theme.characterColour
+        case .number:     foregroundColour = theme.numberColour
+        case .identifier: foregroundColour = theme.identifierColour
+        case .keyword:    foregroundColour = theme.keywordColour
+        default: ()
+        }
       }
     }
+
+    // Crop the effective range to the token range.
+    if let rangePtr = range,
+       let newRange = rangePtr.pointee.intersection(tokenRange)
+    { rangePtr.pointee = newRange }
 
     attributes[.foregroundColor] = foregroundColour
     return attributes
@@ -71,16 +90,16 @@ class CodeStorage: NSTextStorage {
     // We are deleting one character => check whether it is a one-character bracket and if so also delete its matching
     // bracket if it is directly adjascent
     if range.length == 1 && str == "",
-       let token = tokenAttribute(at: range.location),
-       let language = (delegate as? CodeStorageDelegate)?.language
+       let deletedToken = token(at: range.location).token,
+       let language     = (delegate as? CodeStorageDelegate)?.language
     {
 
-      let isOpen    = token.token.isOpenBracket,
-          isBracket = isOpen || token.token.isCloseBracket,
+      let isOpen    = deletedToken.token.isOpenBracket,
+          isBracket = isOpen || deletedToken.token.isCloseBracket,
           isSafe    = (isOpen && range.location + 1 < string.utf16.count) || range.location > 0,
           offset    = isOpen ? 1 : -1
-      if isBracket && isSafe && language.lexeme(of: token.token)?.count == 1 &&
-          tokenAttribute(at: range.location + offset)?.token == token.token.matchingBracket
+      if isBracket && isSafe && language.lexeme(of: deletedToken.token)?.count == 1 &&
+          token(at: range.location + offset).token?.token == deletedToken.token.matchingBracket
       {
 
         let extendedRange = NSRange(location: isOpen ? range.location : range.location - 1, length: 2)
@@ -179,130 +198,149 @@ extension CodeStorage {
 
 extension CodeStorage {
 
-  /// Determine the token attribute value at the given character index. This will be `.tokenBody` if the indexed
-  /// character is a body character (i.e., second or later) of a token lexeme.
-  ///
-  func tokenAttribute(at location: Int) -> TokenAttribute<LanguageConfiguration.Token>? {
-
-    // Use the concrete text storage here as `CodeStorage.attributes(_:at:effectiveRange:)` does attribute synthesis
-    // that we don't want here.
-    return textStorage.attribute(.token, at: location, effectiveRange: nil)
-      as? TokenAttribute<LanguageConfiguration.Token>
-  }
-
-  /// Determine the type and range of the token to which the character at the given index belongs, if it is part of a
-  /// token at all.
-  ///
-  func token(at location: Int) -> (type: LanguageConfiguration.Token, range: NSRange)? {
-
-    func determineTokenLength(type: LanguageConfiguration.Token, start: Int)
-      -> (type: LanguageConfiguration.Token, range: NSRange)?
-    {
-      var idx = location + 1
-      while idx < length, tokenAttribute(at: idx)?.isHead == false { idx += 1 }
-      return (type: type, range: NSRange(location: start, length: idx - start))
-    }
-
-    var idx = location
-    while idx >= 0 && idx < length {
-
-      if let attribute = tokenAttribute(at: idx) {
-
-        if !attribute.isHead { idx -= 1 }   // still looking for the first character of the lexeme
-        else {                              // we found the first character of a token
-
-          return determineTokenLength(type: attribute.token, start: idx)
-
-        }
-      } else { return nil }   // no token (head) attribute => character is not part of a token lexeme
-    }
-    return nil      // this shouldn't happen...
-  }
-
-  /// Executes the specified closure for each token in the given range.
+  /// Yield the token at the given position (column index) on the given line, if any.
   ///
   /// - Parameters:
-  ///   - enumerationRange: The range overwhich tokens are enumerated.
-  ///   - reverseEnumeration: Pass `true` if the enumeration should proceed in reverse.
-  ///   - block: The closure to apply to the token types and ranges found.
+  ///   - line: The line where we are looking for a token.
+  ///   - position: The column index of the location of interest (0-based).
+  /// - Returns: The token at the given position, if any, and the effective range of the token or token-free space,
+  ///     respectively, in the entire text. (The range in the token is its line range, whereas the `effectiveRange`
+  ///     is relative to the entire text storage.)
   ///
-  /// See `NSAttributedString.enumerateAttribute(_:in:options:using:)` for further details of the parameters.
-  ///
-  func enumerateTokens(in enumerationRange: NSRange,
-                       reverse reverseEnumeration: Bool = false,
-                       using block: (LanguageConfiguration.Token, NSRange, UnsafeMutablePointer<ObjCBool>) -> Void)
-  {
-    let opts: NSAttributedString.EnumerationOptions = reverseEnumeration ? [.longestEffectiveRangeNotRequired, .reverse]
-                                                                         : [.longestEffectiveRangeNotRequired]
-    enumerateAttribute(.token, in: enumerationRange, options: opts){ (value, range, stop) in
-
-      // we are only interested in non-token body matches
-      guard let tokenType = value as? TokenAttribute<LanguageConfiguration.Token>, tokenType.isHead else { return }
-
-      theSwitch: switch range.length {
-      case 0:
-        break
-
-      case 1:   // we report one token (that possibly extents across mutliple characters
-        guard let theToken = token(at: range.location) else { break theSwitch }
-        block(theToken.type, theToken.range, stop)
-
-      default:  // we report as many one-character tokens as the length of the `range` specifies
-        guard let theRange: Range<Int> = Range(range) else { break theSwitch }
-
-        forLoop: for idx in reverseEnumeration ? theRange.reversed() : Array(theRange) {
-
-          block(tokenType.token, NSRange(location: idx, length: 1), stop)
-          if stop.pointee.boolValue { break forLoop }
-
-        }
-      }
-    }
-  }
-
-  /// If there is a bracket at the given location, return its matching bracket's location if it exists and is within
-  /// the given range.
-  ///
-  /// - Parameters:
-  ///   - location: Location of the original bracket (maybe opening or closing).
-  ///   - range: Range of locations to consider for the matching bracket.
-  /// - Returns: Character range of the lexeme of the matching bracket if it exists in the given `range`.
-  ///
-  func matchingBracket(forLocationAt location: Int, in range: NSRange) -> NSRange? {
-    guard let bracketToken = token(at: location),
-          bracketToken.type.isOpenBracket || bracketToken.type.isCloseBracket
+  func token(on line: Int, at position: Int) -> (token: LanguageConfiguration.Tokeniser.Token?, effectiveRange: NSRange)? {
+    guard let lineMap  = (delegate as? CodeStorageDelegate)?.lineMap,
+          let lineInfo = lineMap.lookup(line: line),
+          let tokens   = lineInfo.info?.tokens
     else { return nil }
 
-    let matchingBracketTokenType = bracketToken.type.matchingBracket
-    let searchRange: NSRange
-    if bracketToken.type.isOpenBracket {
+    // FIXME: This is fairly naive, especially for very long lines...
+    var previousToken: LanguageConfiguration.Tokeniser.Token? = nil
+    for token in tokens {
 
-      // searching to the right
-      searchRange = NSRange(location: location + 1, length: max(range.max - location - 1, 0))
+      if position < token.range.location {
 
-    } else {
+        // `token` is already after `column`
+        let afterPreviousTokenOrLineStart = previousToken?.range.max ?? 0
+        return (token: nil, effectiveRange: NSRange(location: lineInfo.range.location + afterPreviousTokenOrLineStart,
+                                                    length: token.range.location - afterPreviousTokenOrLineStart))
 
-      // searching to the left
-      searchRange = NSRange(location: range.location, length: max(location - range.location, 0))
-
+      } else if token.range.contains(position),
+                let effectiveRange = token.range.shifted(by: lineInfo.range.location)
+      {
+        // `token` includes `column`
+        return (token: token, effectiveRange: effectiveRange)
+      }
+      previousToken = token
     }
 
-    var level                   = 1
-    var matchingRange: NSRange? = nil
-    enumerateTokens(in: searchRange, reverse: bracketToken.type.isCloseBracket){ (tokenType, range, stop) in
+    // `column` is after any tokens (if any) on this line
+    let afterPreviousTokenOrLineStart = previousToken?.range.max ?? 0
+    return (token: nil, effectiveRange: NSRange(location: lineInfo.range.location + afterPreviousTokenOrLineStart,
+                                                length: lineInfo.range.length - afterPreviousTokenOrLineStart))
+  }
 
-      if tokenType == bracketToken.type { level += 1 }  // nesting just got deeper
-      else if tokenType == matchingBracketTokenType {   // matching bracket found
+  /// Yield the token at the given storage index.
+  ///
+  /// - Parameter location: Character index into the text storage.
+  /// - Returns: The token at the given position, if any, and the effective range of the token or token-free space,
+  ///     respectively, in the entire text. (The range in the token is its line range, whereas the `effectiveRange`
+  ///     is relative to the entire text storage.)
+  ///
+  /// NB: Token spans never exceed a line.
+  ///
+  func token(at location: Int) -> (token: LanguageConfiguration.Tokeniser.Token?, effectiveRange: NSRange) {
+    if let lineMap  = (delegate as? CodeStorageDelegate)?.lineMap,
+       let line     = lineMap.lineContaining(index: location),
+       let lineInfo = lineMap.lookup(line: line),
+       let result   = token(on: line, at: location - lineInfo.range.location)
+    {
+      return result
+    }
+    else { return (token: nil, effectiveRange: NSRange(location: location, length: 1)) }
+  }
 
-        if level > 1 { level -= 1 }     // but we are not yet at the topmost nesting level
-        else {                          // this is the one actually matching the original bracket
+  /// Convenience wrapper for `token(at:)` that returns only tokens, but with a range in terms of the entire text
+  /// storage (not line-local).
+  ///
+  func tokenOnly(at location: Int) -> LanguageConfiguration.Tokeniser.Token? {
+    let tokenWithEffectiveRange = token(at: location)
+    var token = tokenWithEffectiveRange.token
+    token?.range = tokenWithEffectiveRange.effectiveRange
+    return token
+  }
 
-          matchingRange = range
-          stop.pointee = true
+  /// Determine whether the given location is inside a comment and, if so, return the range of the comment (clamped to
+  /// the current line).
+  ///
+  /// - Parameter location: Character index into the text storage.
+  /// - Returns: If `location` is inside a comment, return the range of the comment, clamped to line bounds, but in
+  ///     terms of teh entire text.
+  ///
+  func comment(at location: Int) -> NSRange? {
+    guard let lineMap       = (delegate as? CodeStorageDelegate)?.lineMap,
+          let line          = lineMap.lineContaining(index: location),
+          let lineInfo      = lineMap.lookup(line: line),
+          let commentRanges = lineInfo.info?.commentRanges
+    else { return nil }
 
+    let column = location - lineInfo.range.location
+    for commentRange in commentRanges {
+      if column < commentRange.location { return nil }
+      else if commentRange.contains(column) { return commentRange.shifted(by: lineInfo.range.location) }
+    }
+    return nil
+  }
+
+  /// If the given location is just past a bracket, return its matching bracket's token range if it exists and the
+  /// matching bracket is within the given range of lines.
+  ///
+  /// - Parameters:
+  ///   - location: Location just past (i.e., to the right of) the original bracket (maybe opening or closing).
+  ///   - lines: Range of lines to consider for the matching bracket.
+  /// - Returns: Character range of the lexeme of the matching bracket if it exists in the given line range `lines`.
+  ///
+  func matchingBracket(at location: Int, in lines: Range<Int>) -> NSRange? {
+    guard let codeStorageDelegate = delegate as? CodeStorageDelegate,
+          let lineAndPosition     = codeStorageDelegate.lineMap.lineAndPositionOf(index: location),
+          lineAndPosition.position > 0,                 // we can't be *past* a bracket on the rightmost column
+          let token               = token(on: lineAndPosition.line, at: lineAndPosition.position - 1)?.token,
+          token.range.max == lineAndPosition.position,  // we need to be past the bracket, even if it is multi-character
+          token.token.isOpenBracket || token.token.isCloseBracket
+    else { return nil }
+
+    let matchingBracketTokenType = token.token.matchingBracket,
+        searchForwards           = token.token.isOpenBracket,
+        allTokens                = codeStorageDelegate.lineMap.lookup(line: lineAndPosition.line)?.info?.tokens ?? []
+
+    var currentLine = lineAndPosition.line
+    var tokens      = searchForwards ? Array(allTokens.drop(while: { $0.range.location <= lineAndPosition.position }))
+                                     : Array(allTokens.prefix(while: { $0.range.max < lineAndPosition.position }).reversed())
+    var level       = 1
+
+    while lines.contains(currentLine) {
+
+      for currentToken in tokens {
+
+        if currentToken.token == token.token { level += 1 }         // nesting just got deeper
+        else if currentToken.token == matchingBracketTokenType {    // matching bracket found
+
+          if level > 1 { level -= 1 }     // but we are not yet at the topmost nesting level
+          else {                          // this is the one actually matching the original bracket
+
+            if let lineStart = codeStorageDelegate.lineMap.lookup(line: currentLine)?.range.location {
+              return currentToken.range.shifted(by: lineStart)
+            } else { return nil }
+
+          }
         }
       }
+
+      // Get the tokens on the next (forwards or backwards) line and reverse them if we search backwards.
+      currentLine += searchForwards ? 1 : -1
+      tokens       = codeStorageDelegate.lineMap.lookup(line: currentLine)?.info?.tokens ?? []
+      if !searchForwards { tokens = tokens.reversed() }
+
     }
-    return matchingRange
+    return nil
   }
 }

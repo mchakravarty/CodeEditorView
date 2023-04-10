@@ -70,6 +70,21 @@ extension TextView {
     return (optCodeStorage?.delegate as? CodeStorageDelegate)?.languageService
   }
 
+  /// Determine the visible range of lines.
+  ///
+  var documentVisibleLines: Range<Int>? {
+    guard let layoutManager = optLayoutManager,
+          let textContainer = optTextContainer,
+          let lineMap       = (optCodeStorage?.delegate as? CodeStorageDelegate)?.lineMap,
+          lineMap.lines.count > 1   // this ensure that the line map has been initialised
+    else { return nil }
+
+    let glyphRange  = layoutManager.glyphRange(forBoundingRectWithoutAdditionalLayout: documentVisibleRect,
+                                               in: textContainer),
+        charRange   = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+    return lineMap.linesOf(range: charRange)
+  }
+
   /// Determine the bounding rectangle for the charcters in the given range.
   ///
   /// - Parameter range: The range of chracters whose bounding rectangle we desire. If nil, the entire text is used.
@@ -86,7 +101,7 @@ extension TextView {
                                                                                   length: codeStorage.length),
                                               actualCharacterRange: nil),
         rect       = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
-    return rect.offsetBy(dx: textContainerOrigin.x, dy: textContainerOrigin.x)
+    return rect.offsetBy(dx: textContainerOrigin.x, dy: textContainerOrigin.y)
   }
 }
 

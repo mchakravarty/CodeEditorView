@@ -46,6 +46,10 @@ class GutterView: UIView {
   ///
   let isMinimapGutter: Bool = false
 
+  /// Invalidated character range whose invalidation has been delayed as the code layout wasn't finished yet.
+  ///
+  var pendingCharRange: NSRange?
+
   /// Dirty rectangle whose drawing has been delayed as the code layout wasn't finished yet.
   ///
   var pendingDrawRect: CGRect?
@@ -104,6 +108,10 @@ class GutterView: NSView {
   ///
   let isMinimapGutter: Bool
 
+  /// Invalidated character range whose invalidation has been delayed as the code layout wasn't finished yet.
+  ///
+  var pendingCharRange: NSRange?
+
   /// Dirty rectangle whose drawing has been delayed as the code layout wasn't finished yet.
   ///
   var pendingDrawRect: NSRect?
@@ -154,36 +162,51 @@ extension GutterView {
   /// We invalidate the area corresponding to entire paragraphs. This makes a difference in the presence of line
   /// breaks.
   ///
-  func invalidateGutter(forCharRange charRange: NSRange) {
+  func invalidateGutter(for charRange: NSRange) {
 
     guard let layoutManager = optLayoutManager,
           let textContainer = optTextContainer
     else { return }
 
-    let string = textView.text as NSString
+    // We require layout to be complete. If it isn't, delay computation of the rectangle to be invalidated.
+    if layoutManager.hasUnlaidCharacters {
 
-    let textRect: CGRect
-
-    if charRange.location == string.length {   // special case: insertion point on trailing empty line
-
-      textRect = layoutManager.extraLineFragmentRect
+      pendingCharRange = pendingCharRange?.union(charRange) ?? charRange
 
     } else {
 
-      // We call `paragraphRange(for:_)` safely by boxing `charRange` to the allowed range.
-      let extendedCharRange   = string.paragraphRange(for: charRange.clamped(to: string.length)),
-          glyphRange          = layoutManager.glyphRange(forCharacterRange: extendedCharRange,
-                                                         actualCharacterRange: nil)
-      textRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+      let string = textView.text as NSString
+
+      let textRect: CGRect
+
+      if charRange.location == string.length {   // special case: insertion point on trailing empty line
+
+        textRect = layoutManager.extraLineFragmentRect
+
+      } else {
+
+        // We call `paragraphRange(for:_)` safely by boxing `charRange` to the allowed range.
+        let extendedCharRange   = string.paragraphRange(for: charRange.clamped(to: string.length)),
+            glyphRange          = layoutManager.glyphRange(forCharacterRange: extendedCharRange,
+                                                           actualCharacterRange: nil)
+        textRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+
+      }
+      setNeedsDisplay(gutterRectFrom(textRect: textRect))
 
     }
-    setNeedsDisplay(gutterRectFrom(textRect: textRect))
   }
 
-  /// Trigger drawing any pending gutter draw rectangle.
+  /// Trigger drawing any pending char range invalidations and gutter draw rectangle.
   ///
   func layoutFinished() {
 
+    if let charRange = pendingCharRange {
+
+      invalidateGutter(for: charRange)
+      pendingCharRange = nil
+
+    }
     if let rect = pendingDrawRect {
 
       setNeedsDisplay(rect)
