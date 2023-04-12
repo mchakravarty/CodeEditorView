@@ -51,7 +51,7 @@ final class CodeView: UITextView {
   // Delegates
   fileprivate var codeViewDelegate:           CodeViewDelegate?
   fileprivate var codeStorageDelegate:        CodeStorageDelegate
-  fileprivate let codeLayoutManagerDelegate = CodeLayoutManagerDelegate()
+  fileprivate let codeLayoutManagerDelegate = CodeLayoutManagerDelegate()  // shared between code view and minimap
 
   // Subviews
   fileprivate var gutterView: GutterView?
@@ -175,8 +175,8 @@ class CodeViewDelegate: NSObject, UITextViewDelegate {
     // NB: Invalidation of the two ranges needs to happen separately. If we were to union them, an insertion point
     //     (range length = 0) at the start of a line would be absorbed into the previous line, which results in a lack
     //     of invalidation of the line on which the insertion point is located.
-    codeView.gutterView?.invalidateGutter(forCharRange: codeView.selectedRange)
-    codeView.gutterView?.invalidateGutter(forCharRange: oldSelectedRange)
+    codeView.gutterView?.invalidateGutter(for: codeView.selectedRange)
+    codeView.gutterView?.invalidateGutter(for: oldSelectedRange)
     oldSelectedRange = textView.selectedRange
   }
 
@@ -337,6 +337,8 @@ final class CodeView: NSTextView {
 
     minimapView.textContainer?.replaceLayoutManager(minimapLayoutManager)
     codeStorage.addLayoutManager(minimapLayoutManager)
+    minimapLayoutManager.delegate = codeLayoutManagerDelegate  // shared with code view
+
     minimapView.backgroundColor                     = backgroundColor
     minimapView.autoresizingMask                    = .none
     minimapView.isEditable                          = false
@@ -427,18 +429,17 @@ final class CodeView: NSTextView {
     }
     oldLastLineOfInsertionPoint = lineOfInsertionPoint
 
-    // NB: This needs to happen after calling `super`, as it depends on the correctly set new set of ranges.
-    DispatchQueue.main.async {
+    // NB: The following needs to happen after calling `super`, as redrawing depends on the correctly set new set of
+    //     ranges.
 
-      // Needed as the selection affects line number highlighting.
-      // NB: Invalidation of the old and new ranges needs to happen separately. If we were to union them, an insertion
-      //     point (range length = 0) at the start of a line would be absorbed into the previous line, which results in
-      //     a lack of invalidation of the line on which the insertion point is located.
-      self.gutterView?.invalidateGutter(for: combinedRanges(ranges: oldSelectedRanges))
-      self.gutterView?.invalidateGutter(for: combinedRanges(ranges: ranges))
-      self.minimapGutterView?.invalidateGutter(for: combinedRanges(ranges: oldSelectedRanges))
-      self.minimapGutterView?.invalidateGutter(for: combinedRanges(ranges: ranges))
-    }
+    // Needed as the selection affects line number highlighting.
+    // NB: Invalidation of the old and new ranges needs to happen separately. If we were to union them, an insertion
+    //     point (range length = 0) at the start of a line would be absorbed into the previous line, which results in
+    //     a lack of invalidation of the line on which the insertion point is located.
+    gutterView?.invalidateGutter(for: combinedRanges(ranges: oldSelectedRanges))
+    gutterView?.invalidateGutter(for: combinedRanges(ranges: ranges))
+    minimapGutterView?.invalidateGutter(for: combinedRanges(ranges: oldSelectedRanges))
+    minimapGutterView?.invalidateGutter(for: combinedRanges(ranges: ranges))
 
     collapseMessageViews()
   }
@@ -643,14 +644,12 @@ final class CodeView: NSTextView {
     guard minimapView?.layoutManager?.hasUnlaidCharacters == false
     else {
 
-      if let codeLayoutManager = minimapView?.layoutManager as? CodeLayoutManager {
-        codeLayoutManager.registerPostLayout(action: adjustScrollPositionOfMinimap)
+      if let minimapLayoutManager = minimapView?.layoutManager as? MinimapLayoutManager {
+        minimapLayoutManager.registerPostLayout(action: adjustScrollPositionOfMinimap)
       }
       return
 
     }
-
-    print("adjustScrollPositionOfMinimap")
 
     let codeViewHeight = frame.size.height,
         codeHeight     = boundingRect()?.height ?? 0,
@@ -960,9 +959,7 @@ class CodeLayoutManager: NSLayoutManager {
     if let codeStorageDelegate = textStorage.delegate as? CodeStorageDelegate,
        let codeView            = gutterView?.textView as? CodeView
     {
-
       codeView.removeMessageViews(withIDs: codeStorageDelegate.lastEvictedMessageIDs)
-
     }
   }
 

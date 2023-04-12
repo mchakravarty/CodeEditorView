@@ -15,14 +15,11 @@ import SwiftUI
 
 extension UIScrollView {
 
-  var verticalScrollFraction: CGFloat {
-    get {
-      let verticalScrollRange = contentSize.height - bounds.height
-      return verticalScrollRange > 0 ? min(max(0, contentOffset.y / verticalScrollRange), 1) : 0
-    }
+  var verticalScrollPosition: CGFloat {
+    get { contentOffset.y }
     set {
-      let visibleRectY = newValue * max(0, contentSize.height - bounds.height)
-      setContentOffset(CGPoint(x: contentOffset.x, y: visibleRectY), animated: false)
+      let newOffset = max(0, min(newValue, contentSize.height - bounds.height))
+      setContentOffset(CGPoint(x: contentOffset.x, y: newOffset), animated: false)
     }
   }
 }
@@ -35,14 +32,11 @@ extension UIScrollView {
 
 extension NSScrollView {
 
-  var verticalScrollFraction: CGFloat {
-    get {
-      let verticalScrollRange = (documentView?.bounds.height ?? 0) - documentVisibleRect.height
-      return verticalScrollRange > 0 ? min(max(0, documentVisibleRect.origin.y / verticalScrollRange), 1) : 0
-    }
+  var verticalScrollPosition: CGFloat {
+    get { documentVisibleRect.origin.y }
     set {
-      let visibleRectY = newValue * max(0, (documentView?.bounds.height ?? 0) - documentVisibleRect.height)
-      contentView.scroll(to: CGPoint(x: documentVisibleRect.origin.x, y: visibleRectY))
+      let newOffset = max(0, min(newValue, contentSize.height - bounds.height))
+      contentView.scroll(to: CGPoint(x: documentVisibleRect.origin.x, y: newOffset))
     }
   }
 }

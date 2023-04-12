@@ -36,7 +36,7 @@ class MinimapView: NSTextView {
 
 /// Customised layout manager for the minimap.
 ///
-class MinimapLayoutManager: NSLayoutManager {
+class MinimapLayoutManager: CodeLayoutManager {
 
   // In place of drawing the actual glyphs, we draw small rectangles in the glyph's foreground colour. We ignore the
   // actual glyph metrics and draw all glyphs as a fixed-sized rectangle whose height is determined by the "used

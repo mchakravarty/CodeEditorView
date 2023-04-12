@@ -61,18 +61,17 @@ public struct CodeEditor {
     ///
     public var selections: [NSRange]
 
-    /// The editor vertical scroll position. The value is between 0 and 1, which represent the completely scrolled up
-    /// and down position, respectively.
+    /// The editor vertical scroll position.
     ///
-    public var verticalScrollFraction: CGFloat
+    public var verticalScrollPosition: CGFloat
 
-    public init(selections: [NSRange], verticalScrollFraction: CGFloat) {
+    public init(selections: [NSRange], verticalScrollPosition: CGFloat) {
       self.selections             = selections
-      self.verticalScrollFraction = verticalScrollFraction
+      self.verticalScrollPosition = verticalScrollPosition
     }
 
     public init() {
-      self.init(selections: [.zero], verticalScrollFraction: 0)
+      self.init(selections: [.zero], verticalScrollPosition: 0)
     }
   }
 
@@ -184,7 +183,7 @@ extension CodeEditor: UIViewRepresentable {
     // delayed.
     // TODO: The scroll fraction assignment still happens to soon if the initialisisation takes a long time, because we loaded a large file. It be better if we could deterministically determine when initialisation is entirely finished and then set the scroll fraction at that point.
     DispatchQueue.main.async {
-      codeView.verticalScrollFraction = position.verticalScrollFraction
+      codeView.verticalScrollPosition = position.verticalScrollPosition
     }
 
     // Report the initial message set
@@ -206,8 +205,8 @@ extension CodeEditor: UIViewRepresentable {
     updateMessages(in: codeView, with: context)
     if text != textView.text { textView.text = text }  // Hoping for the string comparison fast path...
     if selection != codeView.selectedRange { codeView.selectedRange = selection }
-    if abs(position.verticalScrollFraction - textView.verticalScrollFraction) > 0.0001 {
-      textView.verticalScrollFraction = position.verticalScrollFraction
+    if abs(position.verticalScrollPosition - textView.verticalScrollPosition) > 0.0001 {
+      textView.verticalScrollPosition = position.verticalScrollPosition
     }
     if theme.id != codeView.theme.id { codeView.theme = theme }
     if layout != codeView.viewLayout { codeView.viewLayout = layout }
@@ -237,8 +236,8 @@ extension CodeEditor: UIViewRepresentable {
     func scrollPositionDidChange(_ scrollView: UIScrollView) {
       guard !updatingView else { return }
 
-      if abs(position.verticalScrollFraction - scrollView.verticalScrollFraction) > 0.0001 {
-        Task { await position.verticalScrollFraction = scrollView.verticalScrollFraction }
+      if abs(position.verticalScrollPosition - scrollView.verticalScrollPosition) > 0.0001 {
+        Task { await position.verticalScrollPosition = scrollView.verticalScrollPosition }
       }
     }
   }
@@ -288,17 +287,20 @@ extension CodeEditor: NSViewRepresentable {
     // delayed.
     // TODO: The scroll fraction assignment still happens to soon if the initialisisation takes a long time, because we loaded a large file.  It be better if we could deterministically determine when initialisation is entirely finished and then set the scroll fraction at that point.
     DispatchQueue.main.async {
-      scrollView.verticalScrollFraction = position.verticalScrollFraction
+      scrollView.verticalScrollPosition = position.verticalScrollPosition
     }
 
-    // The minimap needs to be vertically positioned in dependence on the scroll position of the main code view and
-    // we need to keep track of the scroll position by observing the bounds of the content view.
+    // The minimap needs to be vertically positioned in dependence on the scroll position of the main code view by
+    // observing the bounds of the content view.
     context.coordinator.boundsChangedNotificationObserver
-      = NotificationCenter.default.addObserver(forName: NSView.boundsDidChangeNotification,
-                                               object: scrollView.contentView,
+    = NotificationCenter.default.addObserver(forName: NSView.boundsDidChangeNotification,
+                                             object: scrollView.contentView,
                                                queue: .main){ _ in
 
         codeView.adjustScrollPositionOfMinimap()
+
+        // FIXME: we would like to get less fine-grained updates here, but `NSScrollView.didEndLiveScrollNotification`
+        //        doesn't happen when moving the cursor around
         context.coordinator.scrollPositionDidChange(scrollView)
       }
 
@@ -321,8 +323,8 @@ extension CodeEditor: NSViewRepresentable {
     updateMessages(in: codeView, with: context)
     if text != codeView.string { codeView.string = text }  // Hoping for the string comparison fast path...
     if selections != codeView.selectedRanges { codeView.selectedRanges = selections }
-    if abs(position.verticalScrollFraction - scrollView.verticalScrollFraction) > 0.0001 {
-      scrollView.verticalScrollFraction = position.verticalScrollFraction
+    if abs(position.verticalScrollPosition - scrollView.verticalScrollPosition) > 0.0001 {
+      scrollView.verticalScrollPosition = position.verticalScrollPosition
     }
     if theme.id != codeView.theme.id { codeView.theme = theme }
     if layout != codeView.viewLayout { codeView.viewLayout = layout }
@@ -357,8 +359,8 @@ extension CodeEditor: NSViewRepresentable {
     func scrollPositionDidChange(_ scrollView: NSScrollView) {
       guard !updatingView else { return }
 
-      if abs(position.verticalScrollFraction - scrollView.verticalScrollFraction) > 0.0001 {
-        position.verticalScrollFraction = scrollView.verticalScrollFraction
+      if abs(position.verticalScrollPosition - scrollView.verticalScrollPosition) > 0.0001 {
+        position.verticalScrollPosition = scrollView.verticalScrollPosition
       }
     }
   }
@@ -434,15 +436,15 @@ extension CodeEditor.Position: RawRepresentable, Codable {
     if components.count == 2 {
 
       selections             = components[0].components(separatedBy: ";").compactMap{ parseNSRange(lexeme: $0) }
-      verticalScrollFraction = CGFloat(Double(components[1]) ?? 0)
+      verticalScrollPosition = CGFloat(Double(components[1]) ?? 0)
 
     } else { self = CodeEditor.Position() }
   }
 
   public var rawValue: String {
     let selectionsString             = selections.map{ "\($0.location):\($0.length)" }.joined(separator: ";"),
-        verticalScrollFractionString = String(describing: verticalScrollFraction)
-    return selectionsString + "|" + verticalScrollFractionString
+        verticalScrollPositionString = String(describing: verticalScrollPosition)
+    return selectionsString + "|" + verticalScrollPositionString
   }
 }
 
