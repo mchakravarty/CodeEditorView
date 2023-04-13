@@ -41,6 +41,11 @@ class CodeStorage: NSTextStorage {
   }
   #endif
 
+  // We access attributes through the API of the wrapped `NSTextStorage`; hence, lazy attribute fixing keeps working as
+  // before. (Lazy attribute fixing dramatically impacts performance due to syntax highlighting cutting the text up
+  // into lots of short attribute ranges.)
+  override var fixesAttributesLazily: Bool { true }
+
   override func attributes(at location: Int, effectiveRange range: NSRangePointer?) -> [NSAttributedString.Key : Any] {
 
     var attributes       = textStorage.attributes(at: location, effectiveRange: range)
