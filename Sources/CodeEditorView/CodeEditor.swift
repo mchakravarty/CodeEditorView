@@ -185,10 +185,10 @@ extension CodeEditor: UIViewRepresentable {
        layoutManager.hasUnlaidCharacters
     {
       layoutManager.registerPostLayout {
-        scrollView.verticalScrollPosition = position.verticalScrollPosition
+        codeView.verticalScrollPosition = position.verticalScrollPosition
       }
     } else {
-      scrollView.verticalScrollPosition = position.verticalScrollPosition
+      codeView.verticalScrollPosition = position.verticalScrollPosition
     }
 
     // Report the initial message set

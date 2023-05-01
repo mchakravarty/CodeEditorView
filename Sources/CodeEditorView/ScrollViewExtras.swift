@@ -18,7 +18,7 @@ extension UIScrollView {
   var verticalScrollPosition: CGFloat {
     get { contentOffset.y }
     set {
-      let newOffset = max(0, min(newValue, (documentView?.bounds.height ?? 0) - contentSize.height))
+      let newOffset = max(0, min(newValue, bounds.height - contentSize.height))
       setContentOffset(CGPoint(x: contentOffset.x, y: newOffset), animated: false)
     }
   }
