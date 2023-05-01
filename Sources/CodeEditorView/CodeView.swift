@@ -374,6 +374,11 @@ final class CodeView: NSTextView {
                                                queue: .main){ _ in
         self.tile()
       }
+
+    // Perform an initial tiling run when the view hierarchy has been set up.
+    DispatchQueue.main.async {
+      self.tile(initial: true)
+    }
   }
 
   required init?(coder: NSCoder) {
@@ -528,13 +533,13 @@ final class CodeView: NSTextView {
   ///
   /// NB: We don't use a ruler view for the gutter on macOS to be able to use the same setup on macOS and iOS.
   ///
-  private func tile() {
+  private func tile(initial: Bool = false) {
     guard let codeContainer = optTextContainer as? CodeContainer,
           let layoutManager = optLayoutManager as? CodeLayoutManager
     else { return }
 
-    // We wait with tiling until the layout is done.
-    if layoutManager.hasUnlaidCharacters {
+    // We wait with tiling until the layout is done unless this is the initial tiling.
+    if !initial && layoutManager.hasUnlaidCharacters {
 
       layoutManager.registerPostLayout { self.tile() }
       return
@@ -634,10 +639,14 @@ final class CodeView: NSTextView {
 
     }
 
-    // NB: We can't set the height of the box highlighting the document visible area here as it depends on the document
-    //     and minimap height, which requires document layout to be completed. All this is set by
+    // NB: We can't generally set the height of the box highlighting the document visible area here as it depends on the
+    //     document and minimap height, which requires document layout to be completed. All this is set by
     //     `adjustScrollPositionOfMinimap()`, which will be invoked in response to bounds changes of the text view
     //     (which in turn are being triggered by layout).
+    //
+    //     We, however, invoke the function once on the initial tiling to ensure that the frame of the box is set
+    //     at least once.
+    if initial { adjustScrollPositionOfMinimap() }
 
     needsDisplay = true
   }
@@ -645,7 +654,6 @@ final class CodeView: NSTextView {
   /// Adjust the positioning of the floating views.
   ///
   func adjustScrollPosition() {
-    gutterView?.needsDisplay = true
     adjustScrollPositionOfMinimap()
   }
 
