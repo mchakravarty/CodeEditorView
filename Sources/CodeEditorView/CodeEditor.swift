@@ -180,10 +180,15 @@ extension CodeEditor: UIViewRepresentable {
     codeView.selectedRange = position.selections.first ?? .zero
 
     // We can't set the scroll position right away as the views are not properly sized yet. Thus, this needs to be
-    // delayed.
-    // TODO: The scroll fraction assignment still happens to soon if the initialisisation takes a long time, because we loaded a large file. It be better if we could deterministically determine when initialisation is entirely finished and then set the scroll fraction at that point.
-    DispatchQueue.main.async {
-      codeView.verticalScrollPosition = position.verticalScrollPosition
+    // delayed until layout is finished.
+    if let layoutManager = codeView.layoutManager as? CodeLayoutManager,
+       layoutManager.hasUnlaidCharacters
+    {
+      layoutManager.registerPostLayout {
+        scrollView.verticalScrollPosition = position.verticalScrollPosition
+      }
+    } else {
+      scrollView.verticalScrollPosition = position.verticalScrollPosition
     }
 
     // Report the initial message set
@@ -284,9 +289,14 @@ extension CodeEditor: NSViewRepresentable {
     codeView.selectedRanges = position.selections.map{ NSValue(range: $0) }
 
     // We can't set the scroll position right away as the views are not properly sized yet. Thus, this needs to be
-    // delayed.
-    // TODO: The scroll fraction assignment still happens to soon if the initialisisation takes a long time, because we loaded a large file.  It be better if we could deterministically determine when initialisation is entirely finished and then set the scroll fraction at that point.
-    DispatchQueue.main.async {
+    // delayed until layout is finished.
+    if let layoutManager = codeView.layoutManager as? CodeLayoutManager,
+       layoutManager.hasUnlaidCharacters
+    {
+      layoutManager.registerPostLayout {
+        scrollView.verticalScrollPosition = position.verticalScrollPosition
+      }
+    } else {
       scrollView.verticalScrollPosition = position.verticalScrollPosition
     }
 
@@ -297,10 +307,9 @@ extension CodeEditor: NSViewRepresentable {
                                              object: scrollView.contentView,
                                                queue: .main){ _ in
 
-        codeView.adjustScrollPositionOfMinimap()
+        codeView.adjustScrollPosition()
 
-        // FIXME: we would like to get less fine-grained updates here, but `NSScrollView.didEndLiveScrollNotification`
-        //        doesn't happen when moving the cursor around
+        // FIXME: we would like to get less fine-grained updates here, but `NSScrollView.didEndLiveScrollNotification` doesn't happen when moving the cursor around
         context.coordinator.scrollPositionDidChange(scrollView)
       }
 

@@ -235,8 +235,9 @@ final class CodeView: NSTextView {
   ///
   var viewLayout: CodeEditor.LayoutConfiguration {
     didSet {
-      needsLayout = true
       tile()
+      needsLayout = true
+      adjustScrollPositionOfMinimap()
     }
   }
 
@@ -528,7 +529,17 @@ final class CodeView: NSTextView {
   /// NB: We don't use a ruler view for the gutter on macOS to be able to use the same setup on macOS and iOS.
   ///
   private func tile() {
-    guard let codeContainer = optTextContainer as? CodeContainer else { return }
+    guard let codeContainer = optTextContainer as? CodeContainer,
+          let layoutManager = optLayoutManager as? CodeLayoutManager
+    else { return }
+
+    // We wait with tiling until the layout is done.
+    if layoutManager.hasUnlaidCharacters {
+
+      layoutManager.registerPostLayout { self.tile() }
+      return
+
+    }
 
     // Add the floating views if they are not yet in the view hierachy.
     if let view = gutterView, view.superview == nil { enclosingScrollView?.addFloatingSubview(view, for: .horizontal) }
@@ -568,19 +579,23 @@ final class CodeView: NSTextView {
         excess               = widthWithoutGutters - ceil(numberOfCharacters * fontWidth)
                                                    - (numberOfCharacters * minimapFontWidth) * minimapFactor,
         minimapX             = floor(visibleWidth - minimapWidth),
-        minimapRect          = CGRect(x: minimapX, y: 0, width: minimapWidth, height: frame.height),
         minimapExclusionPath = OSBezierPath(rect: minimapGutterRect),
         minimapDividerRect   = CGRect(x: minimapX - dividerWidth, y: 0, width: dividerWidth, height: frame.height).integral
 
     minimapDividerView?.isHidden = !viewLayout.showMinimap
     minimapView?.isHidden        = !viewLayout.showMinimap
-    if viewLayout.showMinimap && minimapView?.frame != minimapRect {
+    if let minimapViewFrame = minimapView?.frame,
+       viewLayout.showMinimap
+    {
 
-      minimapDividerView?.frame = minimapDividerRect
-      minimapView?.frame        = minimapRect
-      minimapGutterView?.frame  = minimapGutterRect
-      minimapView?.minSize      = CGSize(width: minimapRect.size.width, height: visibleRect.height)
+      if minimapDividerView?.frame != minimapDividerRect { minimapDividerView?.frame = minimapDividerRect }
+      if minimapViewFrame.width != minimapWidth {
 
+        minimapView?.frame        = CGRect(x: minimapX, y: 0, width: minimapWidth, height: minimapViewFrame.height)
+        minimapGutterView?.frame  = minimapGutterRect
+        minimapView?.minSize      = CGSize(width: minimapFontWidth, height: visibleRect.height)
+
+      }
     }
 
     enclosingScrollView?.hasHorizontalScroller = !viewLayout.wrapText
@@ -625,6 +640,13 @@ final class CodeView: NSTextView {
     //     (which in turn are being triggered by layout).
 
     needsDisplay = true
+  }
+
+  /// Adjust the positioning of the floating views.
+  ///
+  func adjustScrollPosition() {
+    gutterView?.needsDisplay = true
+    adjustScrollPositionOfMinimap()
   }
 
   /// Sets the scrolling position of the minimap in dependence of the scroll position of the main code view.
@@ -979,7 +1001,7 @@ class CodeLayoutManager: NSLayoutManager {
   ///
   func registerPostLayout(action: @escaping () -> ()) {
     let previousPostLayoutAction = postLayoutAction
-    postLayoutAction = { previousPostLayoutAction?(); action() }
+    postLayoutAction = { previousPostLayoutAction?(); action() }  // we execute in the order of registration
   }
 }
 
