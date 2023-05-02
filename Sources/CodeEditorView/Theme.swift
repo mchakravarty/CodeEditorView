@@ -14,6 +14,10 @@ import SwiftUI
 public struct Theme: Identifiable {
   public let id = UUID()
 
+  /// The colour scheme of the theme.
+  ///
+  public var colourScheme: ColorScheme
+
   /// The name of the font to use.
   ///
   public var fontName: String
@@ -70,7 +74,8 @@ public struct Theme: Identifiable {
   ///
   public var invisiblesColour: OSColor
 
-  public init(fontName: String,
+  public init(colourScheme: ColorScheme,
+              fontName: String,
               fontSize: CGFloat,
               textColour: OSColor,
               commentColour: OSColor,
@@ -85,6 +90,7 @@ public struct Theme: Identifiable {
               cursorColour: OSColor,
               invisiblesColour: OSColor)
   {
+    self.colourScheme = colourScheme
     self.fontName = fontName
     self.fontSize = fontSize
     self.textColour = textColour
@@ -109,7 +115,8 @@ typealias Themes = [String: Theme]
 extension Theme {
 
   public static var defaultDark: Theme
-    = Theme(fontName: "SFMono-Medium",
+    = Theme(colourScheme: .dark,
+            fontName: "SFMono-Medium",
             fontSize: 13.0,
             textColour: OSColor(red: 0.87, green: 0.87, blue: 0.88, alpha: 1.0),
             commentColour: OSColor(red: 0.51, green: 0.55, blue: 0.59, alpha: 1.0),
@@ -125,7 +132,8 @@ extension Theme {
             invisiblesColour: OSColor(red: 0.33, green: 0.37, blue: 0.42, alpha: 1.0))
 
   public static var defaultLight: Theme
-    = Theme(fontName: "SFMono-Regular",
+    = Theme(colourScheme: .light,
+            fontName: "SFMono-Regular",
             fontSize: 13.0,
             textColour: OSColor(red: 0.15, green: 0.15, blue: 0.15, alpha: 1.0),
             commentColour: OSColor(red: 0.45, green: 0.50, blue: 0.55, alpha: 1.0),
@@ -173,7 +181,7 @@ extension Theme {
 
   #if os(iOS)
 
-  /// Tint colour on the basis oc the cursor and selection colour of the theme.
+  /// Tint colour on the basis of the cursor and selection colour of the theme.
   ///
   var tintColour: UIColor {
     var selectionHue        = CGFloat(0.0),

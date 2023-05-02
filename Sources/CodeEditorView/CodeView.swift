@@ -228,6 +228,7 @@ final class CodeView: NSTextView {
       minimapView?.backgroundColor         = theme.backgroundColour
       minimapGutterView?.theme             = theme
       documentVisibleBox?.fillColor        = theme.textColour.withAlphaComponent(0.1)
+      minimapDividerView?.fillColor        = theme.backgroundColour.blended(withFraction: 0.15, of: .systemGray)!
       needsLayout = true
       tile()
       setNeedsDisplay(visibleRect)
@@ -835,17 +836,18 @@ extension CodeView {
     if messageBundle.messages.isEmpty { return }
 
     // TODO: CodeEditor needs to be parameterised by message theme
-    let theme = Message.defaultTheme
+    let messageTheme = Message.defaultTheme
 
     let messageView = StatefulMessageView.HostingView(messages: messageBundle.messages,
-                                                      theme: theme,
+                                                      theme: messageTheme,
                                                       geometry: MessageView.Geometry(lineWidth: 100,
                                                                                      lineHeight: 15,
                                                                                      popupWidth: 300,
                                                                                      popupOffset: 16),
-                                                      fontSize: font?.pointSize ?? OSFont.systemFontSize),
+                                                      fontSize: font?.pointSize ?? OSFont.systemFontSize,
+                                                      colourScheme: theme.colourScheme),
         principalCategory = messagesByCategory(messageBundle.messages)[0].key,
-        colour            = theme(principalCategory).colour
+        colour            = messageTheme(principalCategory).colour
 
     messageViews[messageBundle.id] = MessageInfo(view: messageView,
                                                  lineFragementRect: CGRect.zero,

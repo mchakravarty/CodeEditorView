@@ -331,10 +331,11 @@ extension MessageView {
 /// and popup view by tapping.
 ///
 struct StatefulMessageView: View {
-  let messages:    [Message]              // The array of messages that are displayed by this view
-  let theme:       Message.Theme          // The message display theme to use
-  let geometry:    MessageView.Geometry   // The geometry constrains for the view
-  let fontSize:    CGFloat                // Font size to use for messages
+  let messages:     [Message]              // The array of messages that are displayed by this view
+  let theme:        Message.Theme          // The message display theme to use
+  let geometry:     MessageView.Geometry   // The geometry constrains for the view
+  let fontSize:     CGFloat                // Font size to use for messages
+  let colourScheme: ColorScheme            // The colour scheme to use for SwiftUI elements
 
   @ObservedObject var unfolded: ObservableBool  // `true` iff the view shows the popup flavour
 
@@ -355,6 +356,7 @@ struct StatefulMessageView: View {
                 geometry: geometry,
                 unfolded: $unfolded.bool)
       .font(.system(size: fontSize))
+      .environment(\.colorScheme, colourScheme)
       .fixedSize()    // to enforce intrinsic size in the encapsulating `NSHostingView`
   }
 }
@@ -366,9 +368,10 @@ extension StatefulMessageView {
   class HostingView: UIView {
     private var hostingView: UIHostingView<StatefulMessageView>?
 
-    private let messages: [Message]
-    private let theme   : Message.Theme
-    private let fontSize: CGFloat
+    private let messages:     [Message]
+    private let theme   :     Message.Theme
+    private let fontSize:     CGFloat
+    private let colourScheme: ColorScheme
 
     /// Unfolding status as sharable state.
     ///
@@ -382,12 +385,17 @@ extension StatefulMessageView {
       set { unfoldedState.bool = newValue }
     }
 
-    init(messages: [Message], theme: @escaping Message.Theme, geometry: MessageView.Geometry, fontSize: CGFloat)
+    init(messages: [Message],
+         theme: @escaping Message.Theme,
+         geometry: MessageView.Geometry,
+         fontSize: CGFloat,
+         colourScheme: ColorScheme)
     {
-      self.messages = messages
-      self.theme    = theme
-      self.geometry = geometry
-      self.fontSize = fontSize
+      self.messages     = messages
+      self.theme        = theme
+      self.geometry     = geometry
+      self.fontSize     = fontSize
+      self.colourScheme = colourScheme
       super.init(frame: .zero)
 
       isOpaque                                  = false
@@ -397,6 +405,7 @@ extension StatefulMessageView {
                                                                 theme: theme,
                                                                 geometry: geometry,
                                                                 fontSize: fontSize,
+                                                                colourScheme: colourScheme,
                                                                 unfolded: unfoldedState))
       hostingView?.isOpaque                                  = false
       hostingView?.translatesAutoresizingMaskIntoConstraints = false
@@ -423,6 +432,7 @@ extension StatefulMessageView {
                                                        theme: theme,
                                                        geometry: geometry,
                                                        fontSize: fontSize,
+                                                       colourScheme: colourScheme,
                                                        unfolded: unfoldedState)
     }
   }
@@ -435,9 +445,10 @@ extension StatefulMessageView {
   class HostingView: NSView {
     private var hostingView: NSHostingView<StatefulMessageView>?
 
-    private let messages: [Message]
-    private let theme   : Message.Theme
-    private let fontSize: CGFloat
+    private let messages:     [Message]
+    private let theme   :     Message.Theme
+    private let fontSize:     CGFloat
+    private let colourScheme: ColorScheme
 
     /// Unfolding status as sharable state.
     ///
@@ -451,12 +462,17 @@ extension StatefulMessageView {
       set { unfoldedState.bool = newValue }
     }
 
-    init(messages: [Message], theme: @escaping Message.Theme, geometry: MessageView.Geometry, fontSize: CGFloat)
+    init(messages: [Message],
+         theme: @escaping Message.Theme,
+         geometry: MessageView.Geometry,
+         fontSize: CGFloat,
+         colourScheme: ColorScheme)
     {
-      self.messages = messages
-      self.theme    = theme
-      self.geometry = geometry
-      self.fontSize = fontSize
+      self.messages     = messages
+      self.theme        = theme
+      self.geometry     = geometry
+      self.fontSize     = fontSize
+      self.colourScheme = colourScheme
       super.init(frame: .zero)
 
       self.translatesAutoresizingMaskIntoConstraints = false
@@ -465,6 +481,7 @@ extension StatefulMessageView {
                                                                      theme: theme,
                                                                      geometry: geometry,
                                                                      fontSize: fontSize,
+                                                                     colourScheme: colourScheme,
                                                                      unfolded: unfoldedState))
       hostingView?.translatesAutoresizingMaskIntoConstraints = false
       if let view = hostingView {
@@ -490,6 +507,7 @@ extension StatefulMessageView {
                                                        theme: theme,
                                                        geometry: geometry,
                                                        fontSize: fontSize,
+                                                       colourScheme: colourScheme,
                                                        unfolded: unfoldedState)
     }
   }
@@ -593,6 +611,7 @@ struct MessageViews_Previews: PreviewProvider {
                                                          popupWidth: 300,
                                                          popupOffset: 30),
                           fontSize: 15,
+                          colourScheme: .dark,
                           unfolded: StatefulMessageView.ObservableBool(bool: false))
         .offset(y: 18)
     }
