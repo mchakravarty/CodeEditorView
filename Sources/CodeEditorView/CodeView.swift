@@ -123,6 +123,9 @@ final class CodeView: UITextView {
     // Add a text storage delegate that maintains a line map
     codeStorage.delegate = self.codeStorageDelegate
 
+    // Important for longer documents
+    codeLayoutManager.allowsNonContiguousLayout =  true
+
     // Add a gutter view
     let gutterWidth = ceil(theme.fontSize) * 3,
         gutterView  = GutterView(frame: CGRect(x: 0,
@@ -306,6 +309,9 @@ final class CodeView: NSTextView {
 
     // Add a text storage delegate that maintains a line map
     codeStorage.delegate = codeStorageDelegate
+
+    // FIXME: We don't make much use of this yet, as some processes wait until there are no unlaid characters anymore — see #63.
+    codeLayoutManager.allowsNonContiguousLayout =  true
 
     // Create the main gutter view
     let gutterView = GutterView(frame: CGRect.zero,
