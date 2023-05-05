@@ -35,11 +35,16 @@ extension NSScrollView {
   var verticalScrollPosition: CGFloat {
     get { documentVisibleRect.origin.y }
     set {
-      let newOffset = max(0, min(newValue, (documentView?.bounds.height ?? 0) - contentSize.height))
-      contentView.scroll(to: CGPoint(x: documentVisibleRect.origin.x, y: newOffset))
 
-      // This is necessary as the floating subviews are otherwise *sometimes* not correctly re-positioned.
-      reflectScrolledClipView(contentView)
+      (documentView as? CodeView)?.whenLayoutDone { [self] in
+
+        let newOffset = max(0, min(newValue, (documentView?.bounds.height ?? 0) - contentSize.height))
+        contentView.scroll(to: CGPoint(x: documentVisibleRect.origin.x, y: newOffset))
+
+        // This is necessary as the floating subviews are otherwise *sometimes* not correctly re-positioned.
+        reflectScrolledClipView(contentView)
+
+      }
     }
   }
 }

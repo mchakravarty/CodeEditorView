@@ -226,7 +226,7 @@ extension GutterView {
 
     // This is not particularily nice, but there is no point in trying to draw the gutter, before the layout manager
     // has finished laying out the *entire* text. Given that all we got here is a rectangle, we can't even figure out
-    // reliably whether enough text has been laid out to draw that part of the gutter that is being requested. Hence,
+    // reliably whether enough text has been laid out to draw the part of the gutter that is being requested. Hence,
     // we defer drawing the gutter until all characters have been laid out.
     if layoutManager.hasUnlaidCharacters
     {

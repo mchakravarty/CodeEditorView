@@ -179,17 +179,7 @@ extension CodeEditor: UIViewRepresentable {
     }
     codeView.selectedRange = position.selections.first ?? .zero
 
-    // We can't set the scroll position right away as the views are not properly sized yet. Thus, this needs to be
-    // delayed until layout is finished.
-    if let layoutManager = codeView.layoutManager as? CodeLayoutManager,
-       layoutManager.hasUnlaidCharacters
-    {
-      layoutManager.registerPostLayout {
-        codeView.verticalScrollPosition = position.verticalScrollPosition
-      }
-    } else {
-      codeView.verticalScrollPosition = position.verticalScrollPosition
-    }
+    codeView.verticalScrollPosition = position.verticalScrollPosition
 
     // Report the initial message set
     DispatchQueue.main.async { updateMessages(in: codeView, with: context) }
@@ -288,17 +278,7 @@ extension CodeEditor: NSViewRepresentable {
     }
     codeView.selectedRanges = position.selections.map{ NSValue(range: $0) }
 
-    // We can't set the scroll position right away as the views are not properly sized yet. Thus, this needs to be
-    // delayed until layout is finished.
-    if let layoutManager = codeView.layoutManager as? CodeLayoutManager,
-       layoutManager.hasUnlaidCharacters
-    {
-      layoutManager.registerPostLayout {
-        scrollView.verticalScrollPosition = position.verticalScrollPosition
-      }
-    } else {
-      scrollView.verticalScrollPosition = position.verticalScrollPosition
-    }
+    scrollView.verticalScrollPosition = position.verticalScrollPosition
 
     // The minimap needs to be vertically positioned in dependence on the scroll position of the main code view by
     // observing the bounds of the content view.
