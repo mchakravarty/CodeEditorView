@@ -649,14 +649,11 @@ final class CodeView: NSTextView {
 
       }
 
-      // NB: We can't generally set the height of the box highlighting the document visible area here as it depends on the
-      //     document and minimap height, which requires document layout to be completed. All this is set by
-      //     `adjustScrollPositionOfMinimap()`, which will be invoked in response to bounds changes of the text view
-      //     (which in turn are being triggered by layout).
-      //
-      //     We, however, invoke the function once on the initial tiling to ensure that the frame of the box is set
-      //     at least once.
-      if initial { adjustScrollPositionOfMinimap() }
+      // NB: We can't generally set the height of the box highlighting the document visible area here as it depends on
+      //     the document and minimap height, which requires document layout to be completed. However, we still invoke
+      //     `adjustScrollPositionOfMinimap()` here as it does little work and an intermediate update is visually
+      //     more pleasing, especially when resizing the window or similar.
+      adjustScrollPositionOfMinimap()
 
       needsDisplay = true
     }

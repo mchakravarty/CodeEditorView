@@ -19,7 +19,9 @@ extension UIScrollView {
     get { contentOffset.y }
     set {
       let newOffset = max(0, min(newValue, bounds.height - contentSize.height))
-      setContentOffset(CGPoint(x: contentOffset.x, y: newOffset), animated: false)
+      if abs(newOffset - documentVisibleRect.origin.y) > 0.0001 {
+        setContentOffset(CGPoint(x: contentOffset.x, y: newOffset), animated: false)
+      }
     }
   }
 }
@@ -39,7 +41,9 @@ extension NSScrollView {
       (documentView as? CodeView)?.whenLayoutDone { [self] in
 
         let newOffset = max(0, min(newValue, (documentView?.bounds.height ?? 0) - contentSize.height))
-        contentView.scroll(to: CGPoint(x: documentVisibleRect.origin.x, y: newOffset))
+        if abs(newOffset - documentVisibleRect.origin.y) > 0.0001 {
+          contentView.scroll(to: CGPoint(x: documentVisibleRect.origin.x, y: newOffset))
+        }
 
         // This is necessary as the floating subviews are otherwise *sometimes* not correctly re-positioned.
         reflectScrolledClipView(contentView)
