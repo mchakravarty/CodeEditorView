@@ -601,7 +601,7 @@ final class CodeView: NSTextView {
       {
 
         if minimapDividerView?.frame != minimapDividerRect { minimapDividerView?.frame = minimapDividerRect }
-        if minimapViewFrame.width != minimapWidth {
+        if minimapViewFrame.origin.x != minimapX || minimapViewFrame.width != minimapWidth {
 
           minimapView?.frame        = CGRect(x: minimapX,
                                              y: minimapViewFrame.origin.y,
