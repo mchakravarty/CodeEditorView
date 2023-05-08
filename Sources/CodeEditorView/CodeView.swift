@@ -380,6 +380,11 @@ final class CodeView: NSTextView {
                                                object: self,
                                                queue: .main){ _ in
         self.tile()
+
+        // NB: When resizing the window, where the text container doesn't completely fill the text view (i.e., the text
+        //     is short), we need to explicitly redraw the gutter, as line wrapping may have channged, which affects
+        //     line numbering.
+        gutterView.needsDisplay = true
       }
 
     // Perform an initial tiling run when the view hierarchy has been set up.
