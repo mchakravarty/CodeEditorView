@@ -19,7 +19,7 @@ extension UIScrollView {
     get { contentOffset.y }
     set {
       let newOffset = max(0, min(newValue, bounds.height - contentSize.height))
-      if abs(newOffset - documentVisibleRect.origin.y) > 0.0001 {
+      if abs(newOffset - contentOffset.y) > 0.0001 {
         setContentOffset(CGPoint(x: contentOffset.x, y: newOffset), animated: false)
       }
     }
