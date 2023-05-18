@@ -212,7 +212,7 @@ extension CodeStorageDelegate {
          let oneLine = lineMap.lookup(line: line)
       {
 
-        return .success(TextLocation(line: line, column: location - oneLine.range.location + 1))
+        return .success(TextLocation(zeroBasedLine: line, column: location - oneLine.range.location + 1))
 
       } else { return .failure(ConversionError.locationOutOfBounds) }
     }
@@ -220,14 +220,14 @@ extension CodeStorageDelegate {
     func location(from textLocation: TextLocation) -> Result<Int, Error> {
       guard let lineMap = codeStorageDelegate?.lineMap else { return .failure(ConversionError.lineMapUnavailable) }
 
-      if let oneLine = lineMap.lookup(line: textLocation.line) {
+      if let oneLine = lineMap.lookup(line: textLocation.zeroBasedLine) {
 
-        return .success(oneLine.range.location + textLocation.column - 1)
+        return .success(oneLine.range.location + textLocation.zeroBasedLine)
 
       } else { return .failure(ConversionError.lineOutOfBounds) }
     }
 
-    func length(of line: Int) -> Int? { codeStorageDelegate?.lineMap.lookup(line: line)?.range.length }
+    func length(of zeroBasedLine: Int) -> Int? { codeStorageDelegate?.lineMap.lookup(line: zeroBasedLine)?.range.length }
   }
 
   /// Yield a location converter for the text maintained by the present code storage delegate.
@@ -554,7 +554,7 @@ extension CodeStorageDelegate {
   /// NB: Ignores messages for lines that do not exist in the line map. A message may not be added to multiple lines.
   ///
   func add(message: Located<Message>) -> LineInfo.MessageBundle? {
-    guard var info = lineMap.lookup(line: message.location.line)?.info else { return nil }
+    guard var info = lineMap.lookup(line: message.location.zeroBasedLine)?.info else { return nil }
 
     if info.messages != nil {
 
@@ -567,7 +567,7 @@ extension CodeStorageDelegate {
       info.messages = LineInfo.MessageBundle(messages: [message.entity])
 
     }
-    lineMap.setInfoOf(line: message.location.line, to: info)
+    lineMap.setInfoOf(line: message.location.zeroBasedLine, to: info)
     return info.messages
   }
 

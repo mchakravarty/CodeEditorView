@@ -807,7 +807,7 @@ extension CodeView {
   func report(message: Located<Message>) {
     guard let messageBundle = codeStorageDelegate.add(message: message) else { return }
 
-    updateMessageView(for: messageBundle, at: message.location.line)
+    updateMessageView(for: messageBundle, at: message.location.zeroBasedLine)
   }
 
   /// Removes a given message. If it doesn't exist, do nothing. This function is quite expensive.
@@ -819,7 +819,9 @@ extension CodeView {
   }
 
   /// Given a new or updated message bundle, update the corresponding message view appropriately. This includes covering
-  /// the two special cases, where we create a new view or we remove a view for good (as its last message was deleted).
+  /// the two special cases, where we create a new view or we remove a view for good (as its last message got deleted).
+  ///
+  /// NB: The `line` argument is zero-based.
   ///
   private func updateMessageView(for messageBundle: LineInfo.MessageBundle, at line: Int) {
     guard let charRange = codeStorageDelegate.lineMap.lookup(line: line)?.range else { return }

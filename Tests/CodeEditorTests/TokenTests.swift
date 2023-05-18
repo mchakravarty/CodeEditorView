@@ -32,21 +32,21 @@ let str = "xyz"
     codeStorage.setAttributedString(NSAttributedString(string: code))  // this triggers tokenisation
 
     let lineMap = codeStorageDelegate.lineMap
-    XCTAssertEqual(lineMap.lines.count, 3)    // code starts at line 1
+    XCTAssertEqual(lineMap.lines.count, 2)    // code starts at line 0
 
     // Line 1
-    XCTAssertEqual(lineMap.lookup(line: 1)?.info?.tokens,
+    XCTAssertEqual(lineMap.lookup(line: 0)?.info?.tokens,
                    [ Tokeniser.Token(token: .singleLineComment, range: NSRange(location: 0, length: 2))
                    , Tokeniser.Token(token: .number, range: NSRange(location: 3, length: 2))
                    , Tokeniser.Token(token: .string, range: NSRange(location: 6, length: 5))])
-    XCTAssertEqual(lineMap.lookup(line: 1)?.info?.commentRanges, [NSRange(location: 0, length: 12)])
+    XCTAssertEqual(lineMap.lookup(line: 0)?.info?.commentRanges, [NSRange(location: 0, length: 12)])
 
     // Line 2
-    XCTAssertEqual(lineMap.lookup(line: 2)?.info?.tokens,
+    XCTAssertEqual(lineMap.lookup(line: 1)?.info?.tokens,
                    [ Tokeniser.Token(token: .keyword, range: NSRange(location: 0, length: 3))
-                   , Tokeniser.Token(token: .identifier, range: NSRange(location: 4, length: 3))
+                     , Tokeniser.Token(token: .identifier(.none), range: NSRange(location: 4, length: 3))
                    , Tokeniser.Token(token: .string, range: NSRange(location: 10, length: 5))])
-    XCTAssertEqual(lineMap.lookup(line: 2)?.info?.commentRanges, [])
+    XCTAssertEqual(lineMap.lookup(line: 1)?.info?.commentRanges, [])
   }
 
   func testTokeniseAllComment() throws {
@@ -62,19 +62,19 @@ let str = "xyz"
     codeStorage.setAttributedString(NSAttributedString(string: code))  // this triggers tokenisation
 
     let lineMap = codeStorageDelegate.lineMap
-    XCTAssertEqual(lineMap.lines.count, 3)    // code starts at line 1
+    XCTAssertEqual(lineMap.lines.count, 2)    // code starts at line 1
 
     // Line 1
-    XCTAssertEqual(lineMap.lookup(line: 1)?.info?.tokens,
+    XCTAssertEqual(lineMap.lookup(line: 0)?.info?.tokens,
                    [ Tokeniser.Token(token: .singleLineComment, range: NSRange(location: 0, length: 2))])
-    XCTAssertEqual(lineMap.lookup(line: 1)?.info?.commentRanges, [NSRange(location: 0, length: 3)])
+    XCTAssertEqual(lineMap.lookup(line: 0)?.info?.commentRanges, [NSRange(location: 0, length: 3)])
 
     // Line 2
-    XCTAssertEqual(lineMap.lookup(line: 2)?.info?.tokens,
+    XCTAssertEqual(lineMap.lookup(line: 1)?.info?.tokens,
                    [ Tokeniser.Token(token: .singleLineComment, range: NSRange(location: 0, length: 2))
-                   , Tokeniser.Token(token: .identifier, range: NSRange(location: 3, length: 1))
-                   , Tokeniser.Token(token: .identifier, range: NSRange(location: 5, length: 4))])
-    XCTAssertEqual(lineMap.lookup(line: 2)?.info?.commentRanges, [NSRange(location: 0, length: 9)])
+                     , Tokeniser.Token(token: .identifier(.none), range: NSRange(location: 3, length: 1))
+                     , Tokeniser.Token(token: .identifier(.none), range: NSRange(location: 5, length: 4))])
+    XCTAssertEqual(lineMap.lookup(line: 1)?.info?.commentRanges, [NSRange(location: 0, length: 9)])
   }
 
   func testTokeniseWithNewline() throws {
@@ -90,11 +90,11 @@ let str = "xyz"\n
     codeStorage.setAttributedString(NSAttributedString(string: code))  // this triggers tokenisation
 
     let lineMap = codeStorageDelegate.lineMap
-    XCTAssertEqual(lineMap.lines.count, 4)    // code starts at line 1
+    XCTAssertEqual(lineMap.lines.count, 3)    // code starts at line 1
 
     // Line 3
-    XCTAssertEqual(lineMap.lookup(line: 3)?.info?.tokens, [])
-    XCTAssertEqual(lineMap.lookup(line: 3)?.info?.commentRanges, [])
+    XCTAssertEqual(lineMap.lookup(line: 2)?.info?.tokens, [])
+    XCTAssertEqual(lineMap.lookup(line: 2)?.info?.commentRanges, [])
   }
 
   func testTokeniseCommentAtEnd() throws {
@@ -110,17 +110,17 @@ test
     codeStorage.setAttributedString(NSAttributedString(string: code))  // this triggers tokenisation
 
     let lineMap = codeStorageDelegate.lineMap
-    XCTAssertEqual(lineMap.lines.count, 3)    // code starts at line 1
+    XCTAssertEqual(lineMap.lines.count, 2)    // code starts at line 1
 
     // Line 1
-    XCTAssertEqual(lineMap.lookup(line: 1)?.info?.tokens,
+    XCTAssertEqual(lineMap.lookup(line: 0)?.info?.tokens,
                    [ Tokeniser.Token(token: .keyword, range: NSRange(location: 0, length: 3))
-                   , Tokeniser.Token(token: .identifier, range: NSRange(location: 4, length: 3))
+                     , Tokeniser.Token(token: .identifier(.none), range: NSRange(location: 4, length: 3))
                    , Tokeniser.Token(token: .string, range: NSRange(location: 10, length: 5))
                    , Tokeniser.Token(token: .singleLineComment, range: NSRange(location: 16, length: 2))
                    , Tokeniser.Token(token: .number, range: NSRange(location: 19, length: 2))
                    , Tokeniser.Token(token: .string, range: NSRange(location: 22, length: 5))])
-    XCTAssertEqual(lineMap.lookup(line: 1)?.info?.commentRanges, [NSRange(location: 16, length: 12)])
+    XCTAssertEqual(lineMap.lookup(line: 0)?.info?.commentRanges, [NSRange(location: 16, length: 12)])
   }
 
   func testTokeniseCommentAtEndMulti() throws {
@@ -137,26 +137,26 @@ test
     codeStorage.setAttributedString(NSAttributedString(string: code))  // this triggers tokenisation
 
     let lineMap = codeStorageDelegate.lineMap
-    XCTAssertEqual(lineMap.lines.count, 4)    // code starts at line 1
+    XCTAssertEqual(lineMap.lines.count, 3)    // code starts at line 1
 
     // Line 1
-    XCTAssertEqual(lineMap.lookup(line: 1)?.info?.tokens,
+    XCTAssertEqual(lineMap.lookup(line: 0)?.info?.tokens,
                    [ Tokeniser.Token(token: .keyword, range: NSRange(location: 0, length: 3))
-                   , Tokeniser.Token(token: .identifier, range: NSRange(location: 4, length: 3))
+                     , Tokeniser.Token(token: .identifier(.none), range: NSRange(location: 4, length: 3))
                    , Tokeniser.Token(token: .string, range: NSRange(location: 10, length: 5))])
     // Line 2
-    XCTAssertEqual(lineMap.lookup(line: 2)?.info?.tokens,
+    XCTAssertEqual(lineMap.lookup(line: 1)?.info?.tokens,
                    [ Tokeniser.Token(token: .keyword, range: NSRange(location: 2, length: 3))
-                   , Tokeniser.Token(token: .identifier, range: NSRange(location: 6, length: 1))
+                     , Tokeniser.Token(token: .identifier(.none), range: NSRange(location: 6, length: 1))
                    , Tokeniser.Token(token: .number, range: NSRange(location: 10, length: 2))
                    , Tokeniser.Token(token: .singleLineComment, range: NSRange(location: 13, length: 2))
                    , Tokeniser.Token(token: .number, range: NSRange(location: 16, length: 2))
                    , Tokeniser.Token(token: .string, range: NSRange(location: 19, length: 5))])
 
     // Comment ranges
-    XCTAssertEqual(lineMap.lookup(line: 1)?.info?.commentRanges, [])
-    XCTAssertEqual(lineMap.lookup(line: 2)?.info?.commentRanges, [NSRange(location: 13, length: 12)])
-    XCTAssertEqual(lineMap.lookup(line: 3)?.info?.commentRanges, [])
+    XCTAssertEqual(lineMap.lookup(line: 0)?.info?.commentRanges, [])
+    XCTAssertEqual(lineMap.lookup(line: 1)?.info?.commentRanges, [NSRange(location: 13, length: 12)])
+    XCTAssertEqual(lineMap.lookup(line: 2)?.info?.commentRanges, [])
   }
 
   static var allTests = [

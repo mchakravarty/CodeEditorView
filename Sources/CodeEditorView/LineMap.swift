@@ -16,10 +16,9 @@ struct LineMap<LineInfo> {
   ///
   typealias OneLine = (range: NSRange, info: LineInfo?)
 
-  /// One entry per line of the underlying string, where `lineMap[0]` is always `NSRange(location: 0, length: 0)` with
-  /// no extra info.
+  /// One entry per line of the underlying string.
   ///
-  var lines: [OneLine] = [(range: .zero, info: nil)]
+  var lines: [OneLine] = []
 
   /// MARK: -
   /// MARK: Initialisation
@@ -32,34 +31,38 @@ struct LineMap<LineInfo> {
   ///
   init(string: String) { lines.append(contentsOf: linesOf(string: string)) }
 
+
   // MARK: -
   // MARK: Queries
 
   /// Safe lookup of the information pertaining to a given line.
   ///
-  /// - Parameter line: The line to look up.
+  /// - Parameter line: The zero-based line number to look up.
   /// - Returns: The description of the given line if it is within the valid range of the line map.
   ///
-  func lookup(line: Int) -> OneLine? { return line < lines.count ? lines[line] : nil }
+  func lookup(line: Int) -> OneLine? { return (line >= 0 && line < lines.count) ? lines[line] : nil }
 
   /// Return the character range covered by the given range of lines. Safely handles out of bounds situations.
   ///
+  /// NB: Line numbers are zero-based.
+  ///
   func charRangeOf(lines: Range<Int>) -> NSRange {
-    let startRange = lookup(line: lines.first ?? 1)?.range ?? .zero,
-        endRange   = lookup(line: lines.last ?? 1)?.range ?? .zero
+    let startRange = lookup(line: lines.first ?? 0)?.range ?? .zero,
+        endRange   = lookup(line: lines.last ?? 0)?.range ?? .zero
     return NSRange(location: startRange.location, length: endRange.max - startRange.location)
   }
 
-  /// Determine the line that contains the characters at the given string index. (Safe to be called with an out of
-  /// bounds index.)
+  /// Determine the zero-based line number of the line containing the characters at the given string index. (Safe to be
+  /// called with an out of bounds index.)
   ///
   /// - Parameter index: The string index of the characters whose line we want to determine.
-  /// - Returns: The line containing the indexed character if the index is within the bounds of the string.
+  /// - Returns: The zero-based line number containing the indexed character if the index is within the bounds of the
+  ///     string.
   ///
   /// - Complexity: This functions asymptotic complexity is logarithmic in the number of lines contained in the line map.
   ///
   func lineContaining(index: Int) -> Int? {
-    var lineRange = 1..<lines.count
+    var lineRange = 0..<lines.count
 
     while lineRange.count > 1 {
 
@@ -85,15 +88,15 @@ struct LineMap<LineInfo> {
     }
   }
 
-  /// Determine the line that contains the cursor position specified by the given string index. (Safe to be called with
-  /// an out of bounds index.)
+  /// Determine the zero-based line number that contains the cursor position specified by the given string index. (Safe
+  /// to be called with an out of bounds index.)
   ///
   /// Corresponds to `lineContaining(index:)`, but also handles the index just after the last valid string index — i.e.,
   /// the end-of-string insertion point.
   ///
   /// - Parameter index: The string index of the cursor position whose line we want to determine.
-  /// - Returns: The line containing the given cursor poisition if the index is within the bounds of the string or
-  ///            just beyond.
+  /// - Returns: The zero-based line number containing the given cursor poisition if the index is within the bounds of
+  ///     the string or just beyond.
   ///
   /// - Complexity: This functions asymptotic complexity is logarithmic in the number of lines contained in the line
   ///               map.
@@ -103,12 +106,12 @@ struct LineMap<LineInfo> {
     else { return lineContaining(index: index) }
   }
 
-  /// Determine the line that contains the cursor position specified by the given string index together with the line
-  /// position. (Safe to be called with an out of bounds index.)
+  /// Determine the zero-based line that contains the cursor position specified by the given string index together with
+  /// the line position. (Safe to be called with an out of bounds index.)
   ///
   /// - Parameter index: The string index of the cursor position whose line we want to determine.
-  /// - Returns: The line containing the given cursor poisition together with line position if the index is within the
-  ///     bounds of the string or just beyond.
+  /// - Returns: The zero-based line containing the given cursor poisition together with line position if the index is
+  ///     within the bounds of the string or just beyond.
   ///
   /// - Complexity: This functions asymptotic complexity is logarithmic in the number of lines contained in the line
   ///               map.
@@ -121,12 +124,12 @@ struct LineMap<LineInfo> {
     return (line: line, position: index - range.location)
   }
 
-  /// Given a character range, return the smallest line range that includes the characters. Deal with out of bounds
-  /// conditions by clipping to the front and end of the line range, respectively.
+  /// Given a character range, return the smallest zero-based line range that includes the characters. Deal with out of
+  /// bounds conditions by clipping to the front and end of the line range, respectively.
   ///
   /// - Parameter range: The character range for which we want to know the line range.
   /// - Returns: The smallest range of lines that includes all characters in the given character range. The start value
-  ///     of that range is greater or equal 1.
+  ///     of that range is greater or equal 0.
   ///
   /// There are two special cases:
   /// - If (1) the range is empty, (2) its location (= insertion) at the end of the string, and (3) the text ends on a
@@ -156,12 +159,13 @@ struct LineMap<LineInfo> {
     }
   }
 
-  /// Given a character range, return the smallest line range that includes the characters plus maybe a trailing empty
-  /// line. Deal with out of bounds conditions by clipping to the front and end of the line range, respectively.
+  /// Given a character range, return the smallest zero-based line range that includes the characters plus maybe a
+  /// trailing empty line. Deal with out of bounds conditions by clipping to the front and end of the line range,
+  /// respectively.
   ///
   /// - Parameter range: The character range for which we want to know the line range.
   /// - Returns: The smallest range of lines that includes all characters in the given character range. The start value
-  ///     of that range is greater or equal 1.
+  ///     of that range is greater or equal 0.
   ///
   /// There are two special cases:
   /// - If the character range extends until the end of the text and the last line is a trailing empty line, that
@@ -191,7 +195,7 @@ struct LineMap<LineInfo> {
   /// - Parameters:
   ///   - editedRange: The character range that was affected by editing (after the edit).
   ///   - delta: The length increase of the edited string (negative if it got shorter).
-  /// - Returns: The range of lines (of the original string) that is affected by the editing action.
+  /// - Returns: The zero-based range of lines (of the original string) that is affected by the editing action.
   ///
   func linesAffected(by editedRange: NSRange, changeInLength delta: Int) -> Range<Int> {
 
@@ -209,10 +213,10 @@ struct LineMap<LineInfo> {
   // MARK: -
   // MARK: Editing
 
-  /// Set the info field for the given line.
+  /// Set the info field for the given line (starting from 0).
   ///
   /// - Parameters:
-  ///   - line: The line whose info field ought to be set.
+  ///   - line: The zero-based line whose info field ought to be set.
   ///   - info: The new info value for that line.
   ///
   ///   NB: Ignores lines that do not exist.

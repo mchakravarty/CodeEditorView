@@ -16,36 +16,34 @@ final class LineMapTests: XCTestCase {
 
   func testInitEmpty() {
     hasLineMap("",
-               LineMap<Void>(lines: [mkRange(loc: 0, len: 0), mkRange(loc: 0, len: 0)]))
+               LineMap<Void>(lines: [mkRange(loc: 0, len: 0)]))
   }
 
   func testInitLineBreak() {
     hasLineMap("\n",
-               LineMap<Void>(lines: [mkRange(loc: 0, len: 0), mkRange(loc: 0, len: 1), mkRange(loc: 1, len: 0)]))
+               LineMap<Void>(lines: [mkRange(loc: 0, len: 1), mkRange(loc: 1, len: 0)]))
   }
 
   func testInitSimple() {
     hasLineMap("abc",
-               LineMap<Void>(lines: [mkRange(loc: 0, len: 0), mkRange(loc: 0, len: 3)]))
+               LineMap<Void>(lines: [mkRange(loc: 0, len: 3)]))
   }
 
   func testInitSimpleTrailing() {
     hasLineMap("abc\n",
-               LineMap<Void>(lines: [mkRange(loc: 0, len: 0), mkRange(loc: 0, len: 4), mkRange(loc: 4, len: 0)]))
+               LineMap<Void>(lines: [mkRange(loc: 0, len: 4), mkRange(loc: 4, len: 0)]))
   }
 
   func testInitLines() {
     hasLineMap("abc\ndefg\nhij",
-               LineMap<Void>(lines: [mkRange(loc: 0, len: 0),
-                                     mkRange(loc: 0, len: 4),
+               LineMap<Void>(lines: [mkRange(loc: 0, len: 4),
                                      mkRange(loc: 4, len: 5),
                                      mkRange(loc: 9, len: 3)]))
   }
 
   func testInitEmptyLines() {
     hasLineMap("\nabc\n\n\ndefg\nhi\n",
-               LineMap<Void>(lines: [mkRange(loc: 0, len: 0),
-                                     mkRange(loc: 0, len: 1),
+               LineMap<Void>(lines: [mkRange(loc: 0, len: 1),
                                      mkRange(loc: 1, len: 4),
                                      mkRange(loc: 5, len: 1),
                                      mkRange(loc: 6, len: 1),
@@ -64,39 +62,39 @@ final class LineMapTests: XCTestCase {
   func testLookupLineBreak() {
     let lineMap = LineMap<Void>(string: "\n")
     XCTAssertNil(lineMap.lineContaining(index: 1))
-    XCTAssertEqual(lineMap.lineContaining(index: 0), 1)
+    XCTAssertEqual(lineMap.lineContaining(index: 0), 0)
   }
 
   func testLookupSimple() {
     let lineMap = LineMap<Void>(string: "abc")
     XCTAssertNil(lineMap.lineContaining(index: 3))
-    XCTAssertEqual(lineMap.lineContaining(index: 0), 1)
-    XCTAssertEqual(lineMap.lineContaining(index: 2), 1)
+    XCTAssertEqual(lineMap.lineContaining(index: 0), 0)
+    XCTAssertEqual(lineMap.lineContaining(index: 2), 0)
   }
 
   func testLookupSimpleTrailing() {
     let lineMap = LineMap<Void>(string: "abc\n")
     XCTAssertNil(lineMap.lineContaining(index: 4))
-    XCTAssertEqual(lineMap.lineContaining(index: 0), 1)
-    XCTAssertEqual(lineMap.lineContaining(index: 2), 1)
-    XCTAssertEqual(lineMap.lineContaining(index: 3), 1)
+    XCTAssertEqual(lineMap.lineContaining(index: 0), 0)
+    XCTAssertEqual(lineMap.lineContaining(index: 2), 0)
+    XCTAssertEqual(lineMap.lineContaining(index: 3), 0)
   }
 
   func testLookupLines() {
     let lineMap = LineMap<Void>(string: "abc\ndefg\nhij")
-    XCTAssertEqual(lineMap.lineContaining(index: 0), 1)
-    XCTAssertEqual(lineMap.lineContaining(index: 3), 1)
-    XCTAssertEqual(lineMap.lineContaining(index: 4), 2)
-    XCTAssertEqual(lineMap.lineContaining(index: 9), 3)
+    XCTAssertEqual(lineMap.lineContaining(index: 0), 0)
+    XCTAssertEqual(lineMap.lineContaining(index: 3), 0)
+    XCTAssertEqual(lineMap.lineContaining(index: 4), 1)
+    XCTAssertEqual(lineMap.lineContaining(index: 9), 2)
   }
 
   func testLookupEmptyLines() {
     let lineMap = LineMap<Void>(string: "\nabc\n\n\ndefg\nhi\n")
-    XCTAssertEqual(lineMap.lineContaining(index: 0), 1)
-    XCTAssertEqual(lineMap.lineContaining(index: 4), 2)
-    XCTAssertEqual(lineMap.lineContaining(index: 5), 3)
-    XCTAssertEqual(lineMap.lineContaining(index: 11), 5)
-    XCTAssertEqual(lineMap.lineContaining(index: 14), 6)
+    XCTAssertEqual(lineMap.lineContaining(index: 0), 0)
+    XCTAssertEqual(lineMap.lineContaining(index: 4), 1)
+    XCTAssertEqual(lineMap.lineContaining(index: 5), 2)
+    XCTAssertEqual(lineMap.lineContaining(index: 11), 4)
+    XCTAssertEqual(lineMap.lineContaining(index: 14), 5)
   }
 
   // Editing tests

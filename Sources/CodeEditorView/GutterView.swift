@@ -329,7 +329,7 @@ extension GutterView {
       // TODO: CodeEditor needs to be parameterised by message theme
       let theme = Message.defaultTheme
 
-      for line in lineRange {
+      for line in lineRange {  // NB: These are zero-based line numbers
 
         // NB: We adjust the range, so that in case of a trailing empty line that last line break is not included in
         //     the second to last line (as otherwise, the bounding rect will contain both the second to last and last
@@ -352,7 +352,7 @@ extension GutterView {
 
         #endif
 
-        ("\(line)" as NSString).draw(in: gutterRect, withAttributes: attributes)
+        ("\(line + 1)" as NSString).draw(in: gutterRect, withAttributes: attributes)
       }
     }
 
