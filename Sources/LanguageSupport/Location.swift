@@ -31,7 +31,7 @@ public struct TextLocation {
   }
 }
 
-/// Protocol for a service converting between index positions in a string and text locations in line-column format.
+/// Protocol for a service converting between index positions of a string and text locations in line-column format.
 ///
 public protocol LocationConverter {
   func textLocation(from location: Int) -> Result<TextLocation, Error>

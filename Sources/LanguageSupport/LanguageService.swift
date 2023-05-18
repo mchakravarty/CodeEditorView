@@ -8,20 +8,42 @@
 //  syntactic and semantic information to the code editor for a single file. It uses `Combine` for the asynchronous
 //  communication between information providers and the code editor, where necessary.
 //
-//  An instance of a language service is sepcific to a single file. Hence, locations etc are always relative to the file
+//  An instance of a language service is specific to a single file. Hence, locations etc are always relative to the file
 //  associated with the used language service.
 
 import SwiftUI
 import Combine
 
 
+/// Provider of document-specific location information for a language service.
+///
+public protocol LocationService: LocationConverter {
+
+  /// Yields the length of the given line.
+  ///
+  /// - Parameter line: The line of which we want to know the length, starting from 1.
+  /// - Returns: The length (number of characters) of the given line, including any trainling newline character, or
+  ///     `nil` if the line does not exist.
+  ///
+  func length(of line: Int) -> Int?
+}
+
 /// Function that instantiates a language service from a location converter.
 ///
-public typealias LanguageServiceBuilder = (LocationConverter) -> LanguageService
+public typealias LanguageServiceBuilder = (LocationService) -> LanguageService
 
 /// Determines the capabilities and endpoints for language-dependent external services, such as an LSP server.
 ///
 public protocol LanguageService {
+
+  /// Requests semantic token information for all tokens in the given line range.
+  ///
+  /// - Parameter lineRange: The lines whose semantic token information is being requested.
+  /// - Returns: Semantic tokens together with the line and line-relative character range.
+  ///
+  func tokens(for lineRange: Range<Int>) async throws -> [(token: LanguageConfiguration.Token,
+                                                           line: Int,
+                                                           range: NSRange)]
 
   /// Yields an info popover for the given location in the file associated with the current language service.
   ///

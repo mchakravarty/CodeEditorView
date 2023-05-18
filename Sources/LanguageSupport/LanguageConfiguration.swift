@@ -25,7 +25,40 @@ import AppKit
 ///
 public struct LanguageConfiguration {
 
-  /// Supported flavours of tokens
+  /// The various categories of types.
+  ///
+  public enum TypeFlavour: Equatable {
+    case `class`
+    case `struct`
+    case `enum`
+    case `protocol`
+    case other
+  }
+
+  /// Flavours of identifiers and operators.
+  ///
+  public enum Flavour: Equatable {
+    case module
+    case `type`(TypeFlavour)
+    case parameter
+    case typeParameter
+    case variable
+    case property
+    case enumCase
+    case function
+    case method
+    case macro
+    case modifier
+
+    public var isType: Bool {
+      switch self {
+      case .type: return true
+      default: return false
+      }
+    }
+  }
+
+  /// Supported kinds of tokens.
   ///
   public enum Token: Equatable {
     case roundBracketOpen
@@ -40,8 +73,10 @@ public struct LanguageConfiguration {
     case singleLineComment
     case nestedCommentOpen
     case nestedCommentClose
-    case identifier
+    case identifier(Flavour?)
+    case `operator`(Flavour?)
     case keyword
+    case regexp
 
     public var isOpenBracket: Bool {
       switch self {
@@ -77,6 +112,20 @@ public struct LanguageConfiguration {
       case .nestedCommentOpen:  return true
       case .nestedCommentClose: return true
       default:                  return false
+      }
+    }
+
+    public var isIdentifier: Bool {
+      switch self {
+      case .identifier: return true
+      default: return false
+      }
+    }
+
+    public var isOperator: Bool {
+      switch self {
+      case .operator: return true
+      default: return false
       }
     }
   }
@@ -177,7 +226,9 @@ public struct LanguageConfiguration {
     case .nestedCommentOpen:  return nestedComment?.open
     case .nestedCommentClose: return nestedComment?.close
     case .identifier:         return nil
+    case .operator:           return nil
     case .keyword:            return nil
+    case .regexp:             return nil
     }
   }
 }
@@ -314,7 +365,8 @@ extension LanguageConfiguration {
       codeTokenDictionary.updateValue((token: .nestedCommentClose, transition: decNestedComment),
                                       forKey: .string(lexemes.close))
     }
-    if let lexeme = identifierRegexp { codeTokenDictionary.updateValue(token(Token.identifier), forKey: .pattern(lexeme)) }
+    if let lexeme = identifierRegexp { codeTokenDictionary.updateValue(token(Token.identifier(nil)),
+                                                                       forKey: .pattern(lexeme)) }
     for reserved in reservedIdentifiers {
       codeTokenDictionary.updateValue(token(.keyword), forKey: .word(reserved))
     }

@@ -185,9 +185,9 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
 
 extension CodeStorageDelegate {
 
-  /// This class serves as a location converter on the basis of the line map of an encapsulated storage delegate.
+  /// This class serves as a location service on the basis of the line map of an encapsulated storage delegate.
   ///
-  final class LineMapLocationConverter: LocationConverter {
+  final class LineMapLocationService: LocationService {
     private weak var codeStorageDelegate: CodeStorageDelegate?
 
     enum ConversionError: Error {
@@ -226,11 +226,13 @@ extension CodeStorageDelegate {
 
       } else { return .failure(ConversionError.lineOutOfBounds) }
     }
+
+    func length(of line: Int) -> Int? { codeStorageDelegate?.lineMap.lookup(line: line)?.range.length }
   }
 
   /// Yield a location converter for the text maintained by the present code storage delegate.
   ///
-  var lineMapLocationConverter: LineMapLocationConverter { LineMapLocationConverter(codeStorageDelegate: self) }
+  var lineMapLocationConverter: LineMapLocationService { LineMapLocationService(codeStorageDelegate: self) }
 }
 
 
