@@ -21,7 +21,7 @@ public protocol LocationService: LocationConverter {
 
   /// Yields the length of the given line.
   ///
-  /// - Parameter line: The line of which we want to know the length, starting from 1.
+  /// - Parameter line: The line of which we want to know the length, starting from 0.
   /// - Returns: The length (number of characters) of the given line, including any trainling newline character, or
   ///     `nil` if the line does not exist.
   ///
@@ -30,7 +30,7 @@ public protocol LocationService: LocationConverter {
 
 /// Function that instantiates a language service from a location converter.
 ///
-public typealias LanguageServiceBuilder = (LocationService) -> LanguageService
+public typealias LanguageServiceBuilder = (LocationService) async throws -> LanguageService
 
 /// Determines the capabilities and endpoints for language-dependent external services, such as an LSP server.
 ///
@@ -38,12 +38,11 @@ public protocol LanguageService {
 
   /// Requests semantic token information for all tokens in the given line range.
   ///
-  /// - Parameter lineRange: The lines whose semantic token information is being requested.
-  /// - Returns: Semantic tokens together with the line and line-relative character range.
+  /// - Parameter lineRange: The lines whose semantic token information is being requested. The line count is zero-based.
+  /// - Returns: Semantic tokens together with their line-relative character range divided up per line. The first
+  ///     subarray contains the semantic tokens for the first line of `lineRange` and so on.
   ///
-  func tokens(for lineRange: Range<Int>) async throws -> [(token: LanguageConfiguration.Token,
-                                                           line: Int,
-                                                           range: NSRange)]
+  func tokens(for lineRange: Range<Int>) async throws -> [[(token: LanguageConfiguration.Token, range: NSRange)]]
 
   /// Yields an info popover for the given location in the file associated with the current language service.
   ///

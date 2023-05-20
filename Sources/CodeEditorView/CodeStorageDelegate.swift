@@ -8,16 +8,19 @@
 //  stored in the 'NSTextStorage' that they serve. This is needed to quickly navigate the text (e.g., at which character
 //  position does a particular line start) and to support code-specific rendering (e.g., syntax highlighting).
 
-// FIXME: the aliases ought to be moved to some central place for os impedance matching
 #if os(iOS)
 import UIKit
 #elseif os(macOS)
 import AppKit
 #endif
+import os
 
 import Rearrange
 
 import LanguageSupport
+
+
+private let logger = Logger(subsystem: "org.justtesting.CodeEditorView", category: "CodeStorageDelegate")
 
 
 // MARK: -
@@ -123,7 +126,19 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
     self.language  = language
     self.tokeniser = Tokeniser(for: language.tokenDictionary)
     super.init()
-    self.languageService = language.languageService.map{ $0(lineMapLocationConverter) }
+
+    // If there is support for a language service, we try to initialise it.
+    if let languageService = language.languageService {
+      Task {
+
+        do {
+          try await self.languageService = languageService(lineMapLocationConverter)
+        } catch let err {
+          logger.error("Failed to initialise language service: \(err)")
+        }
+
+      }
+    }
   }
 
   func textStorage(_ textStorage: NSTextStorage,
