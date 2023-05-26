@@ -256,8 +256,8 @@ extension CodeStorageDelegate {
 
 extension CodeStorageDelegate {
 
-  /// Tokenise the substring of the given text storage that contains the specified lines and store token tokens as part
-  /// of the line information.
+  /// Tokenise the substring of the given text storage that contains the specified lines and store tokens as part of the
+  /// line information.
   ///
   /// - Parameters:
   ///   - originalRange: The character range that contains all characters that have changed.
@@ -435,10 +435,86 @@ extension CodeStorageDelegate {
       currentLine += 1
     }
 
+    requestSemanticTokens(for: lines, in: textStorage)
+
     if visualDebugging {
       textStorage.addAttribute(.backgroundColor, value: visualDebuggingTrailingColour, range: highlightingRange)
       textStorage.addAttribute(.backgroundColor, value: visualDebuggingLinesColour, range: range)
     }
+  }
+
+  /// Query semantic tokens for the given lines from the language service (if available) and merge them into the token
+  /// information for those lines (maintained in the line map),
+  ///
+  /// - Parameters:
+  ///     lines: The lines for which semantic token information is requested.
+  ///     textStorage: The text storage whose contents is being tokenised.
+  ///
+  func requestSemanticTokens(for lines: Range<Int>, in textStorage: NSTextStorage) {
+    guard let firstLine = lines.first else { return }
+
+    Task {
+      do {
+        if let semanticTokens = try await languageService?.tokens(for: lines) {
+
+          guard lines.count == semanticTokens.count else {
+            logger.error("Language service returned an array of incorrect length; expected \(lines.count), but got \(semanticTokens.count)")
+            return
+          }
+
+          // We need to avoid concurrent write access to the line map.
+          await MainActor.run {
+
+            // Merge the semantic tokens into the syntactic tokens per line
+            for i in 0..<lines.count {
+              merge(semanticTokens: semanticTokens[i], into: firstLine + i)
+            }
+
+            // Request redrawing for those lines
+            for layoutManager in textStorage.layoutManagers {
+              layoutManager.invalidateDisplay(forCharacterRange: lineMap.charRangeOf(lines: lines))
+            }
+          }
+
+        }
+      } catch let error { logger.error("Failed to get semantic tokens for line range \(lines): \(error.localizedDescription)") }
+    }
+  }
+
+  /// Merge semantic token information for one line into the line map.
+  ///
+  /// - Parameters:
+  ///   - semanticTokens: The semntic tokens to merge.
+  ///   - line: The line on which the tokens are located.
+  ///
+  /// NB: Currently, we only enrich the information of tokens that are already present as syntactic tokens.
+  ///
+  private func merge(semanticTokens: [(token: LanguageConfiguration.Token, range: NSRange)], into line: Int) {
+    guard var info = lineMap.lookup(line: line)?.info else { return }
+
+    var remainingSemanticTokens = semanticTokens
+    var tokens                  = info.tokens
+    for i in 0..<tokens.count {
+
+      let token = tokens[i]
+      while let semanticToken = remainingSemanticTokens.first,
+            semanticToken.range.location <= token.range.location
+      {
+        remainingSemanticTokens.removeFirst()
+
+        // We enrich identifier and operator tokens if the semantic token is an identifier, operator, or keyword.
+        if semanticToken.range == token.range
+            && (token.token.isIdentifier || token.token.isOperator)
+            && (semanticToken.token.isIdentifier || semanticToken.token.isOperator || semanticToken.token == .keyword)
+        {
+          tokens[i] = LanguageConfiguration.Tokeniser.Token(token: semanticToken.token, range: token.range)
+        }
+      }
+    }
+
+    // Store updated token array
+    info.tokens = tokens
+    lineMap.setInfoOf(line: line, to: info)
   }
 }
 
