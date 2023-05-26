@@ -42,6 +42,8 @@ public protocol LanguageService {
   /// - Returns: Semantic tokens together with their line-relative character range divided up per line. The first
   ///     subarray contains the semantic tokens for the first line of `lineRange` and so on.
   ///
+  /// The number of elements of the result is the same as the number of lines in the `lineRange`.
+  ///
   func tokens(for lineRange: Range<Int>) async throws -> [[(token: LanguageConfiguration.Token, range: NSRange)]]
 
   /// Yields an info popover for the given location in the file associated with the current language service.

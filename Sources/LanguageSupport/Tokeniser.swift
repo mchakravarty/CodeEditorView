@@ -96,6 +96,11 @@ public struct Tokeniser<TokenType: Equatable, StateType: TokeniserState> {
     ///
     public var range: NSRange
 
+    public init(token: TokenType, range: NSRange) {
+      self.token = token
+      self.range = range
+    }
+
     /// Produce a copy with an adjusted location of the token by shifting it by the given amount.
     ///
     /// - Parameter amount: The amount by which to shift the token. (Positive amounts shift to the right and negative
