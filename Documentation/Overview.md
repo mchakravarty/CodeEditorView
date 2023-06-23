@@ -10,8 +10,8 @@ Typical usage of the `CodeEditor` view is as roughly follows.
 
 ```swift
 struct ContentView: View {
-  @State private var text:     String                = "My awesome code..."
-  @State private var messages: Set<Located<Message>> = Set ()
+  @State private var text:     String                    = "My awesome code..."
+  @State private var messages: Set<TextLocated<Message>> = Set ()
 
   @Environment(\.colorScheme) private var colorScheme: ColorScheme
 
@@ -57,22 +57,17 @@ More details about messages support are in [Messages](Messages.md).
 
 ### Locations
 
-Messages are `Located` by way of a generic wrapper:
+Messages are *located* by way of a generic wrapper:
 
 ```swift
-struct Located<Entity> {
-  let location: FileLocation
+struct TextLocated<Entity> {
+  let location: TextLocation
   let entity:   Entity
 }
 
 struct TextLocation {
-  let line:   Int   // starts from line 1
-  let column: Int   // starts from column 1
-}
-
-struct FileLocation {
-  let file:     FilePath
-  let location: TextLocation
+  let zeroBasedLine:   Int   // starts from line 0
+  let zeroBasedColumn: Int   // starts from column 0
 }
 ```
 

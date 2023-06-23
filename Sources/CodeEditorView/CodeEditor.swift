@@ -90,7 +90,7 @@ public struct CodeEditor {
 
   @Binding private var text:     String
   @Binding private var position: Position
-  @Binding private var messages: Set<Located<Message>>
+  @Binding private var messages: Set<TextLocated<Message>>
 
   /// Creates a fully configured code editor.
   ///
@@ -99,7 +99,7 @@ public struct CodeEditor {
   ///   - position: Binding to the current edit position.
   ///   - messages: Binding to the messages reported at the appropriate lines of the edited text. NB: Messages
   ///               processing and display is relatively expensive. Hence, there should only be a limited number of
-  ///               simultaneous messages and they shouldn't change to frequently.
+  ///               simultaneous messages and they shouldn't change too frequently.
   ///   - language: Language configuration for highlighting and similar.
   ///   - layout: Layout configuration determining the visible elements of the editor view.
   ///   - setActions: Function that the code editor uses to update the context about the available code editing
@@ -108,7 +108,7 @@ public struct CodeEditor {
   ///
   public init(text:       Binding<String>,
               position:   Binding<Position>,
-              messages:   Binding<Set<Located<Message>>>,
+              messages:   Binding<Set<TextLocated<Message>>>,
               language:   LanguageConfiguration = .none,
               layout:     LayoutConfiguration = .standard,
               setActions: ((Actions) -> Void)? = nil)
@@ -135,7 +135,7 @@ public struct CodeEditor {
 
     /// This is the last observed value of `messages`, to enable us to compute the difference in the next update.
     ///
-    fileprivate var lastMessages: Set<Located<Message>> = Set()
+    fileprivate var lastMessages: Set<TextLocated<Message>> = Set()
 
     /// The current set of code actions, which, on setting, are directly propagated to the context.
     ///
@@ -374,8 +374,8 @@ extension CodeEditor {
 
   /// Update the message set of the given code view.
   ///
-  private func update(oldMessages: Set<Located<Message>>,
-                      to updatedMessages: Set<Located<Message>>,
+  private func update(oldMessages: Set<TextLocated<Message>>,
+                      to updatedMessages: Set<TextLocated<Message>>,
                       in codeView: CodeView)
   {
     let messagesToAdd    = updatedMessages.subtracting(oldMessages),

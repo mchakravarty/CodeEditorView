@@ -35,6 +35,11 @@ public typealias LanguageServiceBuilder = (LocationService) async throws -> Lang
 /// Determines the capabilities and endpoints for language-dependent external services, such as an LSP server.
 ///
 public protocol LanguageService {
+  
+  /// Notifies the code editor about a new set of diagnoistic messages. A new set replaces the previous set (merging
+  /// happens server-side, not client-side).
+  ///
+  var diagnostics: CurrentValueSubject<Set<TextLocated<Message>>, Never> { get }
 
   /// Requests semantic token information for all tokens in the given line range.
   ///

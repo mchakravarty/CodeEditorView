@@ -193,7 +193,7 @@ public struct Tokeniser<TokenType: Equatable, StateType: TokeniserState> {
 
       states = try tokenMap.mapValues{ try tokeniser(for: $0) }
 
-    } catch let err { logger.error("failed to compile regexp: \(err.localizedDescription)"); return nil }
+    } catch let err { logger.debug("failed to compile regexp: \(err.localizedDescription)"); return nil }
   }
 }
 

@@ -5,7 +5,7 @@
 //  Created by Manuel M T Chakravarty on 22/03/2021.
 //
 //  Messages are messages that can be displayed inline in a code view in short form and as a popup in long form.
-//  They are bound to a particular primary location by way of line information, by may also include secondary locations
+//  They are bound to a particular primary location by way of line information, but may also include secondary locations
 //  that contribute to the reported issue. A typical use case is diagnostic information.
 
 import Foundation
@@ -67,6 +67,6 @@ public struct Message: Identifiable, Hashable {
 
 /// Order and sort an array of messages by categories.
 ///
-func messagesByCategory(_ messages: [Message]) -> [(key: Message.Category, value: [Message])] {
+public func messagesByCategory(_ messages: [Message]) -> [(key: Message.Category, value: [Message])] {
   Array(Dictionary(grouping: messages){ $0.category }).sorted{ $0.key < $1.key }
 }

@@ -90,7 +90,7 @@ extension CodeView {
           show(infoPopover: InfoPopover(displaying: info.view, width: width), for: info.anchor ?? range)
 
         }
-      } catch let error { logger.error("Info action failed: \(error.localizedDescription)") }
+      } catch let error { logger.trace("Info action failed: \(error.localizedDescription)") }
     }
   }
 }

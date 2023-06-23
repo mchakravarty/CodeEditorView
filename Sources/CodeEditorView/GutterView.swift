@@ -9,6 +9,8 @@ import os
 
 import Rearrange
 
+import LanguageSupport
+
 
 private let logger = Logger(subsystem: "org.justtesting.CodeEditorView", category: "GutterView")
 

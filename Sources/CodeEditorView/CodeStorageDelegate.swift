@@ -7,6 +7,10 @@
 //  'NSTextStorageDelegate' for code views compute, collect, store, and update additional information about the text
 //  stored in the 'NSTextStorage' that they serve. This is needed to quickly navigate the text (e.g., at which character
 //  position does a particular line start) and to support code-specific rendering (e.g., syntax highlighting).
+//
+//  It also handles the language service, if available. We need to have the language service available here, as
+//  functionality, such as semantic tokens, interacts with functionality in here, such as token highlighting. The code
+//  view accesses the language service from here.
 
 #if os(iOS)
 import UIKit
@@ -122,24 +126,39 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
   ///
   private var processingOneCharacterEdit: Bool?
 
+
+  // MARK: Initialisers
+
   init(with language: LanguageConfiguration) {
     self.language  = language
     self.tokeniser = Tokeniser(for: language.tokenDictionary)
     super.init()
-
-    // If there is support for a language service, we try to initialise it.
-    if let languageService = language.languageService {
-      Task {
-
-        do {
-          try await self.languageService = languageService(lineMapLocationConverter)
-        } catch let err {
-          logger.error("Failed to initialise language service: \(err)")
-        }
-
-      }
-    }
   }
+  
+  /// Initialise the language service.
+  ///
+  /// - Returns: The initialised language service if successful.
+  ///
+  /// Initialising the language service in the `init` is too early. We want the whole code view-related set of classes
+  /// to be already set up, as the laguage service may immediately start sending notifications.
+  ///
+  func languageServiceInit() async -> LanguageService? {
+    logger.trace("Attempting to initialise language service")
+
+    if let languageServiceBuilder = language.languageService {
+      languageService = try? await languageServiceBuilder(lineMapLocationConverter)
+    }
+
+    if self.languageService != nil {
+      logger.trace("Initialisation of language service was successful")
+    } else {
+      logger.trace("Initialisation of language service was NOT successful")
+    }
+    return languageService
+  }
+
+  
+  // MARK: Delegate methods
 
   func textStorage(_ textStorage: NSTextStorage,
                    willProcessEditing editedMask: TextStorageEditActions,
@@ -458,7 +477,7 @@ extension CodeStorageDelegate {
         if let semanticTokens = try await languageService?.tokens(for: lines) {
 
           guard lines.count == semanticTokens.count else {
-            logger.error("Language service returned an array of incorrect length; expected \(lines.count), but got \(semanticTokens.count)")
+            logger.trace("Language service returned an array of incorrect length; expected \(lines.count), but got \(semanticTokens.count)")
             return
           }
 
@@ -477,7 +496,7 @@ extension CodeStorageDelegate {
           }
 
         }
-      } catch let error { logger.error("Failed to get semantic tokens for line range \(lines): \(error.localizedDescription)") }
+      } catch let error { logger.trace("Failed to get semantic tokens for line range \(lines): \(error.localizedDescription)") }
     }
   }
 
@@ -644,7 +663,7 @@ extension CodeStorageDelegate {
   ///
   /// NB: Ignores messages for lines that do not exist in the line map. A message may not be added to multiple lines.
   ///
-  func add(message: Located<Message>) -> LineInfo.MessageBundle? {
+  func add(message: TextLocated<Message>) -> LineInfo.MessageBundle? {
     guard var info = lineMap.lookup(line: message.location.zeroBasedLine)?.info else { return nil }
 
     if info.messages != nil {

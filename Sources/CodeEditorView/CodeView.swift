@@ -7,6 +7,7 @@
 //  This file contains both the macOS and iOS versions of the subclass for `NSTextView` and `UITextView`, respectively,
 //  which forms the heart of the code editor.
 
+import Combine
 import SwiftUI
 
 import Rearrange
@@ -248,6 +249,10 @@ final class CodeView: NSTextView {
   /// Keeps track of the set of message views.
   ///
   var messageViews: MessageViews = [:]
+  
+  /// For the consumption of the diagnostics stream.
+  /// 
+  private var diagnosticsCancellable: Cancellable?
 
   /// Holds the info popover if there is one.
   ///
@@ -269,7 +274,7 @@ final class CodeView: NSTextView {
     codeLayoutManager.addTextContainer(codeContainer)
     codeLayoutManager.delegate = codeLayoutManagerDelegate
 
-    codeStorageDelegate  = CodeStorageDelegate(with: language)
+    codeStorageDelegate = CodeStorageDelegate(with: language)
 
     super.init(frame: frame, textContainer: codeContainer)
 
@@ -388,8 +393,24 @@ final class CodeView: NSTextView {
       }
 
     // Perform an initial tiling run when the view hierarchy has been set up.
-    DispatchQueue.main.async {
-      self.tile(initial: true)
+    Task {
+      tile(initial: true)
+    }
+
+    // Try to initialise a language service asynchronously.
+    Task {
+      if let languageService = await codeStorageDelegate.languageServiceInit() {
+
+        // Report diagnostic messages as they come in
+        diagnosticsCancellable = languageService.diagnostics
+          .receive(on: DispatchQueue.main)
+          .sink{ [self] messages in
+
+          retractMessages()
+          messages.forEach{ report(message: $0) }
+
+        }
+      }
     }
   }
 
@@ -545,6 +566,7 @@ final class CodeView: NSTextView {
   ///
   /// NB: We don't use a ruler view for the gutter on macOS to be able to use the same setup on macOS and iOS.
   ///
+  @MainActor
   private func tile(initial: Bool = false) {
     guard let codeContainer = optTextContainer as? CodeContainer else { return }
 
@@ -804,7 +826,7 @@ extension CodeView {
 
   /// Adds a new message to the set of messages for this code view.
   ///
-  func report(message: Located<Message>) {
+  func report(message: TextLocated<Message>) {
     guard let messageBundle = codeStorageDelegate.add(message: message) else { return }
 
     updateMessageView(for: messageBundle, at: message.location.zeroBasedLine)

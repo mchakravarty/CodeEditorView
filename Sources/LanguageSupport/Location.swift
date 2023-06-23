@@ -64,6 +64,34 @@ public protocol LocationConverter {
   func location(from textLocation: TextLocation) -> Result<Int, Error>
 }
 
+/// Generic text location attribute.
+///
+public struct TextLocated<Entity> {
+  public let location: TextLocation
+  public let entity:   Entity
+
+  /// Attribute the given entity with the given location.
+  ///
+  /// - Parameters:
+  ///   - location: The location to aasociate the `entity` with.
+  ///   - entity: The attributed entity.
+  ///
+  public init(location: TextLocation, entity: Entity) {
+    self.location = location
+    self.entity   = entity
+  }
+}
+
+extension TextLocated: Equatable where Entity: Equatable {
+  static public func == (lhs: TextLocated<Entity>, rhs: TextLocated<Entity>) -> Bool {
+    lhs.entity == rhs.entity
+  }
+}
+
+extension TextLocated: Hashable where Entity: Hashable {
+  public func hash(into hasher: inout Hasher) { hasher.combine(entity) }
+}
+
 /// Location in a named text file in terms of a line-column position, where the line and column count starts at 1.
 ///
 public struct FileLocation {
@@ -117,9 +145,9 @@ public struct FileLocation {
   }
 }
 
-/// Generic location attribute.
+/// Generic file location attribute.
 ///
-public struct Located<Entity> {
+public struct FileLocated<Entity> {
   public let location: FileLocation
   public let entity:   Entity
 
@@ -135,13 +163,13 @@ public struct Located<Entity> {
   }
 }
 
-extension Located: Equatable where Entity: Equatable {
-  static public func == (lhs: Located<Entity>, rhs: Located<Entity>) -> Bool {
+extension FileLocated: Equatable where Entity: Equatable {
+  static public func == (lhs: FileLocated<Entity>, rhs: FileLocated<Entity>) -> Bool {
     lhs.entity == rhs.entity
   }
 }
 
-extension Located: Hashable where Entity: Hashable {
+extension FileLocated: Hashable where Entity: Hashable {
   public func hash(into hasher: inout Hasher) { hasher.combine(entity) }
 }
 

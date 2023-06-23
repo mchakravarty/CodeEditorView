@@ -22,9 +22,9 @@ Typical usage of the view is as follows.
 
 ```swift
 struct ContentView: View {
-  @State private var text:     String                = "My awesome code..."
-  @State private var position: CodeEditor.Position  = CodeEditor.Position()
-  @State private var messages: Set<Located<Message>> = Set()
+  @State private var text:     String                    = "My awesome code..."
+  @State private var position: CodeEditor.Position       = CodeEditor.Position()
+  @State private var messages: Set<TextLocated<Message>> = Set()
 
   @Environment(\.colorScheme) private var colorScheme: ColorScheme
 
