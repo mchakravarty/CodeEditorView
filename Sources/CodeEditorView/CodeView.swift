@@ -480,7 +480,9 @@ final class CodeView: NSTextView {
     minimapGutterView?.invalidateGutter(for: combinedRanges(ranges: oldSelectedRanges))
     minimapGutterView?.invalidateGutter(for: combinedRanges(ranges: ranges))
 
-    collapseMessageViews()
+    DispatchQueue.main.async {
+      self.collapseMessageViews()
+    }
   }
 
   override func drawBackground(in rect: NSRect) {

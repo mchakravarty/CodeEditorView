@@ -35,11 +35,40 @@ public typealias LanguageServiceBuilder = (LocationService) async throws -> Lang
 /// Determines the capabilities and endpoints for language-dependent external services, such as an LSP server.
 ///
 public protocol LanguageService {
+
+  // MARK: Document synchronisation
   
+  /// Notify the language service of a document change.
+  /// 
+  /// - Parameters:
+  ///   - changeLocation: The location at which the change originates.
+  ///   - delta: The change of the document length.
+  ///   - deltaLine: The change of the number of lines.
+  ///   - deltaColumn: The change of the column position on the last line of the changed text.
+  ///   - text: The text at `editedRange` after the change.
+  ///
+  func documentDidChange(position changeLocation: Int,
+                         changeInLength delta: Int,
+                         lineChange deltaLine: Int,
+                         columnChange deltaColumn: Int,
+                         newText text: String) async throws
+
+  /// Notify the language service that the document gets closed and the language service is no longer needed.
+  ///
+  /// NB: After this call, no functions from the language service may be used anymore.
+  ///
+  func closeDocument() async throws
+
+
+  // MARK: Diagnostics
+
   /// Notifies the code editor about a new set of diagnoistic messages. A new set replaces the previous set (merging
   /// happens server-side, not client-side).
   ///
   var diagnostics: CurrentValueSubject<Set<TextLocated<Message>>, Never> { get }
+
+
+  // MARK: Semantic tokens
 
   /// Requests semantic token information for all tokens in the given line range.
   ///
@@ -50,6 +79,9 @@ public protocol LanguageService {
   /// The number of elements of the result is the same as the number of lines in the `lineRange`.
   ///
   func tokens(for lineRange: Range<Int>) async throws -> [[(token: LanguageConfiguration.Token, range: NSRange)]]
+
+
+  // MARK: Entity information
 
   /// Yields an info popover for the given location in the file associated with the current language service.
   ///

@@ -157,7 +157,12 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
     return languageService
   }
 
-  
+  deinit {
+    Task {
+      try await languageService?.closeDocument()
+    }
+  }
+
   // MARK: Delegate methods
 
   func textStorage(_ textStorage: NSTextStorage,
@@ -198,6 +203,12 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
     let lines = lineMap.linesAffected(by: editedRange, changeInLength: delta)
     lastEvictedMessageIDs = lines.compactMap{ lineMap.lookup(line: $0)?.info?.messages?.id  }
 
+    let endColumn = if let beforeLine     = lines.last,
+                       let beforeLineInfo = lineMap.lookup(line: beforeLine)
+                    {
+                       editedRange.max - delta - beforeLineInfo.range.location
+                    } else { 0 }
+
     lineMap.updateAfterEditing(string: textStorage.string, range: editedRange, changeInLength: delta)
     tokenise(range: editedRange, in: textStorage)
 
@@ -210,6 +221,24 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
       tokenCompletion(for: codeStorage, at: editedRange.location)
     }
     processingOneCharacterEdit = nil
+
+    // Notify language service (if attached)
+    let text         = (textStorage.string as NSString).substring(with: editedRange),
+        afterLine    = lineMap.lineOf(index: editedRange.max),
+        lineChange   = if let afterLine,
+                          let beforeLine = lines.last { afterLine - beforeLine } else { 0 },
+        columnChange = if let afterLine,
+                          let info = lineMap.lookup(line: afterLine)
+                       {
+                         editedRange.max - info.range.location - endColumn
+                       } else { 0 }
+    Task {
+      try await languageService?.documentDidChange(position: editedRange.location,
+                                                   changeInLength: delta,
+                                                   lineChange: lineChange,
+                                                   columnChange: columnChange,
+                                                   newText: text)
+    }
   }
 }
 
@@ -246,7 +275,7 @@ extension CodeStorageDelegate {
          let oneLine = lineMap.lookup(line: line)
       {
 
-        return .success(TextLocation(zeroBasedLine: line, column: location - oneLine.range.location + 1))
+        return .success(TextLocation(zeroBasedLine: line, column: location - oneLine.range.location))
 
       } else { return .failure(ConversionError.locationOutOfBounds) }
     }
@@ -256,7 +285,7 @@ extension CodeStorageDelegate {
 
       if let oneLine = lineMap.lookup(line: textLocation.zeroBasedLine) {
 
-        return .success(oneLine.range.location + textLocation.zeroBasedLine)
+        return .success(oneLine.range.location + textLocation.zeroBasedColumn)
 
       } else { return .failure(ConversionError.lineOutOfBounds) }
     }
