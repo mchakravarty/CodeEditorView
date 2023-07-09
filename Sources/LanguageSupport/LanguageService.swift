@@ -94,4 +94,16 @@ public protocol LanguageService {
   ///   simply no extra information available for the given location, the function simply returns `nil`.
   ///
   func info(at location: Int) async throws -> (view: any View, anchor: NSRange?)?
+
+
+  // MARK: Developer support
+  
+  /// Render the capabilities of the underlying language service.
+  ///
+  /// - Returns: A view rendering the capabilities of the underlying language service.
+  ///
+  /// The information and its representation is dependent on the nature of the underlying language service and, in
+  /// general, not fit for automatic interpretation.
+  ///
+  func capabilities() async throws -> (any View)?
 }
