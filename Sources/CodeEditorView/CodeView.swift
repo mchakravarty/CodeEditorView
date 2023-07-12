@@ -258,6 +258,10 @@ final class CodeView: NSTextView {
   ///
   var infoPopover: InfoPopover?
 
+  /// Holds the capabilities window if there is one.
+  ///
+  var capabilitiesWindow: CapabilitiesWindow?
+
   /// Designated initialiser for code views with a gutter.
   ///
   init(frame: CGRect, with language: LanguageConfiguration, viewLayout: CodeEditor.LayoutConfiguration, theme: Theme) {

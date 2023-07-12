@@ -95,4 +95,49 @@ extension CodeView {
   }
 }
 
+
+// MARK: Capabilities support
+
+/// Wndow used to display the result of a capabilities query.
+///
+final class CapabilitiesWindow: NSWindow {
+
+  convenience init(displaying view: any View) {
+
+    let wrappedView = ScrollView(.vertical) { AnyView(view).padding().frame(minWidth: 480).fixedSize() }
+                        .frame(minWidth: 480, minHeight: 600)
+    let viewController = NSHostingController(rootView: wrappedView)
+    self.init(contentViewController: viewController)
+  }
+}
+
+extension CodeView {
+
+  @MainActor
+  func show(capabilitiesWindow: CapabilitiesWindow) {
+
+    // If there is already a window, close it first.
+    self.capabilitiesWindow?.close()
+
+    self.capabilitiesWindow = capabilitiesWindow
+
+    capabilitiesWindow.makeKeyAndOrderFront(nil)
+  }
+
+  func capabilitiesAction() {
+    guard let languageService = optLanguageService else { return }
+
+    Task {
+      do {
+        if let capabilitiesView = try await languageService.capabilities() {
+
+          show(capabilitiesWindow: CapabilitiesWindow(displaying: capabilitiesView))
+          logger.trace("Retrieved capabilities")
+
+        }
+      } catch let error { logger.trace("Capabilities action failed: \(error.localizedDescription)") }
+    }
+  }
+}
+
 #endif

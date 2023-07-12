@@ -78,10 +78,16 @@ public struct CodeEditor {
   /// Collects all currently available code actions.
   ///
   public struct Actions {
-
+    
     /// Display semantic information about the current selection.
     ///
     public var info: (() -> Void)?
+
+    // Dev support
+
+    /// Diagnostic information about the capabilities of the attached language service if any.
+    ///
+    public var capabilities: (() -> Void)?
   }
 
   let language:   LanguageConfiguration
@@ -297,7 +303,8 @@ extension CodeEditor: NSViewRepresentable {
     DispatchQueue.main.async{ updateMessages(in: codeView, with: context) }
 
     // Set the initial actions
-    context.coordinator.actions = Actions(info: codeView.infoAction)
+    context.coordinator.actions = Actions(info: codeView.infoAction,
+                                          capabilities: codeView.capabilitiesAction)
 
     return scrollView
   }
