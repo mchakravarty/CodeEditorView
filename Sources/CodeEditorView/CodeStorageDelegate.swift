@@ -142,17 +142,20 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
   /// Initialising the language service in the `init` is too early. We want the whole code view-related set of classes
   /// to be already set up, as the laguage service may immediately start sending notifications.
   ///
+  /// NB: This is about initialising the service for one document. The project-wide service will often have been
+  ///     initialised already.
+  ///
   func languageServiceInit() async -> LanguageService? {
-    logger.trace("Attempting to initialise language service")
+    logger.trace("Attempting to instantiate language service for one document")
 
     if let languageServiceBuilder = language.languageService {
       languageService = try? await languageServiceBuilder(lineMapLocationConverter)
     }
 
     if self.languageService != nil {
-      logger.trace("Initialisation of language service was successful")
+      logger.trace("Instantiation of language service was successful")
     } else {
-      logger.trace("Initialisation of language service was NOT successful")
+      logger.trace("Instantiation of language service was NOT successful")
     }
     return languageService
   }

@@ -104,8 +104,8 @@ final class CapabilitiesWindow: NSWindow {
 
   convenience init(displaying view: any View) {
 
-    let wrappedView = ScrollView(.vertical) { AnyView(view).padding().frame(minWidth: 480).fixedSize() }
-                        .frame(minWidth: 480, minHeight: 600)
+    let wrappedView = ScrollView(.vertical) { AnyView(view).padding().frame(minWidth: 600) }
+                        .frame(minWidth: 600, minHeight: 600)
     let viewController = NSHostingController(rootView: wrappedView)
     self.init(contentViewController: viewController)
   }
