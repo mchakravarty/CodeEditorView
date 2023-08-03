@@ -148,15 +148,18 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
   func languageServiceInit() async -> LanguageService? {
     logger.trace("Attempting to instantiate language service for one document")
 
-    if let languageServiceBuilder = language.languageService {
-      languageService = try? await languageServiceBuilder(lineMapLocationConverter)
+    do {
+      if let languageServiceBuilder = language.languageService {
+        languageService = try await languageServiceBuilder(lineMapLocationConverter)
+        logger.trace("Instantiation of language service was successful")
+      } else {
+        logger.trace("Instantiation of language service was NOT successful: missing language service builder")
+      }
+    } catch let err {
+      logger.trace("Instantiation of language service was NOT successful: \(err.localizedDescription)")
+      return nil
     }
 
-    if self.languageService != nil {
-      logger.trace("Instantiation of language service was successful")
-    } else {
-      logger.trace("Instantiation of language service was NOT successful")
-    }
     return languageService
   }
 
