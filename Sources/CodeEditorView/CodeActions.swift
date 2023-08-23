@@ -108,6 +108,7 @@ final class CapabilitiesWindow: NSWindow {
                         .frame(minWidth: 600, minHeight: 600)
     let viewController = NSHostingController(rootView: wrappedView)
     self.init(contentViewController: viewController)
+    title = "Language Service Capabilities"
   }
 }
 

@@ -145,19 +145,14 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
   /// NB: This is about initialising the service for one document. The project-wide service will often have been
   ///     initialised already.
   ///
-  func languageServiceInit() async -> LanguageService? {
+  func languageServiceInit() -> LanguageService? {
     logger.trace("Attempting to instantiate language service for one document")
 
-    do {
-      if let languageServiceBuilder = language.languageService {
-        languageService = try await languageServiceBuilder(lineMapLocationConverter)
-        logger.trace("Instantiation of language service was successful")
-      } else {
-        logger.trace("Instantiation of language service was NOT successful: missing language service builder")
-      }
-    } catch let err {
-      logger.trace("Instantiation of language service was NOT successful: \(err.localizedDescription)")
-      return nil
+    if let languageServiceBuilder = language.languageService {
+      languageService = languageServiceBuilder(lineMapLocationConverter)
+      logger.trace("Instantiation of language service was successful")
+    } else {
+      logger.trace("Instantiation of language service was NOT successful: missing language service builder")
     }
 
     return languageService

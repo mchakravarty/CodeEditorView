@@ -30,7 +30,7 @@ public protocol LocationService: LocationConverter {
 
 /// Function that instantiates a language service from a location converter.
 ///
-public typealias LanguageServiceBuilder = (LocationService) async throws -> LanguageService
+public typealias LanguageServiceBuilder = (LocationService) -> LanguageService
 
 /// Determines the capabilities and endpoints for language-dependent external services, such as an LSP server.
 ///

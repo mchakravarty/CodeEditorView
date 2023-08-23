@@ -401,20 +401,18 @@ final class CodeView: NSTextView {
       tile(initial: true)
     }
 
-    // Try to initialise a language service asynchronously.
-    Task {
-      if let languageService = await codeStorageDelegate.languageServiceInit() {
+    // Try to initialise a language service.
+    if let languageService = codeStorageDelegate.languageServiceInit() {
 
-        // Report diagnostic messages as they come in
-        diagnosticsCancellable = languageService.diagnostics
-          .receive(on: DispatchQueue.main)
-          .sink{ [self] messages in
+      // Report diagnostic messages as they come in.
+      diagnosticsCancellable = languageService.diagnostics
+        .receive(on: DispatchQueue.main)
+        .sink{ [self] messages in
 
           retractMessages()
           messages.forEach{ report(message: $0) }
 
         }
-      }
     }
   }
 
