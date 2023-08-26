@@ -45,7 +45,7 @@ public protocol LanguageService {
   ///   - delta: The change of the document length.
   ///   - deltaLine: The change of the number of lines.
   ///   - deltaColumn: The change of the column position on the last line of the changed text.
-  ///   - text: The text at `editedRange` after the change.
+  ///   - text: The text at `changeLocation` after the change.
   ///
   func documentDidChange(position changeLocation: Int,
                          changeInLength delta: Int,
