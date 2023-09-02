@@ -32,6 +32,109 @@ public protocol LocationService: LocationConverter {
 ///
 public typealias LanguageServiceBuilder = (LocationService) -> LanguageService
 
+/// Indicates the reason for querying code completions.
+///  
+public enum CompletionTriggerReason {
+
+  /// Completion was triggered by typing a character of an identifier or by explicitly requesting completion.
+  ///
+  case standard
+
+  /// Completion was triggered by the given trigger character.
+  ///
+  case character(Character)
+
+  /// Completion was re-triggered to refine an incomplete completion list (after an additional character has been
+  /// provided).
+  case incomplete
+}
+
+/// A set of code completions for a specific code position.
+///
+public struct Completions {
+  
+  /// A single completion item.
+  ///
+  public struct Completion {
+
+    /// The view representing this completion in the completion selection list.
+    ///
+    public let rowView: any View
+
+    /// The view representing the documentation for this completion.
+    ///
+    public let documentationView: any View
+
+    /// Whether this item ought to be selected in the list of possible completions. (Only one completion in a list of
+    /// completions ought to have this flag set.)
+    ///
+    public let selected: Bool
+
+    /// String to use when sorting completions.
+    ///
+    public let sortText: String
+
+    /// String to use when filtering completions; e.g., upon further user input.
+    ///
+    public let filterText: String
+
+    /// String to insert when this completion get chosen. It may contain placeholders.
+    ///
+    public let insertText: String
+
+    /// The range of the characters that are to be replaced by this completion.
+    ///
+    public let insertRange: NSRange
+    
+    /// Characters that commit to this completion when typed while the completion is selected.
+    ///
+    public let commitCharacters: [Character]
+
+    public init(rowView: any View, 
+                documentationView: any View,
+                selected: Bool,
+                sortText: String,
+                filterText: String,
+                insertText: String,
+                insertRange: NSRange,
+                commitCharacters: [Character])
+    {
+      self.rowView           = rowView
+      self.documentationView = documentationView
+      self.selected          = selected
+      self.sortText          = sortText
+      self.filterText        = filterText
+      self.insertText        = insertText
+      self.insertRange       = insertRange
+      self.commitCharacters  = commitCharacters
+    }
+  }
+
+  /// Whether more code completions are possible at the code position in question. If so, the completions ought to be
+  /// queried again once further user input is available.
+  ///
+  public let isIncomplete: Bool
+
+  /// Suggested code completions at the code position in questions.
+  ///
+  public let items: [Completion]
+  
+  /// Yield a set of code completions for a specific code position.
+  ///
+  /// - Parameters:
+  ///   - isIncomplete: Whether more code completions are possible at the code position in question.
+  ///   - items: Suggested code completions.
+  ///
+  public init(isIncomplete: Bool, items: [Completions.Completion]) {
+    self.isIncomplete = isIncomplete
+    self.items        = items
+  }
+  
+  /// An empty set of completions.
+  ///
+  public static var none: Completions { Completions(isIncomplete: false, items: []) }
+}
+
 /// Determines the capabilities and endpoints for language-dependent external services, such as an LSP server.
 ///
 public protocol LanguageService {
@@ -66,6 +169,22 @@ public protocol LanguageService {
   /// happens server-side, not client-side).
   ///
   var diagnostics: CurrentValueSubject<Set<TextLocated<Message>>, Never> { get }
+
+
+  // MARK: Code completion
+
+  /// Characters that are not valid inside identifiers, but should trigger code completion.
+  ///
+  var completionTriggerCharacters: CurrentValueSubject<[Character], Never> { get }
+  
+  /// Yield a set of completions at the given editing position
+  ///
+  /// - Parameters:
+  ///   - location: The text location for which completions are to be determined.
+  ///   - reason: The trigger that prompted this invocation.
+  /// - Returns: A possible incomplete list of completions for the given `location`.
+  /// 
+  func completions(at location: Int, reason: CompletionTriggerReason) async throws -> Completions
 
 
   // MARK: Semantic tokens
