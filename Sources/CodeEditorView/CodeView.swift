@@ -711,13 +711,8 @@ final class CodeView: NSTextView {
             minimapHeight  = minimapView?.boundingRect()?.height ?? 0,
             visibleHeight  = documentVisibleRect.size.height
 
-        let scrollFactor: CGFloat
-        if minimapHeight < visibleHeight || codeHeight <= visibleHeight { scrollFactor = 1 }
-        else {
-
-          scrollFactor = 1 - (minimapHeight - visibleHeight) / (codeHeight - visibleHeight)
-
-        }
+        let scrollFactor: CGFloat = if minimapHeight < visibleHeight || codeHeight <= visibleHeight { 1 } 
+                                    else { 1 - (minimapHeight - visibleHeight) / (codeHeight - visibleHeight) }
 
         // We box the positioning of the minimap at the top and the bottom of the code view (with the `max` and `min`
         // expessions. This is necessary as the minimap will otherwise be partially cut off by the enclosing clip view.
@@ -726,8 +721,9 @@ final class CodeView: NSTextView {
                                    codeViewHeight - minimapHeight))
         if minimapView?.frame.origin.y != newOriginY { minimapView?.frame.origin.y = newOriginY }  // don't update frames in vain
 
-        let minimapVisibleY      = documentVisibleRect.origin.y * minimapHeight / codeHeight,
-            minimapVisibleHeight = visibleHeight * minimapHeight / codeHeight,
+        let heightRatio: CGFloat = if codeHeight <= minimapHeight { 1 } else { minimapHeight / codeHeight }
+        let minimapVisibleY      = documentVisibleRect.origin.y * heightRatio,
+            minimapVisibleHeight = visibleHeight * heightRatio,
             documentVisibleFrame = CGRect(x: 0,
                                           y: minimapVisibleY,
                                           width: minimapView?.bounds.size.width ?? 0,
