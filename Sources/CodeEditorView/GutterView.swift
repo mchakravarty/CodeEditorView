@@ -238,6 +238,11 @@ extension GutterView {
 
     }
 
+    // From macOS 14, the system doesn't automatically clip drawing to view bounds. Hence, we clip the draw rect here
+    // explicitly. We also assume that the super view for floating gutters has `clipToBounds == true` to avoid drawing
+    // outside of the containing scroll view bounds.
+    let rect = rect.intersection(bounds)
+
     theme.backgroundColour.setFill()
     OSBezierPath(rect: rect).fill()
     let desc = OSFont.systemFont(ofSize: theme.fontSize).fontDescriptor.addingAttributes(

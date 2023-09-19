@@ -585,9 +585,20 @@ final class CodeView: NSTextView {
     func actuallyTile() {
 
       // Add the floating views if they are not yet in the view hierachy.
-      if let view = gutterView, view.superview == nil { enclosingScrollView?.addFloatingSubview(view, for: .horizontal) }
-      if let view = minimapDividerView, view.superview == nil { enclosingScrollView?.addFloatingSubview(view, for: .horizontal) }
-      if let view = minimapView, view.superview == nil { enclosingScrollView?.addFloatingSubview(view, for: .horizontal) }
+      // NB: Since macOS 14, we need to explicitly set clipping; otherwise, views will draw outside of the bounds of the
+      //     scroll view. We need to do this vor each view, as it is not guaranteed that they share a container view.
+      if let view = gutterView, view.superview == nil {
+        enclosingScrollView?.addFloatingSubview(view, for: .horizontal)
+        view.superview?.clipsToBounds = true
+      }
+      if let view = minimapDividerView, view.superview == nil {
+        enclosingScrollView?.addFloatingSubview(view, for: .horizontal)
+        view.superview?.clipsToBounds = true
+      }
+      if let view = minimapView, view.superview == nil {
+        enclosingScrollView?.addFloatingSubview(view, for: .horizontal)
+        view.superview?.clipsToBounds = true
+      }
 
       // Compute size of the main view gutter
       //
