@@ -55,11 +55,16 @@ public struct Completions {
   
   /// A single completion item.
   ///
-  public struct Completion {
-
-    /// The view representing this completion in the completion selection list.
+  public struct Completion: Identifiable {
+    
+    /// Unique identifier in the current list of completions that remains stable during narrowing down and widening
+    /// the list of completions.
     ///
-    public let rowView: any View
+    public let id: Int
+
+    /// The view representing this completion in the completion selection list, after passing its selection status.
+    ///
+    public let rowView: (Bool) -> any View
 
     /// The view representing the documentation for this completion.
     ///
@@ -78,27 +83,29 @@ public struct Completions {
     ///
     public let filterText: String
 
-    /// String to insert when this completion get chosen. It may contain placeholders.
+    /// String to insert when this completion gets chosen. It may contain placeholders.
     ///
     public let insertText: String
 
-    /// The range of the characters that are to be replaced by this completion.
+    /// The range of the characters that are to be replaced by this completion if available.
     ///
-    public let insertRange: NSRange
-    
+    public let insertRange: NSRange?
+
     /// Characters that commit to this completion when typed while the completion is selected.
     ///
     public let commitCharacters: [Character]
 
-    public init(rowView: any View, 
+    public init(id: Int,
+                rowView: @escaping (Bool) -> any View,
                 documentationView: any View,
                 selected: Bool,
                 sortText: String,
                 filterText: String,
                 insertText: String,
-                insertRange: NSRange,
+                insertRange: NSRange?,
                 commitCharacters: [Character])
     {
+      self.id                = id
       self.rowView           = rowView
       self.documentationView = documentationView
       self.selected          = selected
@@ -117,7 +124,7 @@ public struct Completions {
 
   /// Suggested code completions at the code position in questions.
   ///
-  public let items: [Completion]
+  public var items: [Completion]
   
   /// Yield a set of code completions for a specific code position.
   ///
@@ -134,6 +141,19 @@ public struct Completions {
   ///
   public static var none: Completions { Completions(isIncomplete: false, items: []) }
 }
+
+extension Completions.Completion: Comparable {
+
+  public static func == (lhs: Completions.Completion, rhs: Completions.Completion) -> Bool {
+    lhs.sortText == lhs.sortText
+  }
+
+  public static func < (lhs: Completions.Completion, rhs: Completions.Completion) -> Bool {
+    lhs.sortText < lhs.sortText
+  }
+}
+
+
 
 /// Determines the capabilities and endpoints for language-dependent external services, such as an LSP server.
 ///

@@ -209,7 +209,8 @@ final class CodeView: NSTextView {
   var minimapDividerView: NSBox?
 
   // Notification observer
-  var frameChangedNotificationObserver: NSObjectProtocol?
+  private var frameChangedNotificationObserver: NSObjectProtocol?
+  private var didChangeNotificationObserver:    NSObjectProtocol?
 
   /// Contains the line on which the insertion point was located, the last time the selection range got set (if the
   /// selection was an insertion point at all; i.e., it's length was 0).
@@ -257,6 +258,14 @@ final class CodeView: NSTextView {
   /// Holds the info popover if there is one.
   ///
   var infoPopover: InfoPopover?
+  
+  /// Holds the completion panel. It is always available, but open, closed, and positioned on demand.
+  /// 
+  var completionPanel: CompletionPanel = CompletionPanel()
+  
+  /// Cancellable task used to compute completions.
+  ///
+  var completionTask: Task<(), Error>?
 
   /// Holds the capabilities window if there is one.
   ///
@@ -396,6 +405,14 @@ final class CodeView: NSTextView {
         gutterView.needsDisplay = true
       }
 
+    // We need to check whether we need to look up completions or cancel a running completion process after every text
+    // change.
+    didChangeNotificationObserver
+      = NotificationCenter.default.addObserver(forName: NSText.didChangeNotification, object: self, queue: .main){ _ in
+
+        self.considerCompletionFor(range: self.rangeForUserCompletion)
+      }
+
     // Perform an initial tiling run when the view hierarchy has been set up.
     Task {
       tile(initial: true)
@@ -422,6 +439,7 @@ final class CodeView: NSTextView {
 
   deinit {
     if let observer = frameChangedNotificationObserver { NotificationCenter.default.removeObserver(observer) }
+    if let observer = didChangeNotificationObserver { NotificationCenter.default.removeObserver(observer) }
   }
 
   override func setSelectedRanges(_ ranges: [NSValue], 

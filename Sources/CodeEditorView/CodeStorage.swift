@@ -20,9 +20,10 @@ import LanguageSupport
 // `NSTextStorage` is a class cluster; hence, we realise our subclass by decorating an embeded vanilla text storage.
 class CodeStorage: NSTextStorage {
 
-  let textStorage: NSTextStorage = NSTextStorage()
+  fileprivate let textStorage: NSTextStorage = NSTextStorage()
 
   var theme: Theme
+
 
   override var string: String { textStorage.string }
 

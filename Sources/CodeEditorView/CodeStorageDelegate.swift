@@ -124,7 +124,7 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
   /// Flag that indicates that the current editing round is for a one-character addition to the text. This property
   /// needs to be determined before attribute fixing and the like.
   ///
-  private var processingOneCharacterEdit: Bool?
+  private(set) var processingOneCharacterEdit: Bool?
 
 
   // MARK: Initialisers
@@ -221,7 +221,6 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
     if delta == 1 && processingOneCharacterEdit == true {
       tokenCompletion(for: codeStorage, at: editedRange.location)
     }
-    processingOneCharacterEdit = nil
 
     // Notify language service (if attached)
     let text         = (textStorage.string as NSString).substring(with: editedRange),
@@ -511,8 +510,8 @@ extension CodeStorageDelegate {
             return
           }
 
-          // We need to avoid concurrent write access to the line map.
-          await MainActor.run {
+          // We need to avoid concurrent write access to the line map; hence, use the main actor.
+          Task { @MainActor in
 
             // Merge the semantic tokens into the syntactic tokens per line
             for i in 0..<lines.count {

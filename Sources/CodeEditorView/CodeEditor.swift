@@ -83,6 +83,10 @@ public struct CodeEditor {
     ///
     public var info: (() -> Void)?
 
+    /// Display completions for the partial word in front of the selection.
+    ///
+    public var completions: (() -> Void)?
+
     // Dev support
 
     /// Diagnostic information about the capabilities of the attached language service if any.
@@ -291,7 +295,7 @@ extension CodeEditor: NSViewRepresentable {
     context.coordinator.boundsChangedNotificationObserver
     = NotificationCenter.default.addObserver(forName: NSView.boundsDidChangeNotification,
                                              object: scrollView.contentView,
-                                               queue: .main){ _ in
+                                             queue: .main){ _ in
 
         codeView.adjustScrollPosition()
 
@@ -304,6 +308,7 @@ extension CodeEditor: NSViewRepresentable {
 
     // Set the initial actions
     context.coordinator.actions = Actions(info: codeView.infoAction,
+                                          completions: codeView.completionAction,
                                           capabilities: codeView.capabilitiesAction)
 
     return scrollView
