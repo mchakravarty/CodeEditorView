@@ -19,7 +19,7 @@ let package = Package(
   ],
   dependencies: [
     .package(
-      url: "https://github.com/ChimeHQ/Rearrange",
+      url: "https://github.com/ChimeHQ/Rearrange.git",
       .upToNextMajor(from: "1.6.0")),
   ],
   targets: [
