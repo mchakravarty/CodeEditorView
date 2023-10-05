@@ -519,9 +519,10 @@ extension CodeStorageDelegate {
             }
 
             // Request redrawing for those lines
-            for layoutManager in textStorage.layoutManagers {
-              layoutManager.invalidateDisplay(forCharacterRange: lineMap.charRangeOf(lines: lines))
-            }
+// FIXME: adapt to TextKit 2
+//            for layoutManager in textStorage.layoutManagers {
+//              layoutManager.invalidateDisplay(forCharacterRange: lineMap.charRangeOf(lines: lines))
+//            }
           }
 
         }

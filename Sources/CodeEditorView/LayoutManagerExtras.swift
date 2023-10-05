@@ -8,6 +8,8 @@
 import SwiftUI
 
 
+// FIXME: REMOVE for TextKit 2
+
 // MARK: Layout manager extensions
 
 extension NSLayoutManager {

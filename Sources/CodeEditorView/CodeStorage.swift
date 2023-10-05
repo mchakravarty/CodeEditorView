@@ -158,14 +158,15 @@ extension CodeStorage {
 
       // Collect the text views, where we insert at the insertion point
       var affectedTextViews: [NSTextView] = []
-      for layoutManager in self.layoutManagers {
-        for textContainer in layoutManager.textContainers {
-
-          if let textView = textContainer.textView, textView.selectedRange() == NSRange(location: index, length: 0) {
-            affectedTextViews.append(textView)
-          }
-        }
-      }
+// FIXME: adapt to TextKit 2
+//      for layoutManager in self.layoutManagers {
+//        for textContainer in layoutManager.textContainers {
+//
+//          if let textView = textContainer.textView, textView.selectedRange() == NSRange(location: index, length: 0) {
+//            affectedTextViews.append(textView)
+//          }
+//        }
+//      }
 
       self.replaceCharacters(in: NSRange(location: index, length: 0), with: string)
 
@@ -184,17 +185,18 @@ extension CodeStorage {
   ///
   func setInsertionPointAfterDeletion(of range: NSRange) {
 
-    for layoutManager in self.layoutManagers {
-      for textContainer in layoutManager.textContainers {
-
-        if let codeContainer = textContainer as? CodeContainer,
-           let textView      = codeContainer.textView,
-           NSIntersectionRange(textView.selectedRange, range).length != 0
-        {
-          Dispatch.DispatchQueue.main.async{ textView.selectedRange = NSRange(location: range.location, length: 0) }
-        }
-      }
-    }
+// FIXME: adapt to TextKit 2
+//    for layoutManager in self.layoutManagers {
+//      for textContainer in layoutManager.textContainers {
+//
+//        if let codeContainer = textContainer as? CodeContainer,
+//           let textView      = codeContainer.textView,
+//           NSIntersectionRange(textView.selectedRange, range).length != 0
+//        {
+//          Dispatch.DispatchQueue.main.async{ textView.selectedRange = NSRange(location: range.location, length: 0) }
+//        }
+//      }
+//    }
   }
 }
 

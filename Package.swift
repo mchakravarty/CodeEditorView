@@ -6,8 +6,8 @@ import PackageDescription
 let package = Package(
   name: "CodeEditorView",
   platforms: [
-    .macOS(.v13),
-    .iOS(.v16)
+    .macOS(.v14),
+    .iOS(.v17)
   ],
   products: [
     .library(

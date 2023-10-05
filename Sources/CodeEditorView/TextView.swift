@@ -21,9 +21,9 @@ protocol TextView {
   associatedtype Font
 
   // This is necessary as these members are optional in AppKit and not optional in UIKit.
-  var optLayoutManager: NSLayoutManager? { get }
-  var optTextContainer: NSTextContainer? { get }
-  var optCodeStorage:   CodeStorage?     { get }
+  var optTextLayoutManager: NSTextLayoutManager? { get }
+  var optTextContainer: NSTextContainer?         { get }
+  var optCodeStorage:   CodeStorage?             { get }
 
   var textBackgroundColor: Color? { get }
   var textFont:            Font? { get }
@@ -73,16 +73,15 @@ extension TextView {
   /// Determine the visible range of lines.
   ///
   var documentVisibleLines: Range<Int>? {
-    guard let layoutManager = optLayoutManager,
-          let textContainer = optTextContainer,
-          let lineMap       = (optCodeStorage?.delegate as? CodeStorageDelegate)?.lineMap,
+    guard let textLayoutManager  = optTextLayoutManager,
+          let textContentStorage = textLayoutManager.textContentManager as? NSTextContentStorage,
+          let lineMap           = (optCodeStorage?.delegate as? CodeStorageDelegate)?.lineMap,
           lineMap.lines.count > 1   // this ensure that the line map has been initialised
     else { return nil }
 
-    let glyphRange  = layoutManager.glyphRange(forBoundingRectWithoutAdditionalLayout: documentVisibleRect,
-                                               in: textContainer),
-        charRange   = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
-    return lineMap.linesOf(range: charRange)
+    if let textRange = textLayoutManager.textViewportLayoutController.viewportRange {
+      return lineMap.linesOf(range: textContentStorage.range(for: textRange))
+    } else { return nil }
   }
 
   /// Determine the bounding rectangle for the charcters in the given range.
@@ -92,15 +91,14 @@ extension TextView {
   ///     the text view.
   ///
   func boundingRect(for range: NSRange? = nil) -> CGRect? {
-    guard let layoutManager = optLayoutManager,
-          let textContainer = optTextContainer,
-          let codeStorage   = optCodeStorage
+    guard let textLayoutManager = optTextLayoutManager,
+          let textContentStorage = textLayoutManager.textContentManager as? NSTextContentStorage
     else { return nil }
 
-    let glyphRange = layoutManager.glyphRange(forCharacterRange: range ?? NSRange(location: 0,
-                                                                                  length: codeStorage.length),
-                                              actualCharacterRange: nil),
-        rect       = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+    let textRange = if let range,
+                       let textRange = textContentStorage.textRange(for: range) { textRange }
+                    else { textContentStorage.documentRange },
+        rect      = textLayoutManager.textLayoutFragmentBoundingRect(for: textRange)
     return rect.offsetBy(dx: textContainerOrigin.x, dy: textContainerOrigin.y)
   }
 }
@@ -188,9 +186,9 @@ extension NSTextView: TextView {
   typealias Color = NSColor
   typealias Font  = NSFont
 
-  var optLayoutManager: NSLayoutManager? { layoutManager }
-  var optTextContainer: NSTextContainer? { textContainer }
-  var optCodeStorage:   CodeStorage?     { textStorage as? CodeStorage }
+  var optTextLayoutManager: NSTextLayoutManager? { textLayoutManager }
+  var optTextContainer:     NSTextContainer?     { textContainer }
+  var optCodeStorage:       CodeStorage?         { textStorage as? CodeStorage }
 
   var textBackgroundColor: Color? { backgroundColor }
   var textFont:            Font? { font }
