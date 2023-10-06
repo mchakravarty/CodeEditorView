@@ -359,6 +359,7 @@ extension GutterView {
                   size: CGSize(width: frame.size.width, height: height))
   }
 
+// FIXME: TextKit 2: remove
   /// Compute the full width rectangle in the gutter from a text container rectangle, such that they both have the same
   /// vertical extension.
   ///
@@ -368,15 +369,14 @@ extension GutterView {
                   size: CGSize(width: frame.size.width, height: textRect.size.height))
   }
 
-// FIXME: TextKit 2: remove
   /// Compute the line number glyph rectangle in the gutter from a text container rectangle, such that they both have
   /// the same vertical extension.
   ///
   private func gutterRectForLineNumbersFrom(textRect: CGRect) -> CGRect {
-    let gutterRect = gutterRectFrom(textRect: textRect)
-    return CGRect(x: gutterRect.origin.x + gutterRect.size.width * 2/7,
+    let gutterRect = gutterRectFrom(y: textRect.minY, height: textRect.height)
+    return CGRect(x: gutterRect.origin.x + gutterRect.size.width * 1/7,
                   y: gutterRect.origin.y,
-                  width: gutterRect.size.width * 4/7,
+                  width: gutterRect.size.width * 5/7,
                   height: gutterRect.size.height)
   }
 

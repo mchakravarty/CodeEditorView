@@ -660,7 +660,7 @@ final class CodeView: NSTextView {
       let theFont                 = font ?? NSFont.systemFont(ofSize: 0),
           fontSize                = theFont.pointSize,
           fontWidth               = theFont.maximumAdvancement.width,  // NB: we deal only with fixed width fonts
-          gutterWidthInCharacters = CGFloat(6),
+          gutterWidthInCharacters = CGFloat(7),
           gutterWidth             = ceil(fontWidth * gutterWidthInCharacters),
           gutterSize              = CGSize(width: gutterWidth, height: frame.height),
           lineFragmentPadding     = CGFloat(5)
