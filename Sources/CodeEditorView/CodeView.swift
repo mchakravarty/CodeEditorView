@@ -401,7 +401,7 @@ final class CodeView: NSTextView {
         self.tile()
 
         // NB: When resizing the window, where the text container doesn't completely fill the text view (i.e., the text
-        //     is short), we need to explicitly redraw the gutter, as line wrapping may have channged, which affects
+        //     is short), we need to explicitly redraw the gutter, as line wrapping may have changed, which affects
         //     line numbering.
         gutterView.needsDisplay = true
       }
@@ -1082,6 +1082,7 @@ class CodeLayoutManager: NSLayoutManager {
                          changeInLength: delta,
                          invalidatedRange: invalidatedCharRange)
 
+    // FIXME: is that necessary?
     gutterView?.invalidateGutter(for: invalidatedCharRange)
 
     // Remove all messages in the edited range.
