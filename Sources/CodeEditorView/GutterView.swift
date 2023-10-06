@@ -181,6 +181,8 @@ extension GutterView {
           let lineMap            = optLineMap
     else { return }
 
+    textLayoutManager.textViewportLayoutController.layoutViewport()
+
     // We can't draw the gutter without having layout information for the viewport.
     let viewPortBounds = textLayoutManager.textViewportLayoutController.viewportBounds
     textLayoutManager.ensureLayout(for: viewPortBounds)
