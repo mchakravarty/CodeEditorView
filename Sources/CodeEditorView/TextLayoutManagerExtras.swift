@@ -108,7 +108,7 @@ extension NSTextLayoutManager {
     }
   }
   
-  /// Compute smallest rect that encompasses all text layout fragments that (partly) lie in the given range.
+  /// Compute the smallest rect that encompasses all text layout fragments that (partly) lie in the given range.
   ///
   /// - Parameter textRange: The range for which we want to compute the bounding box.
   /// - Returns: The bounding box.

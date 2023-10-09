@@ -27,7 +27,7 @@ extension Message {
     case .live:
       return (colour: OSColor.green, icon: Image(systemName: "line.horizontal.3"))
     case .error:
-      return (colour: OSColor.red, icon: Image(systemName: "xmark.circle.fill"))
+      return (colour: OSColor.red, icon: Image(systemName: "xmark.octagon.fill"))
     case .warning:
       return (colour: OSColor.yellow, icon: Image(systemName: "exclamationmark.triangle.fill"))
     case .informational:
@@ -46,8 +46,9 @@ extension Message {
 /// NB: The array of messages may not be empty.
 ///
 struct MessageInlineView: View {
-  let messages: [Message]
-  let theme:    Message.Theme
+  let messages:   [Message]
+  let theme:      Message.Theme
+  let background: Color
 
   var body: some View {
 
@@ -92,7 +93,7 @@ struct MessageInlineView: View {
 
           // Transparent narrow separator
           Divider()
-            .background(Color.clear)
+            .foregroundColor(Color.clear)
 
           // Topmost message of the highest priority category
           HStack {
@@ -103,6 +104,7 @@ struct MessageInlineView: View {
           .background(colour.opacity(0.5))
 
         }
+        .background(background.roundedCornersOnTheLeft(cornerRadius: 5))
       }
     }
   }
@@ -282,6 +284,7 @@ struct MessageView: View {
 
   let messages:    [Message]        // The array of messages that are displayed by this view
   let theme:       Message.Theme    // The message display theme to use
+  let background:  Color
   let geometry:    Geometry
 
   @Binding var unfolded: Bool       // False => inline view; true => popup view
@@ -305,7 +308,7 @@ struct MessageView: View {
       }
       .opacity(unfolded ? 1.0 : 0.0)
 
-      MessageInlineView(messages: messages, theme: theme)
+      MessageInlineView(messages: messages, theme: theme, background: background)
         .frame(minWidth: MessageView.minimumInlineWidth, maxWidth: geometry.lineWidth, maxHeight: geometry.lineHeight)
         .transition(.opacity)
         .onTapGesture { unfolded.toggle() }
@@ -336,6 +339,7 @@ struct StatefulMessageView: View {
   let messages:     [Message]              // The array of messages that are displayed by this view
   let theme:        Message.Theme          // The message display theme to use
   let geometry:     MessageView.Geometry   // The geometry constrains for the view
+  let background:   Color                  // The background colour
   let fontSize:     CGFloat                // Font size to use for messages
   let colourScheme: ColorScheme            // The colour scheme to use for SwiftUI elements
 
@@ -354,7 +358,8 @@ struct StatefulMessageView: View {
 
   var body: some View {
     MessageView(messages: messages,
-                theme: theme,
+                theme: theme, 
+                background: background,
                 geometry: geometry,
                 unfolded: $unfolded.bool)
       .font(.system(size: fontSize))
@@ -448,7 +453,8 @@ extension StatefulMessageView {
     private var hostingView: NSHostingView<StatefulMessageView>?
 
     private let messages:     [Message]
-    private let theme   :     Message.Theme
+    private let theme:        Message.Theme
+    private let background:   Color
     private let fontSize:     CGFloat
     private let colourScheme: ColorScheme
 
@@ -466,12 +472,14 @@ extension StatefulMessageView {
 
     init(messages: [Message],
          theme: @escaping Message.Theme,
+         background: Color,
          geometry: MessageView.Geometry,
          fontSize: CGFloat,
          colourScheme: ColorScheme)
     {
       self.messages     = messages
       self.theme        = theme
+      self.background   = background
       self.geometry     = geometry
       self.fontSize     = fontSize
       self.colourScheme = colourScheme
@@ -481,7 +489,8 @@ extension StatefulMessageView {
 
       self.hostingView = NSHostingView(rootView: StatefulMessageView(messages: messages,
                                                                      theme: theme,
-                                                                     geometry: geometry,
+                                                                     geometry: geometry, 
+                                                                     background: background,
                                                                      fontSize: fontSize,
                                                                      colourScheme: colourScheme,
                                                                      unfolded: unfoldedState))
@@ -508,6 +517,7 @@ extension StatefulMessageView {
       self.hostingView?.rootView = StatefulMessageView(messages: messages,
                                                        theme: theme,
                                                        geometry: geometry,
+                                                       background: background,
                                                        fontSize: fontSize,
                                                        colourScheme: colourScheme,
                                                        unfolded: unfoldedState)
@@ -533,13 +543,15 @@ let message1 = Message(category: .error, length: 1, summary: "It's wrong!", desc
 struct MessageViewPreview: View {
   let messages:    [Message]
   let theme:       Message.Theme
+  let background:  Color
   let geometry:    MessageView.Geometry
 
   @State private var unfolded: Bool = false
 
   var body: some View {
     MessageView(messages: messages,
-                theme: theme,
+                theme: theme, 
+                background: background,
                 geometry: geometry,
                 unfolded: $unfolded)
   }
@@ -548,30 +560,36 @@ struct MessageViewPreview: View {
 struct MessageViews_Previews: PreviewProvider {
 
   static var previews: some View {
+    let darkBackground  = Color(Theme.defaultDark.backgroundColour)
+    let lightBackground = Color(Theme.defaultLight.backgroundColour)
 
     // Inline view
 
-    MessageInlineView(messages: [message1], theme: Message.defaultTheme)
+    MessageInlineView(messages: [message1], theme: Message.defaultTheme, background: darkBackground)
       .frame(width: 80, height: 15, alignment: .center)
       .preferredColorScheme(.dark)
 
-    MessageInlineView(messages: [message1], theme: Message.defaultTheme)
+    MessageInlineView(messages: [message1], theme: Message.defaultTheme, background: darkBackground)
       .frame(width: 80, height: 25, alignment: .center)
       .preferredColorScheme(.dark)
 
     VStack{
 
-      MessageInlineView(messages: [message1, message2], theme: Message.defaultTheme)
+      MessageInlineView(messages: [message1, message2], theme: Message.defaultTheme, background: darkBackground)
         .frame(width: 180, height: 15, alignment: .center)
         .preferredColorScheme(.dark)
 
-      MessageInlineView(messages: [message1, message2, message3], theme: Message.defaultTheme)
+      MessageInlineView(messages: [message1, message2, message3],
+                        theme: Message.defaultTheme,
+                        background: darkBackground)
         .frame(width: 180, height: 15, alignment: .center)
         .preferredColorScheme(.dark)
 
     }
 
-    MessageInlineView(messages: [message1, message2, message3], theme: Message.defaultTheme)
+    MessageInlineView(messages: [message1, message2, message3],
+                      theme: Message.defaultTheme,
+                      background: lightBackground)
       .frame(width: 180, height: 15, alignment: .center)
       .preferredColorScheme(.light)
 
@@ -611,7 +629,8 @@ struct MessageViews_Previews: PreviewProvider {
                           geometry: MessageView.Geometry(lineWidth: 150,
                                                          lineHeight: 15,
                                                          popupWidth: 300,
-                                                         popupOffset: 30),
+                                                         popupOffset: 30), 
+                          background: darkBackground,
                           fontSize: 15,
                           colourScheme: .dark,
                           unfolded: StatefulMessageView.ObservableBool(bool: false))

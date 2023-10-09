@@ -237,31 +237,26 @@ extension GutterView {
 
     }
 
-// FIXME: for TextKit 2
-    /*
-    // FIXME: Eventually, we want this in the minimap, too, but `messageView.value.lineFragementRect` is of course
-    //        incorrect for the minimap, so we need a more general set up.
+    // FIXME: Eventually, we want this in the minimap, too.
     if !isMinimapGutter {
+
+      let viewportRange = textLayoutManager.textViewportLayoutController.viewportRange
 
       // Highlight lines with messages
       for messageView in getMessageViews() {
 
-        let glyphRange = layoutManager.glyphRange(forBoundingRectWithoutAdditionalLayout: messageView.value.lineFragementRect,
-                                                  in: textContainer),
-            index      = layoutManager.characterIndexForGlyph(at: glyphRange.location)
-        // TODO: should be filter by char range
-        //      if charRange.contains(index) {
+        if let location = textContentStorage.textLocation(for: messageView.value.characterIndex),
+           viewportRange == nil || viewportRange!.contains(location),
+           let (y: y, height: height) = textLayoutManager.textLayoutFragmentExtent(for: NSTextRange(location: location))
+        {
 
-        messageView.value.colour.withAlphaComponent(0.1).setFill()
-        layoutManager.enumerateFragmentRects(forLineContaining: index){ fragmentRect in
-          let intersectionRect = rect.intersection(self.gutterRectFrom(textRect: fragmentRect))
+          messageView.value.colour.withAlphaComponent(0.1).setFill()
+          let intersectionRect = rect.intersection(gutterRectFrom(y: y, height: height))
           if !intersectionRect.isEmpty { NSBezierPath(rect: intersectionRect).fill() }
-        }
 
-  //      }
+        }
       }
     }
-     */
 
     #endif
 
@@ -357,16 +352,6 @@ extension GutterView {
   private func gutterRectFrom(y: CGFloat, height: CGFloat) -> CGRect {
     return CGRect(origin: CGPoint(x: 0, y: y + textView.textContainerOrigin.y),
                   size: CGSize(width: frame.size.width, height: height))
-  }
-
-// FIXME: TextKit 2: remove
-  /// Compute the full width rectangle in the gutter from a text container rectangle, such that they both have the same
-  /// vertical extension.
-  ///
-  @available(*, deprecated, renamed: "gutterRectFrom(y:height:)", message: "")
-  private func gutterRectFrom(textRect: CGRect) -> CGRect {
-    return CGRect(origin: CGPoint(x: 0, y: textRect.origin.y + textView.textContainerOrigin.y),
-                  size: CGSize(width: frame.size.width, height: textRect.size.height))
   }
 
   /// Compute the line number glyph rectangle in the gutter from a text container rectangle, such that they both have

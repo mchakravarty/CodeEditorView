@@ -519,7 +519,7 @@ extension CodeStorageDelegate {
             }
 
             // Request redrawing for those lines
-// FIXME: adapt to TextKit 2
+// FIXME: adapt to TextKit 2: we might need a callback to invalidate character ranges
 //            for layoutManager in textStorage.layoutManagers {
 //              layoutManager.invalidateDisplay(forCharacterRange: lineMap.charRangeOf(lines: lines))
 //            }

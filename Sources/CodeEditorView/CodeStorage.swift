@@ -143,7 +143,7 @@ class CodeStorage: NSTextStorage {
 
 extension CodeStorage {
 
-  /// Insert the given string, such that it safe in an ongoing insertion cycle and does leave the cursor (insertion
+  /// Insert the given string, such that it is safe in an ongoing insertion cycle and does leave the cursor (insertion
   /// point) in place if the insertion is at the location of the insertion point.
   ///
   func cursorInsert(string: String, at index: Int) {
@@ -158,7 +158,7 @@ extension CodeStorage {
 
       // Collect the text views, where we insert at the insertion point
       var affectedTextViews: [NSTextView] = []
-// FIXME: adapt to TextKit 2
+// FIXME: adapt to TextKit 2 : HOPEFULLY, we don't need that anymore
 //      for layoutManager in self.layoutManagers {
 //        for textContainer in layoutManager.textContainers {
 //
@@ -185,7 +185,6 @@ extension CodeStorage {
   ///
   func setInsertionPointAfterDeletion(of range: NSRange) {
 
-// FIXME: adapt to TextKit 2
 //    for layoutManager in self.layoutManagers {
 //      for textContainer in layoutManager.textContainers {
 //
