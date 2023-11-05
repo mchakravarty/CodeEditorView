@@ -141,6 +141,11 @@ final class CodeView: UITextView {
     addSubview(gutterView)
     self.gutterView              = gutterView
     codeLayoutManager.gutterView = gutterView
+
+    // TODO: we need these two on each change event
+//    self?.considerCompletionFor(range: self!.rangeForUserCompletion)
+//    self?.removeMessageViews(withIDs: self!.codeStorageDelegate.lastEvictedMessageIDs)
+
   }
 
   required init?(coder: NSCoder) {
@@ -199,9 +204,10 @@ class CodeViewDelegate: NSObject, UITextViewDelegate {
 final class CodeView: NSTextView {
 
   // Delegates
-  fileprivate let codeViewDelegate =          CodeViewDelegate()
-  fileprivate let codeLayoutManagerDelegate = CodeLayoutManagerDelegate()
-  fileprivate var codeStorageDelegate:        CodeStorageDelegate
+  fileprivate let codeViewDelegate =                 CodeViewDelegate()
+  fileprivate var codeStorageDelegate:               CodeStorageDelegate
+  fileprivate let minimapTextLayoutManagerDelegate = MinimapTextLayoutManagerDelegate()
+  fileprivate let minimapContentStorageDelegate    = MinimapContentStorageDelegate()
 
   // Subviews
   var gutterView:         GutterView?
@@ -284,13 +290,12 @@ final class CodeView: NSTextView {
 
     let codeLayoutManager  = NSTextLayoutManager(),
         codeContainer      = CodeContainer(size: frame.size),
-        codeContentStorage = NSTextContentStorage(),
+        minimapCodeStorage = TextStorageObserver(),
+        codeContentStorage = CodeContentStorage(observer: minimapCodeStorage),
         codeStorage        = CodeStorage(theme: theme)
     codeLayoutManager.textContainer = codeContainer
     codeContentStorage.textStorage  = codeStorage
     codeContentStorage.addTextLayoutManager(codeLayoutManager)
-// FXIEM: do we still need this for TextKit 2?
-//    codeLayoutManager.delegate = codeLayoutManagerDelegate
 
     codeStorageDelegate = CodeStorageDelegate(with: language)
 
@@ -344,52 +349,51 @@ final class CodeView: NSTextView {
     self.gutterView              = gutterView
     // NB: The gutter view is floating. We cannot add it now, as we don't have an `enclosingScrollView` yet.
 
-//    // Create the minimap with its own gutter, but sharing the code storage with the code view
-//    //
-//    let minimapLayoutManager = MinimapLayoutManager(),
-//        minimapView          = MinimapView(),
-//        minimapGutterView    = GutterView(frame: CGRect.zero,
-//                                          textView: minimapView,
-//                                          theme: theme,
-//                                          getMessageViews: { self.messageViews },
-//                                          isMinimapGutter: true),
-//        minimapDividerView   = NSBox()
-//    minimapView.codeView = self
-//
-//    minimapDividerView.boxType     = .custom
-//    minimapDividerView.fillColor   = theme.backgroundColour.blended(withFraction: 0.15, of: .systemGray)!
-//    minimapDividerView.borderWidth = 0
-//    self.minimapDividerView = minimapDividerView
-//    // NB: The divider view is floating. We cannot add it now, as we don't have an `enclosingScrollView` yet.
-//
-//    minimapView.textContainer?.replaceLayoutManager(minimapLayoutManager)
-//    codeStorage.addLayoutManager(minimapLayoutManager)
-//    minimapLayoutManager.delegate = codeLayoutManagerDelegate  // shared with code view
-//
-//    minimapView.backgroundColor                     = backgroundColor
-//    minimapView.autoresizingMask                    = .none
-//    minimapView.isEditable                          = false
-//    minimapView.isSelectable                        = false
-//    minimapView.isHorizontallyResizable             = false
-//    minimapView.isVerticallyResizable               = true
-//    minimapView.textContainerInset                  = CGSize(width: 0, height: 0)
-//    minimapView.textContainer?.widthTracksTextView  = false    // we need to be able to control the size (see `tile()`)
-//    minimapView.textContainer?.heightTracksTextView = false
-//    minimapView.textContainer?.lineBreakMode        = .byWordWrapping
-//    self.minimapView = minimapView
-//    // NB: The minimap view is floating. We cannot add it now, as we don't have an `enclosingScrollView` yet.
-//
-//    minimapView.addSubview(minimapGutterView)
-//    self.minimapGutterView = minimapGutterView
-//
-//    minimapView.layoutManager?.typesetter = MinimapTypeSetter()
-//
-//    let documentVisibleBox = NSBox()
-//    documentVisibleBox.boxType     = .custom
-//    documentVisibleBox.fillColor   = theme.textColour.withAlphaComponent(0.1)
-//    documentVisibleBox.borderWidth = 0
-//    minimapView.addSubview(documentVisibleBox)
-//    self.documentVisibleBox = documentVisibleBox
+    // Create the minimap with its own gutter, but sharing the code storage with the code view
+    //
+    let minimapView        = MinimapView(),
+        minimapGutterView  = GutterView(frame: CGRect.zero,
+                                        textView: minimapView,
+                                        theme: theme,
+                                        getMessageViews: { self.messageViews },
+                                        isMinimapGutter: true),
+        minimapDividerView = NSBox()
+    minimapView.codeView = self
+
+    minimapDividerView.boxType     = .custom
+    minimapDividerView.fillColor   = theme.backgroundColour.blended(withFraction: 0.15, of: .systemGray)!
+    minimapDividerView.borderWidth = 0
+    self.minimapDividerView = minimapDividerView
+    // NB: The divider view is floating. We cannot add it now, as we don't have an `enclosingScrollView` yet.
+
+    if let minimapContentStorage = minimapView.textLayoutManager?.textContentManager as? NSTextContentStorage {
+      minimapContentStorage.textStorage = minimapCodeStorage
+      minimapContentStorage.delegate    = minimapContentStorageDelegate
+    }
+    minimapView.textLayoutManager?.delegate = minimapTextLayoutManagerDelegate
+
+    minimapView.backgroundColor                     = backgroundColor
+    minimapView.autoresizingMask                    = .none
+    minimapView.isEditable                          = false
+    minimapView.isSelectable                        = false
+    minimapView.isHorizontallyResizable             = false
+    minimapView.isVerticallyResizable               = true
+    minimapView.textContainerInset                  = CGSize(width: 0, height: 0)
+    minimapView.textContainer?.widthTracksTextView  = false    // we need to be able to control the size (see `tile()`)
+    minimapView.textContainer?.heightTracksTextView = false
+    minimapView.textContainer?.lineBreakMode        = .byWordWrapping
+    self.minimapView = minimapView
+    // NB: The minimap view is floating. We cannot add it now, as we don't have an `enclosingScrollView` yet.
+
+    minimapView.addSubview(minimapGutterView)
+    self.minimapGutterView = minimapGutterView
+
+    let documentVisibleBox = NSBox()
+    documentVisibleBox.boxType     = .custom
+    documentVisibleBox.fillColor   = theme.textColour.withAlphaComponent(0.1)
+    documentVisibleBox.borderWidth = 0
+    minimapView.addSubview(documentVisibleBox)
+    self.documentVisibleBox = documentVisibleBox
 
     maxSize = CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
 
@@ -407,11 +411,12 @@ final class CodeView: NSTextView {
       }
 
     // We need to check whether we need to look up completions or cancel a running completion process after every text
-    // change.
+    // change. We also need to remove evicted message views.
     didChangeNotificationObserver
-      = NotificationCenter.default.addObserver(forName: NSText.didChangeNotification, object: self, queue: .main){ _ in
+      = NotificationCenter.default.addObserver(forName: NSText.didChangeNotification, object: self, queue: .main){ [weak self] _ in
 
-        self.considerCompletionFor(range: self.rangeForUserCompletion)
+        self?.considerCompletionFor(range: self!.rangeForUserCompletion)
+        self?.removeMessageViews(withIDs: self!.codeStorageDelegate.lastEvictedMessageIDs)
       }
 
     // Perform an initial tiling run when the view hierarchy has been set up.
@@ -464,8 +469,8 @@ final class CodeView: NSTextView {
 
         if let textLocation = textContentStorage?.textLocation(for: oldLineRange.location) {
           invalidateBackground(forLineContaining: textLocation)
+          minimapView?.invalidateBackground(forLineContaining: textLocation)
         }
-//        minimapGutterView?.optLayoutManager?.invalidateDisplay(forCharacterRange: oldLineRange)
 
       }
       if let newLine      = lineOfInsertionPoint,
@@ -474,8 +479,8 @@ final class CodeView: NSTextView {
 
         if let textLocation = textContentStorage?.textLocation(for: newLineRange.location) {
           invalidateBackground(forLineContaining: textLocation)
+          minimapView?.invalidateBackground(forLineContaining: textLocation)
         }
-//        minimapGutterView?.optLayoutManager?.invalidateDisplay(forCharacterRange: newLineRange)
 
       }
     }
@@ -534,61 +539,6 @@ final class CodeView: NSTextView {
     }
   }
   
-  /// Invalidate the entire background area of the line containing the given text location.
-  ///
-  /// - Parameter textLocation: The text location whose line we want to invalidate.
-  ///
-  private func invalidateBackground(forLineContaining textLocation: NSTextLocation) {
-    invalidateBackground(forLinesContaining: NSTextRange(location: textLocation))
-  }
-
-  /// Invalidate the entire background area of the lines containing the given text range.
-  ///
-  /// - Parameter textRange: The text ranges whose lines we want to invalidate.
-  ///
-  private func invalidateBackground(forLinesContaining textRange: NSTextRange) {
-
-    guard let textLayoutManager = optTextLayoutManager else { return }
-
-    if let (y: y, height: height) = textLayoutManager.textLayoutFragmentExtent(for: textRange),
-       let invalidRect            = lineBackgroundRect(y: y, height: height)
-    {
-      setNeedsDisplay(invalidRect)
-    }
-  }
-
-  /// Draw the background of an entire line of text with a highlight colour.
-  ///
-  private func drawBackgroundHighlight(within rect: NSRect, 
-                                       forLineContaining textLocation: NSTextLocation,
-                                       withColour colour: NSColor)
-  {
-    guard let textLayoutManager = optTextLayoutManager else { return }
-
-    colour.setFill()
-    if let (y: y, height: height) = textLayoutManager.textLayoutFragmentExtent(for: NSTextRange(location: textLocation)),
-       let highlightRect          = lineBackgroundRect(y: y, height: height)
-    {
-
-      let clippedRect = highlightRect.intersection(rect)
-      if !clippedRect.isNull { NSBezierPath(rect: clippedRect).fill() }
-
-    }
-  }
-
-  /// Compute the background rect from the extent of a line's fragement rect. On lines that contain a message view, the
-  /// fragment rect doesn't cover the entire background. We, moreover, need to account for the space between the text
-  /// container's right hand side and the divider of the minimap (if the minimap is visible).
-  ///
-  private func lineBackgroundRect(y: CGFloat, height: CGFloat) -> CGRect? {
-    guard let codeContainer = textContainer as? CodeContainer else { return nil }
-
-    // We start at x = 0 as it looks nicer in case we overscoll when horizontal scrolling is enabled (i.e., when lines
-    // are not wrapped).
-    return CGRect(origin: CGPoint(x: 0, y: y),
-                  size: CGSize(width: codeContainer.size.width + codeContainer.excessWidth, height: height))
-  }
-
   /// Position and size the gutter and minimap and set the text container sizes and exclusion paths. Take the current
   /// view layout in `viewLayout` into account.
   ///
@@ -1026,86 +976,6 @@ class CodeContainer: NSTextContainer {
                                  height: calculatedRect.height))
 
     } else { return calculatedRect }
-  }
-}
-
-
-// MARK: Code layout manager
-
-/// Customised layout manager for code layout.
-///
-class CodeLayoutManager: NSLayoutManager {
-
-  weak var gutterView: GutterView?
-
-  /// Action to execute when layout completes.
-  ///
-  var postLayoutAction: (() -> ())?
-
-  override func processEditing(for textStorage: NSTextStorage,
-                               edited editMask: TextStorageEditActions,
-                               range newCharRange: NSRange,
-                               changeInLength delta: Int,
-                               invalidatedRange invalidatedCharRange: NSRange) {
-    super.processEditing(for: textStorage,
-                         edited: editMask,
-                         range: newCharRange,
-                         changeInLength: delta,
-                         invalidatedRange: invalidatedCharRange)
-
-    // FIXME: is that necessary?
-    gutterView?.invalidateGutter(for: invalidatedCharRange)
-
-    // Remove all messages in the edited range.
-    if let codeStorageDelegate = textStorage.delegate as? CodeStorageDelegate,
-       let codeView            = gutterView?.textView as? CodeView
-    {
-      codeView.removeMessageViews(withIDs: codeStorageDelegate.lastEvictedMessageIDs)
-    }
-  }
-
-  // We add the area excluded to accomodate the gutter to the returned rectangle as text view otherwise pushes the used
-  // area of the text container into the exluded area when the text view gets compressed below the width of the text
-  // container including the excluded area.
-  override func usedRect(for container: NSTextContainer) -> CGRect {
-    let rect = super.usedRect(for: container)
-    return CGRect(origin: .zero, size: CGSize(width: rect.maxX, height: rect.height))
-  }
-
-  /// Add an action to be executed when layout finished.
-  ///
-  /// - Parameter action: The action that shoudl run after layout finished.
-  ///
-  /// NB: If multiple actions are registered, they are executed in the order in which they were registered.
-  ///
-  private func registerPostLayout(action: @escaping () -> ()) {
-    let previousPostLayoutAction = postLayoutAction
-    postLayoutAction = { previousPostLayoutAction?(); action() }  // we execute in the order of registration
-  }
-
-  /// Execute the given action when layout is complete. That may be right away or waiting for layout to complete.
-  ///
-  /// - Parameter action: The action that should be done if and when layout is complete.
-  ///
-  func whenLayoutDone(action: @escaping () -> ()) {
-    if hasUnlaidCharacters { registerPostLayout(action: action) } else { action() }
-  }
-}
-
-class CodeLayoutManagerDelegate: NSObject, NSLayoutManagerDelegate {
-
-  func layoutManager(_ layoutManager: NSLayoutManager,
-                     didCompleteLayoutFor textContainer: NSTextContainer?,
-                     atEnd layoutFinishedFlag: Bool)
-  {
-    guard let layoutManager = layoutManager as? CodeLayoutManager else { return }
-
-    if layoutFinishedFlag {
-
-      layoutManager.postLayoutAction?()
-      layoutManager.postLayoutAction = nil
-
-    }
   }
 }
 

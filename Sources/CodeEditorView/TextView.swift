@@ -54,7 +54,14 @@ protocol TextView {
   /// Temporarily highlight the visible part of the given range.
   ///
   func showFindIndicator(for range: NSRange)
+  
+  /// Marks the given rectangle of the current view as needing redrawing.
+  ///
+  func setNeedsDisplay(_ invalidRect: NSRect)
 }
+
+
+// MARK: Shared code
 
 extension TextView {
 
@@ -98,8 +105,64 @@ extension TextView {
     let textRange = if let range,
                        let textRange = textContentStorage.textRange(for: range) { textRange }
                     else { textContentStorage.documentRange },
-        rect      = textLayoutManager.textLayoutFragmentBoundingRect(for: textRange)
+    rect      = textLayoutManager.textLayoutFragmentBoundingRect(for: textRange)
     return rect.offsetBy(dx: textContainerOrigin.x, dy: textContainerOrigin.y)
+  }
+
+  /// Invalidate the entire background area of the line containing the given text location.
+  ///
+  /// - Parameter textLocation: The text location whose line we want to invalidate.
+  ///
+  func invalidateBackground(forLineContaining textLocation: NSTextLocation) {
+    invalidateBackground(forLinesContaining: NSTextRange(location: textLocation))
+  }
+
+  /// Invalidate the entire background area of the lines containing the given text range.
+  ///
+  /// - Parameter textRange: The text ranges whose lines we want to invalidate.
+  ///
+  func invalidateBackground(forLinesContaining textRange: NSTextRange) {
+
+    guard let textLayoutManager = optTextLayoutManager else { return }
+
+    if let (y: y, height: height) = textLayoutManager.textLayoutFragmentExtent(for: textRange),
+       let invalidRect            = lineBackgroundRect(y: y, height: height)
+    {
+      setNeedsDisplay(invalidRect)
+    }
+  }
+
+  /// Draw the background of an entire line of text with a highlight colour.
+  ///
+  func drawBackgroundHighlight(within rect: NSRect,
+                                       forLineContaining textLocation: NSTextLocation,
+                                       withColour colour: NSColor)
+  {
+    guard let textLayoutManager = optTextLayoutManager else { return }
+
+    colour.setFill()
+    if let (y: y, height: height) = textLayoutManager.textLayoutFragmentExtent(for: NSTextRange(location: textLocation)),
+       let highlightRect          = lineBackgroundRect(y: y, height: height)
+    {
+
+      let clippedRect = highlightRect.intersection(rect)
+      if !clippedRect.isNull { NSBezierPath(rect: clippedRect).fill() }
+
+    }
+  }
+
+  /// Compute the background rect from the extent of a line's fragement rect. On lines that contain a message view, the
+  /// fragment rect doesn't cover the entire background. We, moreover, need to account for the space between the text
+  /// container's right hand side and the divider of the minimap (if the minimap is visible).
+  ///
+  func lineBackgroundRect(y: CGFloat, height: CGFloat) -> CGRect? {
+    guard let textContainer = optTextContainer else { return nil }
+
+    // We start at x = 0 as it looks nicer in case we overscoll when horizontal scrolling is enabled (i.e., when lines
+    // are not wrapped).
+    let excess: CGFloat = if let codeContainer = textContainer as? CodeContainer { codeContainer.excessWidth } else { 0 }
+    return CGRect(origin: CGPoint(x: 0, y: y),
+                  size: CGSize(width: textContainer.size.width + excess, height: height))
   }
 }
 

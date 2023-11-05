@@ -23,24 +23,31 @@ class CodeStorage: NSTextStorage {
   fileprivate let textStorage: NSTextStorage = NSTextStorage()
 
   var theme: Theme
+  
 
-
-  override var string: String { textStorage.string }
+  // MARK: Initialisers
 
   init(theme: Theme) {
     self.theme = theme
     super.init()
   }
 
+  @available(*, unavailable)
   required init?(coder: NSCoder) {
     fatalError("init(coder:) has not been implemented")
   }
 
   #if os(macOS)
+  @available(*, unavailable)
   required init?(pasteboardPropertyList propertyList: Any, ofType type: NSPasteboard.PasteboardType) {
     fatalError("init(pasteboardPropertyList:ofType:) has not been implemented")
   }
   #endif
+
+
+  // MARK: Interface to override for subclass
+
+  override var string: String { textStorage.string }
 
   // We access attributes through the API of the wrapped `NSTextStorage`; hence, lazy attribute fixing keeps working as
   // before. (Lazy attribute fixing dramatically impacts performance due to syntax highlighting cutting the text up
@@ -88,7 +95,7 @@ class CodeStorage: NSTextStorage {
     return attributes
   }
 
-  // Extended to handle auto-deletion of adjcent matching brackets
+  // Extended to handle auto-deletion of adjacent matching brackets
   override func replaceCharacters(in range: NSRange, with str: String) {
 
     beginEditing()
@@ -133,6 +140,113 @@ class CodeStorage: NSTextStorage {
     beginEditing()
     textStorage.setAttributes(attrs, range: range)
     edited(.editedAttributes, range: range, changeInLength: 0)
+    endEditing()
+  }
+}
+
+
+// MARK: -
+// MARK: Text storage observation
+
+/// Text content storage that facilitates and additional read-only observer.
+///
+class CodeContentStorage: NSTextContentStorage {
+
+  /// The read-only text storage subclass that observes our text storage.
+  ///
+  weak var observer: TextStorageObserver? {
+    didSet {
+      observer?.textStorage = textStorage
+    }
+  }
+
+  init(observer: TextStorageObserver) {
+    self.observer = observer
+    super.init()
+  }
+  
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  override var textStorage: NSTextStorage? {
+    get { super.textStorage }
+    set {
+      super.textStorage     = newValue
+      observer?.textStorage = newValue
+    }
+  }
+
+  override func processEditing(for textStorage: NSTextStorage,
+                               edited editMask: NSTextStorageEditActions,
+                               range newCharRange: NSRange,
+                               changeInLength delta: Int,
+                               invalidatedRange invalidatedCharRange: NSRange)
+  {
+    super.processEditing(for: textStorage,
+                         edited: editMask,
+                         range: newCharRange,
+                         changeInLength: delta,
+                         invalidatedRange: invalidatedCharRange)
+
+    // Forward editing events to the observing text storage, so that its text layout manager(s) trigger any
+    // necessary UI updates.
+    observer?.processEditing(for: textStorage,
+                             edited: editMask,
+                             range: newCharRange,
+                             changeInLength: delta,
+                             invalidatedRange: invalidatedCharRange)
+  }
+}
+
+/// A text storage implementing a read-only code storage forwarder.
+///
+/// The `NSTextStorageObserving` protocol only supports a single observer per text storage. Hence, we use this
+/// forwarder to allow a second, but read-only observer. This does require the observer text storage to support an
+/// functionality for editing events.
+///
+class TextStorageObserver: NSTextStorage {
+  var textStorage: NSTextStorage?
+
+  // MARK: `NSTextStorage` interface to override
+
+  override var string: String { textStorage?.string ?? "" }
+
+  // We access attributes through the API of the wrapped `NSTextStorage`; hence, lazy attribute fixing keeps working as
+  // before. (Lazy attribute fixing dramatically impacts performance due to syntax highlighting cutting the text up
+  // into lots of short attribute ranges.)
+  override var fixesAttributesLazily: Bool { true }
+
+  override func attributes(at location: Int, effectiveRange range: NSRangePointer?) -> [NSAttributedString.Key : Any] {
+    return textStorage?.attributes(at: location, effectiveRange: range) ?? [:]
+  }
+
+  override func replaceCharacters(in range: NSRange, with str: String) {
+    // read-only
+  }
+
+  override func setAttributes(_ attrs: [NSAttributedString.Key : Any]?, range: NSRange) {
+    // read-only
+  }
+
+
+  // MARK: Editing observation
+  
+  /// Entry point for forarded editing actions of the wrapped text storage.
+  ///
+  func processEditing(for textStorage: NSTextStorage,
+                      edited editMask: NSTextStorageEditActions,
+                      range newCharRange: NSRange,
+                      changeInLength delta: Int,
+                      invalidatedRange invalidatedCharRange: NSRange)
+  {
+    guard self.textStorage === textStorage else { return }
+
+    beginEditing()
+    edited(editMask,
+           range: NSRange(location: newCharRange.location, length: newCharRange.length - delta),
+           changeInLength: delta)
     endEditing()
   }
 }
