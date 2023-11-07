@@ -599,7 +599,6 @@ final class CodeView: NSTextView {
         widthWithoutGutters  = if viewLayout.showMinimap { visibleWidth - gutterWithPadding - minimapExtras  }
                                else { visibleWidth - gutterWithPadding },
         compositeFontWidth   = if viewLayout.showMinimap { fontWidth + minimapFontWidth  } else { fontWidth },
-//        numberOfCharacters   = floor(widthWithoutGutters / compositeFontWidth),
         numberOfCharacters   = widthWithoutGutters / compositeFontWidth,
         codeViewWidth        = if viewLayout.showMinimap { gutterWithPadding + ceil(numberOfCharacters * fontWidth) }
                                else { visibleWidth },
