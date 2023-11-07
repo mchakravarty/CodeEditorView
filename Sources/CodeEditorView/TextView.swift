@@ -160,9 +160,7 @@ extension TextView {
 
     // We start at x = 0 as it looks nicer in case we overscoll when horizontal scrolling is enabled (i.e., when lines
     // are not wrapped).
-    let excess: CGFloat = if let codeContainer = textContainer as? CodeContainer { codeContainer.excessWidth } else { 0 }
-    return CGRect(origin: CGPoint(x: 0, y: y),
-                  size: CGSize(width: textContainer.size.width + excess, height: height))
+    return CGRect(x: 0, y: y, width: textContainer.size.width, height: height)
   }
 }
 

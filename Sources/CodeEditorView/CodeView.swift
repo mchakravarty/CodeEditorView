@@ -421,7 +421,7 @@ final class CodeView: NSTextView {
 
     // Perform an initial tiling run when the view hierarchy has been set up.
     Task {
-      tile(initial: true)
+      tile()
     }
 
     // Try to initialise a language service.
@@ -538,22 +538,22 @@ final class CodeView: NSTextView {
       }
     }
   }
-  
+
   /// Position and size the gutter and minimap and set the text container sizes and exclusion paths. Take the current
   /// view layout in `viewLayout` into account.
   ///
   /// * The main text view contains three subviews: (1) the main gutter on its left side, (2) the minimap on its right
   ///   side, and (3) a divider in between the code view and the minimap gutter.
-  /// * Both the main text view and the minimap text view (or rather their text container) uses an exclusion path to
-  ///   keep text out of the gutter view. The main text view is sized to avoid overlap with the minimap even without an
-  ///   exclusion path.
-  /// * The main text view and the minimap text view need to be able to accomodate exactly the same number of
-  ///   characters, so that line breaking procceds in the exact same way.
+  /// * The main text view by way of `lineFragmentRect(forProposedRect:at:writingDirection:remaining:)`and the minimap
+  ///   view (or rather their text container) by way of an exclusion path keep text out of the gutter view. The main
+  ///   text view is moreover sized to avoid overlap with the minimap.
+  /// * The minimap is a fixed factor `minimapRatio` smaller than the main text view and uses a correspondingly smaller
+  ///   font accomodate exactly the same number of characters, so that line breaking procceds in the exact same way.
   ///
   /// NB: We don't use a ruler view for the gutter on macOS to be able to use the same setup on macOS and iOS.
   ///
   @MainActor
-  private func tile(initial: Bool = false) {
+  private func tile() {
     guard let codeContainer = optTextContainer as? CodeContainer else { return }
 
     // We wait with tiling until the layout is done unless this is the initial tiling.
@@ -578,7 +578,6 @@ final class CodeView: NSTextView {
     // Compute size of the main view gutter
     //
     let theFont                 = font ?? NSFont.systemFont(ofSize: 0),
-        fontSize                = theFont.pointSize,
         fontWidth               = theFont.maximumAdvancement.width,  // NB: we deal only with fixed width fonts
         gutterWidthInCharacters = CGFloat(7),
         gutterWidth             = ceil(fontWidth * gutterWidthInCharacters),
@@ -589,26 +588,26 @@ final class CodeView: NSTextView {
 
     // Compute sizes of the minimap text view and gutter
     //
-    let minimapFontWidth     = minimapFontSize(for: fontSize) / 2,
+    let minimapFontWidth     = fontWidth / minimapRatio,
         minimapGutterWidth   = ceil(minimapFontWidth * gutterWidthInCharacters),
         dividerWidth         = CGFloat(1),
         minimapGutterRect    = CGRect(origin: CGPoint.zero,
                                       size: CGSize(width: minimapGutterWidth, height: frame.height)).integral,
-        minimapExtras        = minimapGutterWidth + minimapFontWidth * 2 + dividerWidth,
-        minimapFactor        = viewLayout.showMinimap ? CGFloat(1) : CGFloat(0),
-        gutterWithPadding    = gutterWidth + lineFragmentPadding * 2,
+        minimapExtras        = minimapGutterWidth + dividerWidth,
+        gutterWithPadding    = gutterWidth + lineFragmentPadding,
         visibleWidth         = enclosingScrollView?.contentSize.width ?? frame.width,
-        widthWithoutGutters  = visibleWidth - gutterWithPadding - minimapExtras * minimapFactor,
-        numberOfCharacters   = codeWidthInCharacters(for: widthWithoutGutters,
-                                                     with: theFont,
-                                                     withMinimap: viewLayout.showMinimap),
-        minimapWidth         = ceil(numberOfCharacters * minimapFontWidth + minimapGutterWidth + minimapFontWidth * 2),
-        codeViewWidth        = visibleWidth - (minimapWidth + dividerWidth) * minimapFactor,
-        excess               = widthWithoutGutters - ceil(numberOfCharacters * fontWidth)
-    - (numberOfCharacters * minimapFontWidth) * minimapFactor,
-    minimapX             = floor(visibleWidth - minimapWidth),
-    minimapExclusionPath = OSBezierPath(rect: minimapGutterRect),
-    minimapDividerRect   = CGRect(x: minimapX - dividerWidth, y: 0, width: dividerWidth, height: frame.height).integral
+        widthWithoutGutters  = if viewLayout.showMinimap { visibleWidth - gutterWithPadding - minimapExtras  }
+                               else { visibleWidth - gutterWithPadding },
+        compositeFontWidth   = if viewLayout.showMinimap { fontWidth + minimapFontWidth  } else { fontWidth },
+//        numberOfCharacters   = floor(widthWithoutGutters / compositeFontWidth),
+        numberOfCharacters   = widthWithoutGutters / compositeFontWidth,
+        codeViewWidth        = if viewLayout.showMinimap { gutterWithPadding + ceil(numberOfCharacters * fontWidth) }
+                               else { visibleWidth },
+        minimapWidth         = visibleWidth - codeViewWidth,
+        minimapCodeWidth     = minimapGutterWidth + numberOfCharacters * minimapFontWidth - 1,  // no rounding for the container
+        minimapX             = floor(visibleWidth - minimapWidth),
+        minimapExclusionPath = OSBezierPath(rect: minimapGutterRect),
+        minimapDividerRect   = CGRect(x: minimapX - dividerWidth, y: 0, width: dividerWidth, height: frame.height).integral
 
     minimapDividerView?.isHidden = !viewLayout.showMinimap
     minimapView?.isHidden        = !viewLayout.showMinimap
@@ -637,23 +636,22 @@ final class CodeView: NSTextView {
     // NB: We use the `excess` width to capture the slack that arises when the window width admits a fractional
     //     number of characters. Adding the slack to the code view's text container size doesn't work as the line breaks
     //     of the minimap and main code view are then sometimes not entirely in sync.
-    let codeContainerWidth = viewLayout.wrapText ? floor(codeViewWidth - excess) : CGFloat.greatestFiniteMagnitude
+    let codeContainerWidth = if viewLayout.wrapText { codeViewWidth } else { CGFloat.greatestFiniteMagnitude }
     if codeContainer.size.width != codeContainerWidth {
       codeContainer.size = NSSize(width: codeContainerWidth, height: CGFloat.greatestFiniteMagnitude)
     }
 
     codeContainer.lineFragmentPadding = lineFragmentPadding
     codeContainer.gutterWidth         = gutterWidth
-    codeContainer.excessWidth         = excess
 
     // Set the text container area of the minimap text view
-    let minimapTextContainerWidth = viewLayout.wrapText ? minimapWidth : CGFloat.greatestFiniteMagnitude
+    let minimapTextContainerWidth = if viewLayout.wrapText { minimapCodeWidth } else { CGFloat.greatestFiniteMagnitude }
     if minimapWidth != minimapView?.frame.width || minimapTextContainerWidth != minimapView?.textContainer?.size.width {
 
       minimapView?.textContainer?.exclusionPaths      = [minimapExclusionPath]
       minimapView?.textContainer?.size                = CGSize(width: minimapTextContainerWidth,
                                                                height: CGFloat.greatestFiniteMagnitude)
-      minimapView?.textContainer?.lineFragmentPadding = minimapFontWidth
+      minimapView?.textContainer?.lineFragmentPadding = 0
 
     }
 
@@ -779,8 +777,7 @@ extension CodeView {
         let topOffset           = textContainerOrigin.y + messageBundle.lineFragementRect.minY,
             topAnchorConstraint = messageBundle.view.topAnchor.constraint(equalTo: self.topAnchor,
                                                                           constant: topOffset)
-        let leftOffset            = textContainerOrigin.x + messageBundle.lineFragementRect.maxX
-                                                          + codeContainer.excessWidth,
+        let leftOffset            = textContainerOrigin.x + messageBundle.lineFragementRect.maxX,
             rightAnchorConstraint = messageBundle.view.rightAnchor.constraint(equalTo: self.leftAnchor,
                                                                               constant: leftOffset)
         messageViews[id]?.topAnchorConstraint   = topAnchorConstraint
@@ -792,7 +789,7 @@ extension CodeView {
 
         // Update the messages view constraints
         let topOffset  = textContainerOrigin.y + messageBundle.lineFragementRect.minY,
-            leftOffset = textContainerOrigin.x + messageBundle.lineFragementRect.maxX + codeContainer.excessWidth
+            leftOffset = textContainerOrigin.x + messageBundle.lineFragementRect.maxX
         messageViews[id]?.topAnchorConstraint?.constant   = topOffset
         messageViews[id]?.rightAnchorConstraint?.constant = leftOffset
 
@@ -923,13 +920,6 @@ class CodeContainer: NSTextContainer {
   /// The amount of space that we need to leave blank at the left-hand side of the text for the gutter.
   ///
   var gutterWidth: CGFloat = 0
-
-  /// This is horizontal space of the code view beyond the width of the text container, which we need to maintain
-  /// in some configurations with the minimap to synchronise line breaks between code view and minimap. The text
-  /// container needs to be aware of the excess, to be able to determine complete rectangles for the drawing of
-  /// background elements, such as line highlights.
-  ///
-  var excessWidth: CGFloat = 0
 
   // We adapt line fragment rects in two ways: (1) we leave `gutterWidth` space on the left hand side and (2) on every
   // line that contains a message, we leave `MessageView.minimumInlineWidth` space on the right hand side (but only for

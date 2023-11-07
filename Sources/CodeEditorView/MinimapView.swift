@@ -82,9 +82,9 @@ class MinimapContentStorageDelegate: NSObject, NSTextContentStorageDelegate {
                                          textContentStorage.attributedString!.attributedSubstring(from: range)),
         font = if range.length > 0,
                   let font = text.attribute(.font, at: 0, effectiveRange: nil) as? NSFont { font }
-               else { NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular) }
+               else { NSFont.monospacedSystemFont(ofSize: 0, weight: .regular) }
     text.addAttribute(.font, 
-                      value: NSFont.userFixedPitchFont(ofSize: font.pointSize / minimapRatio)!,
+                      value: NSFont(name: font.fontName, size: font.pointSize / minimapRatio)!,
                       range: NSRange(location: 0, length: range.length))
 
     return NSTextParagraph(attributedString: text)
@@ -226,33 +226,4 @@ class MinimapTextLayoutManagerDelegate: NSObject, NSTextLayoutManagerDelegate {
 
     return MinimapLayoutFragment(textElement: paragraph, range: nil)
   }
-}
-
-
-// MARK: -
-// MARK: Geometry helpers
-
-/// Compute the size of the code view in number of characters such that we can still accommodate the minimap.
-///
-/// - Parameters:
-///   - width: Overall width available for main and minimap code view *without* gutter and padding.
-///   - font: The fixed pitch font of the main text view.
-///   - withMinimap: Determines whether to include the presence of a minimap into the calculation.
-/// - Returns: The width of the code view in number of characters.
-///
-func codeWidthInCharacters(for width: CGFloat, with font: NSFont, withMinimap: Bool) -> CGFloat {
-  let minimapCharWidth = withMinimap ? minimapFontSize(for: font.pointSize) / 2 : 0
-  return floor(width / (font.maximumAdvancement.width + minimapCharWidth))
-}
-
-/// Compute the font size for the minimap from the font size of the main text view.
-///
-/// - Parameter fontSize: The font size of the main text view
-/// - Returns: The font size for the minimap
-///
-/// The result is always divisible by two, to enable the use of full pixels for the font width while avoiding aspect
-/// ratios that are too unbalanced.
-///
-func minimapFontSize(for fontSize: CGFloat) -> CGFloat {
-  return max(1, ceil(fontSize / 20)) * 2
 }
