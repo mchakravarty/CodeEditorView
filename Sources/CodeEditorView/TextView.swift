@@ -21,9 +21,10 @@ protocol TextView {
   associatedtype Font
 
   // This is necessary as these members are optional in AppKit and not optional in UIKit.
-  var optTextLayoutManager: NSTextLayoutManager? { get }
-  var optTextContainer: NSTextContainer?         { get }
-  var optCodeStorage:   CodeStorage?             { get }
+  var optTextLayoutManager:  NSTextLayoutManager?  { get }
+  var optTextContainer:      NSTextContainer?      { get }
+  var optTextContentStorage: NSTextContentStorage? { get }
+  var optCodeStorage:        CodeStorage?          { get }
 
   var textBackgroundColor: Color? { get }
   var textFont:            Font? { get }
@@ -57,7 +58,7 @@ protocol TextView {
   
   /// Marks the given rectangle of the current view as needing redrawing.
   ///
-  func setNeedsDisplay(_ invalidRect: NSRect)
+  func setNeedsDisplay(_ invalidRect: CGRect)
 }
 
 
@@ -134,9 +135,9 @@ extension TextView {
 
   /// Draw the background of an entire line of text with a highlight colour.
   ///
-  func drawBackgroundHighlight(within rect: NSRect,
+  func drawBackgroundHighlight(within rect: CGRect,
                                        forLineContaining textLocation: NSTextLocation,
-                                       withColour colour: NSColor)
+                                       withColour colour: OSColor)
   {
     guard let textLayoutManager = optTextLayoutManager else { return }
 
@@ -146,7 +147,7 @@ extension TextView {
     {
 
       let clippedRect = highlightRect.intersection(rect)
-      if !clippedRect.isNull { NSBezierPath(rect: clippedRect).fill() }
+      if !clippedRect.isNull { OSBezierPath(rect: clippedRect).fill() }
 
     }
   }
@@ -179,9 +180,10 @@ extension UITextView: TextView {
   typealias Color = UIColor
   typealias Font  = UIFont
 
-  var optLayoutManager: NSLayoutManager? { layoutManager }
-  var optTextContainer: NSTextContainer? { textContainer }
-  var optCodeStorage:   CodeStorage?     { textStorage as? CodeStorage }
+  var optTextLayoutManager:  NSTextLayoutManager?  { textLayoutManager }
+  var optTextContainer:      NSTextContainer?      { textContainer }
+  var optTextContentStorage: NSTextContentStorage? { textLayoutManager?.textContentManager as? NSTextContentStorage }
+  var optCodeStorage:        CodeStorage?          { textStorage as? CodeStorage }
 
   var textBackgroundColor: Color? { backgroundColor }
   var textFont:            Font? { font }
@@ -247,9 +249,10 @@ extension NSTextView: TextView {
   typealias Color = NSColor
   typealias Font  = NSFont
 
-  var optTextLayoutManager: NSTextLayoutManager? { textLayoutManager }
-  var optTextContainer:     NSTextContainer?     { textContainer }
-  var optCodeStorage:       CodeStorage?         { textStorage as? CodeStorage }
+  var optTextLayoutManager:  NSTextLayoutManager?  { textLayoutManager }
+  var optTextContainer:      NSTextContainer?      { textContainer }
+  var optTextContentStorage: NSTextContentStorage? { textContentStorage }
+  var optCodeStorage:        CodeStorage?          { textStorage as? CodeStorage }
 
   var textBackgroundColor: Color? { backgroundColor }
   var textFont:            Font? { font }

@@ -14,8 +14,8 @@ import LanguageSupport
 
 private let logger = Logger(subsystem: "org.justtesting.CodeEditorView", category: "GutterView")
 
-#if os(iOS)
 
+#if os(iOS)
 
 // MARK: -
 // MARK: UIKit version
@@ -23,54 +23,9 @@ private let logger = Logger(subsystem: "org.justtesting.CodeEditorView", categor
 import UIKit
 
 
-private typealias FontDescriptor = UIFontDescriptor
+private let fontDescriptorFeatureIdentifier = OSFontDescriptor.FeatureKey.type
+private let fontDescriptorTypeIdentifier    = OSFontDescriptor.FeatureKey.selector
 
-private let fontDescriptorFeatureIdentifier = FontDescriptor.FeatureKey.type
-private let fontDescriptorTypeIdentifier    = FontDescriptor.FeatureKey.selector
-
-private let lineNumberColour = UIColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 0.5)
-
-class GutterView: UIView {
-
-  /// The text view that this gutter belongs to.
-  ///
-  let textView: UITextView
-
-  /// The current code editor theme
-  ///
-  var theme: Theme
-
-  /// Accessor for the associated text view's message views.
-  ///
-  let getMessageViews: () -> MessageViews
-
-  /// Determines whether this gutter is for a main code view or for the minimap of a code view.
-  ///
-  let isMinimapGutter: Bool = false
-
-  /// Dirty rectangle whose drawing has been delayed as the code layout wasn't finished yet.
-  ///
-  var pendingDrawRect: CGRect?
-
-  /// Create and configure a gutter view for the given text view. This will also set the appropiate exclusion path for
-  /// text container.
-  ///
-  init(frame: CGRect, textView: UITextView, theme: Theme, getMessageViews: @escaping () -> MessageViews) {
-    self.textView        = textView
-    self.theme           = theme
-    self.getMessageViews = getMessageViews
-    super.init(frame: frame)
-    let gutterExclusionPath = UIBezierPath(rect: CGRect(origin: frame.origin,
-                                                        size: CGSize(width: frame.width,
-                                                                     height: CGFloat.greatestFiniteMagnitude)))
-    optTextContainer?.exclusionPaths = [gutterExclusionPath]
-    contentMode = .redraw
-  }
-
-  required init(coder: NSCoder) {
-    fatalError("CodeEditorView.GutterView.init(coder:) not implemented")
-  }
-}
 
 #elseif os(macOS)
 
@@ -81,18 +36,26 @@ class GutterView: UIView {
 import AppKit
 
 
-private typealias FontDescriptor = NSFontDescriptor
+private let fontDescriptorFeatureIdentifier = OSFontDescriptor.FeatureKey.typeIdentifier
+private let fontDescriptorTypeIdentifier    = OSFontDescriptor.FeatureKey.selectorIdentifier
 
-private let fontDescriptorFeatureIdentifier = FontDescriptor.FeatureKey.typeIdentifier
-private let fontDescriptorTypeIdentifier    = FontDescriptor.FeatureKey.selectorIdentifier
+#endif
 
-private let lineNumberColour = NSColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 0.5)
 
-class GutterView: NSView {
+// MARK: -
+// MARK: Shared code
+
+private let lineNumberColour = OSColor(red: 0.5, green: 0.5, blue: 0.5, alpha: 0.5)
+
+final class GutterView: OSView {
 
   /// The text view that this gutter belongs to.
   ///
-  let textView: NSTextView
+  weak var textView: OSTextView?
+
+  /// The code storage containing the text accompanied by this gutter.
+  ///
+  var codeStorage: CodeStorage
 
   /// The current code editor theme
   ///
@@ -109,35 +72,43 @@ class GutterView: NSView {
   /// Create and configure a gutter view for the given text view. This will also set the appropiate exclusion path for
   /// text container.
   ///
-  init(frame: CGRect, textView: NSTextView, theme: Theme, getMessageViews: @escaping () -> MessageViews, isMinimapGutter: Bool) {
+  init(frame: CGRect,
+       textView: OSTextView,
+       codeStorage: CodeStorage,
+       theme: Theme,
+       getMessageViews: @escaping () -> MessageViews,
+       isMinimapGutter: Bool)
+  {
     self.textView        = textView
+    self.codeStorage     = codeStorage
     self.theme           = theme
     self.getMessageViews = getMessageViews
     self.isMinimapGutter = isMinimapGutter
     super.init(frame: frame)
-    // NB: If were decide to use layer backing, we need to set the `layerContentsRedrawPolicy` to redraw on resizing
+#if os(iOS)
+    contentMode = .redraw
+#elseif os(macOS)
+    // NB: If would decide to use layer backing, we need to set the `layerContentsRedrawPolicy` to redraw on resizing
+#endif
   }
 
+  @available(*, unavailable)
   required init(coder: NSCoder) {
     fatalError("CodeEditorView.GutterView.init(coder:) not implemented")
   }
 
-  // Imitate the coordinate system of the associated text view.
-  override var isFlipped: Bool { textView.isFlipped }
-}
-
+#if os(macOS)
+  // Use the coordinate system of the associated text view.
+  override var isFlipped: Bool { textView?.isFlipped ?? false }
 #endif
-
-
-// MARK: -
-// MARK: Shared code
-
+}
 
 extension GutterView {
 
-  var optTextLayoutManager: NSTextLayoutManager?   { textView.optTextLayoutManager }
-  var optTextContainer:     NSTextContainer?       { textView.optTextContainer }
-  var optLineMap:           LineMap<LineInfo>?     { textView.optLineMap }
+  var optTextLayoutManager:  NSTextLayoutManager?   { textView?.optTextLayoutManager }
+  var optTextContentStorage: NSTextContentStorage?  { textView?.optTextContentStorage }
+  var optTextContainer:      NSTextContainer?       { textView?.optTextContainer }
+  var optLineMap:            LineMap<LineInfo>?     { (codeStorage.delegate as? CodeStorageDelegate)?.lineMap }
 
   // MARK: -
   // MARK: Gutter notifications
@@ -177,7 +148,7 @@ extension GutterView {
 
   override func draw(_ rect: CGRect) {
     guard let textLayoutManager  = optTextLayoutManager,
-          let textContentStorage = textView.textContentStorage,
+          let textContentStorage = optTextContentStorage,
           let lineMap            = optLineMap
     else { return }
 
@@ -196,7 +167,7 @@ extension GutterView {
     OSBezierPath(rect: rect).fill()
 
     let desc = OSFont.systemFont(ofSize: theme.fontSize).fontDescriptor.addingAttributes(
-      [ FontDescriptor.AttributeName.featureSettings:
+      [ OSFontDescriptor.AttributeName.featureSettings:
           [
             [
               fontDescriptorFeatureIdentifier: kNumberSpacingType,
@@ -219,13 +190,13 @@ extension GutterView {
     let font = OSFont(descriptor: desc, size: 0) ?? OSFont.systemFont(ofSize: 0)
     #endif
 
-    let selectedLines = textView.selectedLines
+    let selectedLines = textView?.selectedLines ?? Set(1..<2)
 
     // Currently only supported on macOS as `UITextView` is less configurable
     #if os(macOS)
 
     // Highlight the current line in the gutter
-    if let location               = textView.insertionPoint,
+    if let location               = textView?.insertionPoint,
        let textLocation           = textContentStorage.textLocation(for: location),
        let (y: y, height: height) = textLayoutManager.textLayoutFragmentExtent(for: NSTextRange(location: textLocation))
     {
@@ -334,7 +305,7 @@ extension GutterView {
                                        from: .minYEdge).remainder
         let gutterRect = gutterRectForLineNumbersFrom(textRect: textRect)
 
-        let attributes = textView.insertionPoint == textContentStorage.textStorage?.length
+        let attributes = textView?.insertionPoint == textContentStorage.textStorage?.length
                          ? textAttributesSelected
                          : textAttributesDefault
         ("\(lineMap.lines.count)" as NSString).draw(in: gutterRect, withAttributes: attributes)
@@ -350,7 +321,7 @@ extension GutterView {
   /// Compute the full width rectangle in the gutter from its vertical extent.
   ///
   private func gutterRectFrom(y: CGFloat, height: CGFloat) -> CGRect {
-    return CGRect(origin: CGPoint(x: 0, y: y + textView.textContainerOrigin.y),
+    return CGRect(origin: CGPoint(x: 0, y: y + (textView?.textContainerOrigin.y ?? 0)),
                   size: CGSize(width: frame.size.width, height: height))
   }
 
@@ -370,7 +341,7 @@ extension GutterView {
   ///
   private func textRectFrom(gutterRect: CGRect) -> CGRect {
     let containerWidth = optTextContainer?.size.width ?? 0
-    return CGRect(origin: CGPoint(x: frame.size.width, y: gutterRect.origin.y - textView.textContainerOrigin.y),
+    return CGRect(origin: CGPoint(x: frame.size.width, y: gutterRect.origin.y - (textView?.textContainerOrigin.y ?? 0)),
                   size: CGSize(width: containerWidth - frame.size.width, height: gutterRect.size.height))
   }
 }

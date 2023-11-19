@@ -51,13 +51,24 @@ typealias MessageViews = [LineInfo.MessageBundle.ID: MessageInfo]
 ///
 final class CodeView: UITextView {
 
+  // Components
+  let codeContentStorage: CodeContentStorage
+
   // Delegates
-  fileprivate var codeViewDelegate:           CodeViewDelegate?
-  fileprivate var codeStorageDelegate:        CodeStorageDelegate
-  fileprivate let codeLayoutManagerDelegate = CodeLayoutManagerDelegate()  // shared between code view and minimap
+  fileprivate var codeViewDelegate:                  CodeViewDelegate?
+  fileprivate var codeStorageDelegate:               CodeStorageDelegate
+  fileprivate let minimapTextLayoutManagerDelegate = MinimapTextLayoutManagerDelegate()
+  fileprivate let minimapContentStorageDelegate    = MinimapContentStorageDelegate()
 
   // Subviews
-  fileprivate var gutterView: GutterView?
+  var gutterView:         GutterView?
+  var minimapView:        UITextView?
+  var minimapGutterView:  GutterView?
+  var documentVisibleBox: UIView?
+  var minimapDividerView: UIView?
+
+  // Notification observer
+  private var didChangeNotificationObserver: NSObjectProtocol?
 
   /// The current highlighting theme
   ///
@@ -68,6 +79,13 @@ final class CodeView: UITextView {
       tintColor                            = theme.tintColour
       (textStorage as? CodeStorage)?.theme = theme
       gutterView?.theme                    = theme
+      minimapView?.backgroundColor         = theme.backgroundColour
+      minimapGutterView?.theme             = theme
+      documentVisibleBox?.backgroundColor  = theme.textColour.withAlphaComponent(0.1)
+//      minimapDividerView?.backgroundColor        = theme.backgroundColour.blended(withFraction: 0.15, of: .systemGray)!
+      // FIXME: How to mix the colours?
+      minimapDividerView?.backgroundColor  = .red
+      tile()
       setNeedsDisplay(bounds)
     }
   }
@@ -76,10 +94,8 @@ final class CodeView: UITextView {
   ///
   var viewLayout: CodeEditor.LayoutConfiguration {
     didSet {
-      // Nothing to do, but that may change in the future
-      textContainer.widthTracksTextView = viewLayout.wrapText
-      textContainer.size.width          = viewLayout.wrapText ? frame.size.width : CGFloat.greatestFiniteMagnitude
-      setNeedsLayout()
+      tile()
+      adjustScrollPositionOfMinimap()
     }
   }
 
@@ -91,17 +107,18 @@ final class CodeView: UITextView {
   ///
   init(frame: CGRect, with language: LanguageConfiguration, viewLayout: CodeEditor.LayoutConfiguration, theme: Theme) {
 
-    self.viewLayout = viewLayout
     self.theme      = theme
+    self.viewLayout = viewLayout
 
     // Use custom components that are gutter-aware and support code-specific editing actions and highlighting.
-    let codeLayoutManager         = CodeLayoutManager(),
-        codeContainer             = CodeContainer(),
-        codeStorage               = CodeStorage(theme: theme)
-    codeStorage.addLayoutManager(codeLayoutManager)
-    codeContainer.layoutManager = codeLayoutManager
-    codeLayoutManager.addTextContainer(codeContainer)
-    codeLayoutManager.delegate = codeLayoutManagerDelegate
+    let codeLayoutManager  = NSTextLayoutManager(),
+        codeContainer      = CodeContainer(size: frame.size),
+        minimapCodeStorage = TextStorageObserver(),
+        codeStorage        = CodeStorage(theme: theme)
+    codeContentStorage = CodeContentStorage(observer: minimapCodeStorage)
+    codeLayoutManager.textContainer = codeContainer
+    codeContentStorage.textStorage  = codeStorage
+    codeContentStorage.addTextLayoutManager(codeLayoutManager)
 
     codeStorageDelegate = CodeStorageDelegate(with: language)
 
@@ -119,33 +136,85 @@ final class CodeView: UITextView {
     smartDashesType        = .no
     smartInsertDeleteType  = .no
 
+    // Line wrapping
+    textContainerInset                  = .zero
+    textContainer.widthTracksTextView  = false   // we need to be able to control the size (see `tile()`)
+    textContainer.heightTracksTextView = false
+    textContainer.lineBreakMode        = .byWordWrapping
+
     // Add the view delegate
     codeViewDelegate = CodeViewDelegate(codeView: self)
     delegate         = codeViewDelegate
 
     // Add a text storage delegate that maintains a line map
-    codeStorage.delegate = self.codeStorageDelegate
-
-    // Important for longer documents
-    codeLayoutManager.allowsNonContiguousLayout =  true
+    codeStorage.delegate = codeStorageDelegate
 
     // Add a gutter view
-    let gutterWidth = ceil(theme.fontSize) * 3,
-        gutterView  = GutterView(frame: CGRect(x: 0,
-                                               y: 0,
-                                               width: gutterWidth,
-                                               height: CGFloat.greatestFiniteMagnitude),
-                                 textView: self,
+    let gutterView  = GutterView(frame: .zero,
+                                 textView: self, 
+                                 codeStorage: codeStorage,
                                  theme: theme,
-                                 getMessageViews: { self.messageViews })
-    addSubview(gutterView)
+                                 getMessageViews: { self.messageViews },
+                                 isMinimapGutter: false)
+    gutterView.autoresizingMask  = []
     self.gutterView              = gutterView
-    codeLayoutManager.gutterView = gutterView
+    addSubview(gutterView)
 
-    // TODO: we need these two on each change event
-//    self?.considerCompletionFor(range: self!.rangeForUserCompletion)
-//    self?.removeMessageViews(withIDs: self!.codeStorageDelegate.lastEvictedMessageIDs)
+    // Create the minimap with its own gutter, but sharing the code storage with the code view
+    //
+    let minimapView        = MinimapView(),
+        minimapGutterView  = GutterView(frame: CGRect.zero,
+                                        textView: minimapView,
+                                        codeStorage: codeStorage,
+                                        theme: theme,
+                                        getMessageViews: { self.messageViews },
+                                        isMinimapGutter: true),
+        minimapDividerView = UIView()
+    minimapView.codeView = self
 
+//    minimapDividerView.backgroundColor   = theme.backgroundColour.blended(withFraction: 0.15, of: .systemGray)!
+    minimapDividerView.backgroundColor   = .red
+    // FIXME: colour blending???
+    self.minimapDividerView              = minimapDividerView
+    addSubview(minimapDividerView)
+
+    if let minimapContentStorage = minimapView.optTextContentStorage {
+      minimapContentStorage.textStorage = minimapCodeStorage
+      minimapContentStorage.delegate    = minimapContentStorageDelegate
+    }
+    minimapView.textLayoutManager?.delegate = minimapTextLayoutManagerDelegate
+
+    minimapView.backgroundColor                    = theme.backgroundColour
+    minimapView.tintColor                          = theme.tintColour
+    minimapView.isEditable                         = false
+    minimapView.isSelectable                       = false
+    minimapView.textContainerInset                 = .zero
+    minimapView.textContainer.widthTracksTextView  = false    // we need to be able to control the size (see `tile()`)
+    minimapView.textContainer.heightTracksTextView = false
+    minimapView.textContainer.lineBreakMode        = .byWordWrapping
+    self.minimapView = minimapView
+    addSubview(minimapView)
+
+    minimapView.addSubview(minimapGutterView)
+    self.minimapGutterView = minimapGutterView
+
+    let documentVisibleBox = UIView()
+    documentVisibleBox.backgroundColor   = theme.textColour.withAlphaComponent(0.1)
+    minimapView.addSubview(documentVisibleBox)
+    self.documentVisibleBox = documentVisibleBox
+
+    // We need to check whether we need to look up completions or cancel a running completion process after every text
+    // change. We also need to remove evicted message views.
+    didChangeNotificationObserver
+      = NotificationCenter.default.addObserver(forName: UITextView.textDidChangeNotification, object: self, queue: .main){ [weak self] _ in
+
+        self?.removeMessageViews(withIDs: self!.codeStorageDelegate.lastEvictedMessageIDs)
+      }
+
+    // Perform an initial tiling run when the view hierarchy has been set up.
+    Task {
+      tile()
+    }
   }
 
   required init?(coder: NSCoder) {
@@ -203,6 +272,9 @@ class CodeViewDelegate: NSObject, UITextViewDelegate {
 ///
 final class CodeView: NSTextView {
 
+  // Components
+  let codeContentStorage: CodeContentStorage
+
   // Delegates
   fileprivate let codeViewDelegate =                 CodeViewDelegate()
   fileprivate var codeStorageDelegate:               CodeStorageDelegate
@@ -239,7 +311,6 @@ final class CodeView: NSTextView {
       minimapGutterView?.theme             = theme
       documentVisibleBox?.fillColor        = theme.textColour.withAlphaComponent(0.1)
       minimapDividerView?.fillColor        = theme.backgroundColour.blended(withFraction: 0.15, of: .systemGray)!
-      needsLayout = true
       tile()
       setNeedsDisplay(visibleRect)
     }
@@ -250,7 +321,6 @@ final class CodeView: NSTextView {
   var viewLayout: CodeEditor.LayoutConfiguration {
     didSet {
       tile()
-      needsLayout = true
       adjustScrollPositionOfMinimap()
     }
   }
@@ -258,19 +328,19 @@ final class CodeView: NSTextView {
   /// Keeps track of the set of message views.
   ///
   var messageViews: MessageViews = [:]
-  
+
   /// For the consumption of the diagnostics stream.
-  /// 
+  ///
   private var diagnosticsCancellable: Cancellable?
 
   /// Holds the info popover if there is one.
   ///
   var infoPopover: InfoPopover?
-  
+
   /// Holds the completion panel. It is always available, but open, closed, and positioned on demand.
-  /// 
+  ///
   var completionPanel: CompletionPanel = CompletionPanel()
-  
+
   /// Cancellable task used to compute completions.
   ///
   var completionTask: Task<(), Error>?
@@ -287,12 +357,11 @@ final class CodeView: NSTextView {
     self.viewLayout = viewLayout
 
     // Use custom components that are gutter-aware and support code-specific editing actions and highlighting.
-
     let codeLayoutManager  = NSTextLayoutManager(),
         codeContainer      = CodeContainer(size: frame.size),
         minimapCodeStorage = TextStorageObserver(),
-        codeContentStorage = CodeContentStorage(observer: minimapCodeStorage),
         codeStorage        = CodeStorage(theme: theme)
+    codeContentStorage = CodeContentStorage(observer: minimapCodeStorage)
     codeLayoutManager.textContainer = codeContainer
     codeContentStorage.textStorage  = codeStorage
     codeContentStorage.addTextLayoutManager(codeLayoutManager)
@@ -321,7 +390,7 @@ final class CodeView: NSTextView {
     // Line wrapping
     isHorizontallyResizable             = false
     isVerticallyResizable               = true
-    textContainerInset                  = CGSize(width: 0, height: 0)
+    textContainerInset                  = .zero
     textContainer?.widthTracksTextView  = false   // we need to be able to control the size (see `tile()`)
     textContainer?.heightTracksTextView = false
     textContainer?.lineBreakMode        = .byWordWrapping
@@ -342,6 +411,7 @@ final class CodeView: NSTextView {
     // Create the main gutter view
     let gutterView = GutterView(frame: CGRect.zero,
                                 textView: self,
+                                codeStorage: codeStorage,
                                 theme: theme,
                                 getMessageViews: { self.messageViews },
                                 isMinimapGutter: false)
@@ -354,6 +424,7 @@ final class CodeView: NSTextView {
     let minimapView        = MinimapView(),
         minimapGutterView  = GutterView(frame: CGRect.zero,
                                         textView: minimapView,
+                                        codeStorage: codeStorage,
                                         theme: theme,
                                         getMessageViews: { self.messageViews },
                                         isMinimapGutter: true),
@@ -366,7 +437,7 @@ final class CodeView: NSTextView {
     self.minimapDividerView = minimapDividerView
     // NB: The divider view is floating. We cannot add it now, as we don't have an `enclosingScrollView` yet.
 
-    if let minimapContentStorage = minimapView.textLayoutManager?.textContentManager as? NSTextContentStorage {
+    if let minimapContentStorage = minimapView.optTextContentStorage {
       minimapContentStorage.textStorage = minimapCodeStorage
       minimapContentStorage.delegate    = minimapContentStorageDelegate
     }
@@ -399,25 +470,25 @@ final class CodeView: NSTextView {
 
     // We need to re-tile the subviews whenever the frame of the text view changes.
     frameChangedNotificationObserver
-      = NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification,
-                                               object: self,
-                                               queue: .main){ _ in
-        self.tile()
+    = NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification,
+                                             object: self,
+                                             queue: .main){ _ in
+      self.tile()
 
-        // NB: When resizing the window, where the text container doesn't completely fill the text view (i.e., the text
-        //     is short), we need to explicitly redraw the gutter, as line wrapping may have changed, which affects
-        //     line numbering.
-        gutterView.needsDisplay = true
-      }
+      // NB: When resizing the window, where the text container doesn't completely fill the text view (i.e., the text
+      //     is short), we need to explicitly redraw the gutter, as line wrapping may have changed, which affects
+      //     line numbering.
+      gutterView.needsDisplay = true
+    }
 
     // We need to check whether we need to look up completions or cancel a running completion process after every text
     // change. We also need to remove evicted message views.
     didChangeNotificationObserver
-      = NotificationCenter.default.addObserver(forName: NSText.didChangeNotification, object: self, queue: .main){ [weak self] _ in
+    = NotificationCenter.default.addObserver(forName: NSText.didChangeNotification, object: self, queue: .main){ [weak self] _ in
 
-        self?.considerCompletionFor(range: self!.rangeForUserCompletion)
-        self?.removeMessageViews(withIDs: self!.codeStorageDelegate.lastEvictedMessageIDs)
-      }
+      self?.considerCompletionFor(range: self!.rangeForUserCompletion)
+      self?.removeMessageViews(withIDs: self!.codeStorageDelegate.lastEvictedMessageIDs)
+    }
 
     // Perform an initial tiling run when the view hierarchy has been set up.
     Task {
@@ -448,7 +519,7 @@ final class CodeView: NSTextView {
     if let observer = didChangeNotificationObserver { NotificationCenter.default.removeObserver(observer) }
   }
 
-  override func setSelectedRanges(_ ranges: [NSValue], 
+  override func setSelectedRanges(_ ranges: [NSValue],
                                   affinity: NSSelectionAffinity,
                                   stillSelecting stillSelectingFlag: Bool)
   {
@@ -514,7 +585,7 @@ final class CodeView: NSTextView {
 
     // If the selection is an insertion point, highlight the corresponding line
     if let location     = insertionPoint,
-       let textLocation = textContentStorage.textLocation(for: location) 
+       let textLocation = textContentStorage.textLocation(for: location)
     {
       if viewportRange == nil
           || viewportRange!.contains(textLocation)
@@ -538,6 +609,40 @@ final class CodeView: NSTextView {
       }
     }
   }
+}
+
+class CodeViewDelegate: NSObject, NSTextViewDelegate {
+
+  // Hooks for events
+  //
+  var textDidChange:      ((NSTextView) -> ())?
+  var selectionDidChange: ((NSTextView) -> ())?
+
+  // MARK: NSTextViewDelegate protocol
+
+  func textDidChange(_ notification: Notification) {
+    guard let textView = notification.object as? NSTextView else { return }
+
+    textDidChange?(textView)
+  }
+
+  func textViewDidChangeSelection(_ notification: Notification) {
+    guard let textView = notification.object as? NSTextView else { return }
+
+    selectionDidChange?(textView)
+  }
+}
+
+
+#endif
+
+
+// MARK: -
+// MARK: Shared code
+
+extension CodeView {
+
+  // MARK: Tiling
 
   /// Position and size the gutter and minimap and set the text container sizes and exclusion paths. Take the current
   /// view layout in `viewLayout` into account.
@@ -559,6 +664,7 @@ final class CodeView: NSTextView {
     // We wait with tiling until the layout is done unless this is the initial tiling.
     textLayoutManager?.textViewportLayoutController.layoutViewport()
 
+#if os(macOS)
     // Add the floating views if they are not yet in the view hierachy.
     // NB: Since macOS 14, we need to explicitly set clipping; otherwise, views will draw outside of the bounds of the
     //     scroll view. We need to do this vor each view, as it is not guaranteed that they share a container view.
@@ -574,11 +680,12 @@ final class CodeView: NSTextView {
       enclosingScrollView?.addFloatingSubview(view, for: .horizontal)
       view.superview?.clipsToBounds = true
     }
+#endif
 
     // Compute size of the main view gutter
     //
-    let theFont                 = font ?? NSFont.systemFont(ofSize: 0),
-        fontWidth               = theFont.maximumAdvancement.width,  // NB: we deal only with fixed width fonts
+    let theFont                 = font ?? OSFont.systemFont(ofSize: 0),
+        fontWidth               = theFont.maximumHorizontalAdvancement,  // NB: we deal only with fixed width fonts
         gutterWidthInCharacters = CGFloat(7),
         gutterWidth             = ceil(fontWidth * gutterWidthInCharacters),
         gutterSize              = CGSize(width: gutterWidth, height: frame.height),
@@ -595,7 +702,7 @@ final class CodeView: NSTextView {
                                       size: CGSize(width: minimapGutterWidth, height: frame.height)).integral,
         minimapExtras        = minimapGutterWidth + dividerWidth,
         gutterWithPadding    = gutterWidth + lineFragmentPadding,
-        visibleWidth         = enclosingScrollView?.contentSize.width ?? frame.width,
+        visibleWidth         = documentVisibleRect.width,
         widthWithoutGutters  = if viewLayout.showMinimap { visibleWidth - gutterWithPadding - minimapExtras  }
                                else { visibleWidth - gutterWithPadding },
         compositeFontWidth   = if viewLayout.showMinimap { fontWidth + minimapFontWidth  } else { fontWidth },
@@ -622,14 +729,21 @@ final class CodeView: NSTextView {
                                            width: minimapWidth,
                                            height: minimapViewFrame.height)
         minimapGutterView?.frame  = minimapGutterRect
+#if os(macOS)
         minimapView?.minSize      = CGSize(width: minimapFontWidth, height: visibleRect.height)
+#endif
 
       }
     }
 
+#if os(iOS)
+    showsHorizontalScrollIndicator = !viewLayout.wrapText
+    if viewLayout.wrapText && frame.size.width != visibleWidth { frame.size.width = visibleWidth }  // don't update frames in vain
+#elseif os(macOS)
     enclosingScrollView?.hasHorizontalScroller = !viewLayout.wrapText
     isHorizontallyResizable                    = !viewLayout.wrapText
     if !isHorizontallyResizable && frame.size.width != visibleWidth { frame.size.width = visibleWidth }  // don't update frames in vain
+#endif
 
     // Set the text container area of the main text view to reach up to the minimap
     // NB: We use the `excess` width to capture the slack that arises when the window width admits a fractional
@@ -637,7 +751,7 @@ final class CodeView: NSTextView {
     //     of the minimap and main code view are then sometimes not entirely in sync.
     let codeContainerWidth = if viewLayout.wrapText { codeViewWidth } else { CGFloat.greatestFiniteMagnitude }
     if codeContainer.size.width != codeContainerWidth {
-      codeContainer.size = NSSize(width: codeContainerWidth, height: CGFloat.greatestFiniteMagnitude)
+      codeContainer.size = CGSize(width: codeContainerWidth, height: CGFloat.greatestFiniteMagnitude)
     }
 
     codeContainer.lineFragmentPadding = lineFragmentPadding
@@ -645,12 +759,13 @@ final class CodeView: NSTextView {
 
     // Set the text container area of the minimap text view
     let minimapTextContainerWidth = if viewLayout.wrapText { minimapCodeWidth } else { CGFloat.greatestFiniteMagnitude }
-    if minimapWidth != minimapView?.frame.width || minimapTextContainerWidth != minimapView?.textContainer?.size.width {
+    let minimapTextContainer = minimapView?.textContainer
+    if minimapWidth != minimapView?.frame.width || minimapTextContainerWidth != minimapTextContainer?.size.width {
 
-      minimapView?.textContainer?.exclusionPaths      = [minimapExclusionPath]
-      minimapView?.textContainer?.size                = CGSize(width: minimapTextContainerWidth,
+      minimapTextContainer?.exclusionPaths      = [minimapExclusionPath]
+      minimapTextContainer?.size                = CGSize(width: minimapTextContainerWidth,
                                                                height: CGFloat.greatestFiniteMagnitude)
-      minimapView?.textContainer?.lineFragmentPadding = 0
+      minimapTextContainer?.lineFragmentPadding = 0
 
     }
 
@@ -660,8 +775,14 @@ final class CodeView: NSTextView {
     //     more pleasing, especially when resizing the window or similar.
     adjustScrollPositionOfMinimap()
 
-    needsDisplay = true
+#if os(iOS)
+    setNeedsLayout()
+#elseif os(macOS)
+    needsLayout = true
+#endif
   }
+
+  // MARK: Scrolling
 
   /// Adjust the positioning of the floating views.
   ///
@@ -707,37 +828,6 @@ final class CodeView: NSTextView {
 //      }
 //    }
   }
-}
-
-class CodeViewDelegate: NSObject, NSTextViewDelegate {
-
-  // Hooks for events
-  //
-  var textDidChange:      ((NSTextView) -> ())?
-  var selectionDidChange: ((NSTextView) -> ())?
-
-  // MARK: NSTextViewDelegate protocol
-
-  func textDidChange(_ notification: Notification) {
-    guard let textView = notification.object as? NSTextView else { return }
-
-    textDidChange?(textView)
-  }
-
-  func textViewDidChangeSelection(_ notification: Notification) {
-    guard let textView = notification.object as? NSTextView else { return }
-
-    selectionDidChange?(textView)
-  }
-}
-
-#endif
-
-
-// MARK: -
-// MARK: Shared code
-
-extension CodeView {
 
   // MARK: Message views
 
@@ -828,9 +918,15 @@ extension CodeView {
     // TODO: CodeEditor needs to be parameterised by message theme
     let messageTheme = Message.defaultTheme
 
+    #if os(iOS)
+    let background  = SwiftUI.Color(backgroundColor!)
+    #elseif os(macOS)
+    let background  = SwiftUI.Color(backgroundColor)
+    #endif
+
     let messageView = StatefulMessageView.HostingView(messages: messageBundle.messages,
-                                                      theme: messageTheme, 
-                                                      background: SwiftUI.Color(backgroundColor),
+                                                      theme: messageTheme,
+                                                      background: background,
                                                       geometry: MessageView.Geometry(lineWidth: 100,
                                                                                      lineHeight: 15,
                                                                                      popupWidth: 300,
@@ -848,7 +944,7 @@ extension CodeView {
 
     // We invalidate the layout of the line where the message belongs as their may be less space for the text now and
     // because the layout process for the text fills the `lineFragmentRect` property of the above `MessageInfo`.
-    if let textRange = textContentStorage?.textRange(for: charRange) {
+    if let textRange = optTextContentStorage?.textRange(for: charRange) {
 
       optTextLayoutManager?.invalidateLayout(for: textRange)
       invalidateBackground(forLinesContaining: textRange)
@@ -910,7 +1006,7 @@ extension CodeView {
 
 // MARK: Code container
 
-class CodeContainer: NSTextContainer {
+final class CodeContainer: NSTextContainer {
 
   #if os(iOS)
   weak var textView: UITextView?

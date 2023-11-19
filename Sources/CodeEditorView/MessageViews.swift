@@ -368,89 +368,10 @@ struct StatefulMessageView: View {
   }
 }
 
-#if os(iOS)
-
 extension StatefulMessageView {
 
-  class HostingView: UIView {
-    private var hostingView: UIHostingView<StatefulMessageView>?
-
-    private let messages:     [Message]
-    private let theme   :     Message.Theme
-    private let fontSize:     CGFloat
-    private let colourScheme: ColorScheme
-
-    /// Unfolding status as sharable state.
-    ///
-    private let unfoldedState = StatefulMessageView.ObservableBool(bool: false)
-
-    var geometry: MessageView.Geometry {
-      didSet { reconfigure() }
-    }
-    var unfolded: Bool {
-      get { unfoldedState.bool }
-      set { unfoldedState.bool = newValue }
-    }
-
-    init(messages: [Message],
-         theme: @escaping Message.Theme,
-         geometry: MessageView.Geometry,
-         fontSize: CGFloat,
-         colourScheme: ColorScheme)
-    {
-      self.messages     = messages
-      self.theme        = theme
-      self.geometry     = geometry
-      self.fontSize     = fontSize
-      self.colourScheme = colourScheme
-      super.init(frame: .zero)
-
-      isOpaque                                  = false
-      translatesAutoresizingMaskIntoConstraints = false
-
-      hostingView = UIHostingView(rootView: StatefulMessageView(messages: messages,
-                                                                theme: theme,
-                                                                geometry: geometry,
-                                                                fontSize: fontSize,
-                                                                colourScheme: colourScheme,
-                                                                unfolded: unfoldedState))
-      hostingView?.isOpaque                                  = false
-      hostingView?.translatesAutoresizingMaskIntoConstraints = false
-      if let view = hostingView {
-
-        addSubview(view)
-        let constraints = [
-          view.topAnchor.constraint(equalTo: self.topAnchor),
-          view.bottomAnchor.constraint(equalTo: self.bottomAnchor),
-          view.leftAnchor.constraint(equalTo: self.leftAnchor),
-          view.rightAnchor.constraint(equalTo: self.rightAnchor)
-        ]
-        NSLayoutConstraint.activate(constraints)
-
-      }
-    }
-
-    @objc required dynamic init?(coder aDecoder: NSCoder) {
-      fatalError("init(coder:) has not been implemented")
-    }
-
-    private func reconfigure() {
-      self.hostingView?.rootView = StatefulMessageView(messages: messages,
-                                                       theme: theme,
-                                                       geometry: geometry,
-                                                       fontSize: fontSize,
-                                                       colourScheme: colourScheme,
-                                                       unfolded: unfoldedState)
-    }
-  }
-}
-
-#elseif os(macOS)
-
-extension StatefulMessageView {
-
-  class HostingView: NSView {
-    private var hostingView: NSHostingView<StatefulMessageView>?
+  class HostingView: OSView {
+    private var hostingView: OSHostingView<StatefulMessageView>?
 
     private let messages:     [Message]
     private let theme:        Message.Theme
@@ -485,15 +406,21 @@ extension StatefulMessageView {
       self.colourScheme = colourScheme
       super.init(frame: .zero)
 
-      self.translatesAutoresizingMaskIntoConstraints = false
+#if os(iOS)
+      isOpaque = false
+#endif
+      translatesAutoresizingMaskIntoConstraints = false
 
-      self.hostingView = NSHostingView(rootView: StatefulMessageView(messages: messages,
-                                                                     theme: theme,
-                                                                     geometry: geometry, 
-                                                                     background: background,
-                                                                     fontSize: fontSize,
-                                                                     colourScheme: colourScheme,
-                                                                     unfolded: unfoldedState))
+      hostingView = OSHostingView(rootView: StatefulMessageView(messages: messages,
+                                                                theme: theme,
+                                                                geometry: geometry,
+                                                                background: background,
+                                                                fontSize: fontSize,
+                                                                colourScheme: colourScheme,
+                                                                unfolded: unfoldedState))
+#if os(iOS)
+      hostingView?.isOpaque = false
+#endif
       hostingView?.translatesAutoresizingMaskIntoConstraints = false
       if let view = hostingView {
 
@@ -524,9 +451,6 @@ extension StatefulMessageView {
     }
   }
 }
-
-#endif
-
 
 
 // MARK: -

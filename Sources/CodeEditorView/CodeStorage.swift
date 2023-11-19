@@ -14,6 +14,14 @@ import AppKit
 import LanguageSupport
 
 
+#if os(iOS)
+typealias EditActions = NSTextStorage.EditActions
+#elseif os(macOS)
+typealias EditActions = NSTextStorageEditActions
+#endif
+
+
+
 // MARK: -
 // MARK: `NSTextStorage` subclass
 
@@ -179,7 +187,7 @@ class CodeContentStorage: NSTextContentStorage {
   }
 
   override func processEditing(for textStorage: NSTextStorage,
-                               edited editMask: NSTextStorageEditActions,
+                               edited editMask: EditActions,
                                range newCharRange: NSRange,
                                changeInLength delta: Int,
                                invalidatedRange invalidatedCharRange: NSRange)
@@ -206,7 +214,7 @@ class CodeContentStorage: NSTextContentStorage {
 /// forwarder to allow a second, but read-only observer. This does require the observer text storage to support an
 /// functionality for editing events.
 ///
-class TextStorageObserver: NSTextStorage {
+final class TextStorageObserver: NSTextStorage {
   var textStorage: NSTextStorage?
 
   // MARK: `NSTextStorage` interface to override
@@ -236,7 +244,7 @@ class TextStorageObserver: NSTextStorage {
   /// Entry point for forarded editing actions of the wrapped text storage.
   ///
   func processEditing(for textStorage: NSTextStorage,
-                      edited editMask: NSTextStorageEditActions,
+                      edited editMask: EditActions,
                       range newCharRange: NSRange,
                       changeInLength delta: Int,
                       invalidatedRange invalidatedCharRange: NSRange)
@@ -299,6 +307,7 @@ extension CodeStorage {
   ///
   func setInsertionPointAfterDeletion(of range: NSRange) {
 
+// FIXME: adapt to TextKit 2
 //    for layoutManager in self.layoutManagers {
 //      for textContainer in layoutManager.textContainers {
 //

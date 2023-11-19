@@ -29,7 +29,47 @@ import SwiftUI
 let minimapRatio = CGFloat(8)
 
 
-#if os(macOS)
+#if os(iOS)
+
+// MARK: -
+// MARK: Minimap view for iOS
+
+/// Customised text view for the minimap.
+///
+class MinimapView: UITextView {
+  weak var codeView: CodeView?
+
+  // Highlight the current line.
+  //
+  override func draw(_ rect: CGRect) {
+    super.draw(rect)
+
+    let rectWithinBounds = rect.intersection(bounds)
+
+    guard let textLayoutManager  = textLayoutManager,
+          let textContentStorage = textLayoutManager.textContentManager as? NSTextContentStorage
+    else { return }
+
+    let viewportRange = textLayoutManager.textViewportLayoutController.viewportRange
+
+    // If the selection is an insertion point, highlight the corresponding line
+    if let location     = insertionPoint,
+       let textLocation = textContentStorage.textLocation(for: location)
+    {
+      if viewportRange == nil
+          || viewportRange!.contains(textLocation)
+          || viewportRange!.endLocation.compare(textLocation) == .orderedSame
+      {
+        drawBackgroundHighlight(within: rectWithinBounds,
+                                forLineContaining: textLocation,
+                                withColour: codeView?.theme.currentLineColour ?? .systemBackground)
+      }
+    }
+  }
+}
+
+
+#elseif os(macOS)
 
 // MARK: -
 // MARK: Minimap view for macOS
@@ -81,10 +121,10 @@ class MinimapContentStorageDelegate: NSObject, NSTextContentStorageDelegate {
     let text = NSMutableAttributedString(attributedString: 
                                          textContentStorage.attributedString!.attributedSubstring(from: range)),
         font = if range.length > 0,
-                  let font = text.attribute(.font, at: 0, effectiveRange: nil) as? NSFont { font }
-               else { NSFont.monospacedSystemFont(ofSize: 0, weight: .regular) }
-    text.addAttribute(.font, 
-                      value: NSFont(name: font.fontName, size: font.pointSize / minimapRatio)!,
+                  let font = text.attribute(.font, at: 0, effectiveRange: nil) as? OSFont { font }
+               else { OSFont.monospacedSystemFont(ofSize: 0, weight: .regular) }
+    text.addAttribute(.font,
+                      value: OSFont(name: font.fontName, size: font.pointSize / minimapRatio)!,
                       range: NSRange(location: 0, length: range.length))
 
     return NSTextParagraph(attributedString: text)
@@ -116,9 +156,9 @@ class MinimapLineFragment: NSTextLineFragment {
 
     // Determine the advancement per glyph (assuming a monospaced font)
     let font = if range.length > 0,
-                  let font = attributedString.attribute(.font, at: range.location, effectiveRange: nil) as? NSFont { font }
-               else { NSFont.monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular) }
-    advancement = font.maximumAdvancement.width
+                  let font = attributedString.attribute(.font, at: range.location, effectiveRange: nil) as? OSFont { font }
+               else { OSFont.monospacedSystemFont(ofSize: OSFont.systemFontSize, weight: .regular) }
+    advancement = font.maximumHorizontalAdvancement
 
     super.init(attributedString: attributedString, range: range)
   }
@@ -164,10 +204,10 @@ class MinimapLineFragment: NSTextLineFragment {
 
         let index = string.distance(from: string.startIndex, to: string.index(string.startIndex, offsetBy: i))
         // TODO: could try to optimise by using the `effectiveRange` of the attribute lookup to compute an entire glyph run to draw as one rectangle
-        if let colour = attributedString.attribute(.foregroundColor, at: index, effectiveRange: nil) as? NSColor {
+        if let colour = attributedString.attribute(.foregroundColor, at: index, effectiveRange: nil) as? OSColor {
           colour.withAlphaComponent(0.50).setFill()
         }
-        NSBezierPath(rect: CGRect(origin: CGPoint(x: floor(glyphRect.minX), y: glyphRect.minY), 
+        OSBezierPath(rect: CGRect(origin: CGPoint(x: floor(glyphRect.minX), y: glyphRect.minY), 
                                   size: glyphRect.size)).fill()
 
       }
