@@ -784,49 +784,39 @@ extension CodeView {
 
   // MARK: Scrolling
 
-  /// Adjust the positioning of the floating views.
-  ///
-  func adjustScrollPosition() {
-    adjustScrollPositionOfMinimap()
-  }
-
   /// Sets the scrolling position of the minimap in dependence of the scroll position of the main code view.
   ///
   func adjustScrollPositionOfMinimap() {
-    return
+    guard viewLayout.showMinimap,
+          let minimapTextLayoutManager = minimapView?.textLayoutManager
+    else { return }
 
-//    guard viewLayout.showMinimap else { return }
-//
-//    whenLayoutDone { [self] in
-//
-//      guard let minimapLayoutManager = minimapView?.layoutManager as? MinimapLayoutManager else { return }
-//      minimapLayoutManager.whenLayoutDone { [self] in
-//
-//        let codeViewHeight = frame.size.height,
-//            codeHeight     = boundingRect()?.height ?? 0,
-//            minimapHeight  = minimapView?.boundingRect()?.height ?? 0,
-//            visibleHeight  = documentVisibleRect.size.height
-//
-//        let scrollFactor: CGFloat = if minimapHeight < visibleHeight || codeHeight <= visibleHeight { 1 } 
-//                                    else { 1 - (minimapHeight - visibleHeight) / (codeHeight - visibleHeight) }
-//
-//        // We box the positioning of the minimap at the top and the bottom of the code view (with the `max` and `min`
-//        // expessions. This is necessary as the minimap will otherwise be partially cut off by the enclosing clip view.
-//        // To get Xcode-like behaviour, where the minimap sticks to the top, it being a floating view is not sufficient.
-//        let newOriginY = floor(min(max(documentVisibleRect.origin.y * scrollFactor, 0),
-//                                   codeViewHeight - minimapHeight))
-//        if minimapView?.frame.origin.y != newOriginY { minimapView?.frame.origin.y = newOriginY }  // don't update frames in vain
-//
-//        let heightRatio: CGFloat = if codeHeight <= minimapHeight { 1 } else { minimapHeight / codeHeight }
-//        let minimapVisibleY      = documentVisibleRect.origin.y * heightRatio,
-//            minimapVisibleHeight = visibleHeight * heightRatio,
-//            documentVisibleFrame = CGRect(x: 0,
-//                                          y: minimapVisibleY,
-//                                          width: minimapView?.bounds.size.width ?? 0,
-//                                          height: minimapVisibleHeight).integral
-//        if documentVisibleBox?.frame != documentVisibleFrame { documentVisibleBox?.frame = documentVisibleFrame }  // don't update frames in vain
-//      }
-//    }
+    textLayoutManager?.textViewportLayoutController.layoutViewport()
+    minimapTextLayoutManager.textViewportLayoutController.layoutViewport()
+
+    let codeViewHeight = frame.size.height,
+        codeHeight     = boundingRect()?.height ?? 0,
+        minimapHeight  = minimapView?.boundingRect()?.height ?? 0,
+        visibleHeight  = documentVisibleRect.size.height
+
+    let scrollFactor: CGFloat = if minimapHeight < visibleHeight || codeHeight <= visibleHeight { 1 }
+    else { 1 - (minimapHeight - visibleHeight) / (codeHeight - visibleHeight) }
+
+    // We box the positioning of the minimap at the top and the bottom of the code view (with the `max` and `min`
+    // expessions. This is necessary as the minimap will otherwise be partially cut off by the enclosing clip view.
+    // To get Xcode-like behaviour, where the minimap sticks to the top, it being a floating view is not sufficient.
+    let newOriginY = floor(min(max(documentVisibleRect.origin.y * scrollFactor, 0),
+                               codeViewHeight - minimapHeight))
+    if minimapView?.frame.origin.y != newOriginY { minimapView?.frame.origin.y = newOriginY }  // don't update frames in vain
+
+    let heightRatio: CGFloat = if codeHeight <= minimapHeight { 1 } else { minimapHeight / codeHeight }
+    let minimapVisibleY      = documentVisibleRect.origin.y * heightRatio,
+        minimapVisibleHeight = visibleHeight * heightRatio,
+        documentVisibleFrame = CGRect(x: 0,
+                                      y: minimapVisibleY,
+                                      width: minimapView?.bounds.size.width ?? 0,
+                                      height: minimapVisibleHeight).integral
+    if documentVisibleBox?.frame != documentVisibleFrame { documentVisibleBox?.frame = documentVisibleFrame }  // don't update frames in vain
   }
 
   // MARK: Message views
