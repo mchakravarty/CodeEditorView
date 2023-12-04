@@ -186,27 +186,6 @@ extension GutterView {
 
     let selectedLines = textView?.selectedLines ?? Set(1..<2)
 
-    // FIXME: Eventually, we want this in the minimap, too.
-    if !isMinimapGutter {
-
-      let viewportRange = textLayoutManager.textViewportLayoutController.viewportRange
-
-      // Highlight lines with messages
-      for messageView in getMessageViews() {
-
-        if let location = textContentStorage.textLocation(for: messageView.value.characterIndex),
-           viewportRange == nil || viewportRange!.contains(location),
-           let (y: y, height: height) = textLayoutManager.textLayoutFragmentExtent(for: NSTextRange(location: location))
-        {
-
-          messageView.value.colour.withAlphaComponent(0.1).setFill()
-          let intersectionRect = rect.intersection(gutterRectFrom(y: y, height: height))
-          if !intersectionRect.isEmpty { OSBezierPath(rect: intersectionRect).fill() }
-
-        }
-      }
-    }
-
     // Determine the character range whose line numbers need to be drawn by narrowing down the viewport range
     guard var textRange = textLayoutManager.textViewportLayoutController.viewportRange else { return }
     if let firstLineFragmentRange = textLayoutManager.lineFragmentRange(for: CGPoint(x: 1, y: rect.minY),

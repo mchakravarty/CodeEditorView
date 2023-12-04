@@ -143,8 +143,8 @@ extension TextView {
     guard let textLayoutManager = optTextLayoutManager else { return }
 
     colour.setFill()
-    if let (y: y, height: height) = textLayoutManager.textLayoutFragmentExtent(for: NSTextRange(location: textLocation)),
-       let highlightRect          = lineBackgroundRect(y: y, height: height)
+    if let fragmentFrame = textLayoutManager.textLayoutFragment(for: textLocation)?.layoutFragmentFrameWithoutExtraLineFragment,
+       let highlightRect = lineBackgroundRect(y: fragmentFrame.minY, height: fragmentFrame.height)
     {
 
       let clippedRect = highlightRect.intersection(rect)

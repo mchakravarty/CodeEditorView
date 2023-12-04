@@ -274,7 +274,7 @@ final class CodeViewDelegate: NSObject, UITextViewDelegate {
 
     selectionDidChange?(textView)
 
-    codeView.invalidateBackgroundFor(oldSelection: oldSelectedRange, newSelection: codeView.selectedRange)
+    codeView.updateBackgroundFor(oldSelection: oldSelectedRange, newSelection: codeView.selectedRange)
     oldSelectedRange = textView.selectedRange
   }
 
@@ -574,7 +574,7 @@ final class CodeView: NSTextView {
     super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelectingFlag)
     minimapView?.selectedRanges = selectedRanges    // minimap mirrors the selection of the main code view
 
-    invalidateBackgroundFor(oldSelection: combinedRanges(ranges: oldSelectedRanges),
+    updateBackgroundFor(oldSelection: combinedRanges(ranges: oldSelectedRanges),
                             newSelection: combinedRanges(ranges: ranges))
   }
 
@@ -641,8 +641,17 @@ final class CodeBackgroundHighlightView: NSBox {
 extension CodeView {
 
   // MARK: Background highlights
-
-  func invalidateBackgroundFor(oldSelection oldRange: NSRange, newSelection newRange: NSRange) {
+  
+  /// Update the code background for the given selection change.
+  ///
+  /// - Parameters:
+  ///   - oldRange: Old selection range.
+  ///   - newRange: New selection range.
+  ///
+  /// This includes both invalidating rectangle for background redrawing as well as updating the frames of background
+  /// (highlighting) views.
+  ///
+  func updateBackgroundFor(oldSelection oldRange: NSRange, newSelection newRange: NSRange) {
     guard let textContentStorage = optTextContentStorage else { return }
 
     let lineOfInsertionPoint = insertionPoint.flatMap{ optLineMap?.lineOf(index: $0) }
@@ -652,25 +661,13 @@ extension CodeView {
     //     to the selected range change.
     if lineOfInsertionPoint != oldLastLineOfInsertionPoint {
 
-      if let oldLine      = oldLastLineOfInsertionPoint,
-         let oldLineRange = optLineMap?.lookup(line: oldLine)?.range
-      {
-
-        if let textLocation = textContentStorage.textLocation(for: oldLineRange.location) {
-          invalidateBackground(forLineContaining: textLocation)
-          minimapView?.invalidateBackground(forLineContaining: textLocation)
-        }
-
+      if let textLocation = textContentStorage.textLocation(for: oldRange.location) {
+        minimapView?.invalidateBackground(forLineContaining: textLocation)
       }
-      if let newLine      = lineOfInsertionPoint,
-         let newLineRange = optLineMap?.lookup(line: newLine)?.range
-      {
 
-        if let textLocation = textContentStorage.textLocation(for: newLineRange.location) {
-          invalidateBackground(forLineContaining: textLocation)
-          minimapView?.invalidateBackground(forLineContaining: textLocation)
-        }
-
+      if let textLocation = textContentStorage.textLocation(for: newRange.location) {
+        updateCurrentLineHighlight(for: textLocation)
+        minimapView?.invalidateBackground(forLineContaining: textLocation)
       }
     }
     oldLastLineOfInsertionPoint = lineOfInsertionPoint
@@ -689,36 +686,27 @@ extension CodeView {
     }
   }
 
+  func updateCurrentLineHighlight(for location: NSTextLocation) {
+    guard let textLayoutManager  = optTextLayoutManager else { return }
+
+    textLayoutManager.textViewportLayoutController.layoutViewport()
+
+    // The current line highlight view needs to be visible if we have an insertion point (and not a selection range).
+    currentLineHighlightView?.isHidden = insertionPoint == nil
+
+    if let fragmentFrame = textLayoutManager.textLayoutFragment(for: location)?.layoutFragmentFrameWithoutExtraLineFragment,
+       let highlightRect = lineBackgroundRect(y: fragmentFrame.minY, height: fragmentFrame.height)
+    {
+      currentLineHighlightView?.frame = highlightRect
+    }
+  }
+
   func drawBackgroundHighlights(in rect: CGRect) {
     guard let textLayoutManager  = optTextLayoutManager,
           let textContentStorage = optTextContentStorage
     else { return }
 
     let viewportRange = textLayoutManager.textViewportLayoutController.viewportRange
-
-    // If the selection is an insertion point, highlight the corresponding line
-    if let location     = insertionPoint,
-       let textLocation = textContentStorage.textLocation(for: location)
-    {
-
-      currentLineHighlightView?.isHidden = false
-      if viewportRange == nil
-          || viewportRange!.contains(textLocation)
-          || viewportRange!.endLocation.compare(textLocation) == .orderedSame
-      {
-
-        guard let textLayoutManager = optTextLayoutManager else { return }
-
-        if let (y: y, height: height) = textLayoutManager.textLayoutFragmentExtent(for: NSTextRange(location: textLocation)),
-           let highlightRect          = lineBackgroundRect(y: y, height: height)
-        {
-          currentLineHighlightView?.frame = highlightRect
-        }
-
-      }
-    } else {
-      currentLineHighlightView?.isHidden = true
-    }
 
     // Highlight each line that has a message view
     for messageView in messageViews {
@@ -867,6 +855,11 @@ extension CodeView {
     //     `adjustScrollPositionOfMinimap()` here as it does little work and an intermediate update is visually
     //     more pleasing, especially when resizing the window or similar.
     adjustScrollPositionOfMinimap()
+
+    // Only after tiling can we get the correct frame for the highlight view.
+    if let textLocation = optTextContentStorage?.textLocation(for: selectedRange.location) {
+      updateCurrentLineHighlight(for: textLocation)
+    }
 
 #if os(iOS)
     setNeedsLayout()
