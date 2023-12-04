@@ -69,8 +69,8 @@ final class GutterView: OSView {
   ///
   let isMinimapGutter: Bool
 
-  /// Create and configure a gutter view for the given text view. This will also set the appropiate exclusion path for
-  /// text container.
+  /// Create and configure a gutter view for the given text view. The gutter view is transparent, so that we can place
+  /// highlight views behind it.
   ///
   init(frame: CGRect,
        textView: OSTextView,
@@ -86,7 +86,9 @@ final class GutterView: OSView {
     self.isMinimapGutter = isMinimapGutter
     super.init(frame: frame)
 #if os(iOS)
-    contentMode = .redraw
+    isOpaque        = false
+    backgroundColor = .clear
+    contentMode     = .redraw
 #elseif os(macOS)
     // NB: If would decide to use layer backing, we need to set the `layerContentsRedrawPolicy` to redraw on resizing
 #endif
@@ -158,14 +160,6 @@ extension GutterView {
     let viewPortBounds = textLayoutManager.textViewportLayoutController.viewportBounds
     textLayoutManager.ensureLayout(for: viewPortBounds)
 
-    // From macOS 14, the system doesn't automatically clip drawing to view bounds. Hence, we clip the draw rect here
-    // explicitly. We also assume that the super view for floating gutters has `clipToBounds == true` to avoid drawing
-    // outside of the containing scroll view bounds.
-    let rect = rect.intersection(bounds).intersection(viewPortBounds)
-
-    theme.backgroundColour.setFill()
-    OSBezierPath(rect: rect).fill()
-
     let desc = OSFont.systemFont(ofSize: theme.fontSize).fontDescriptor.addingAttributes(
       [ OSFontDescriptor.AttributeName.featureSettings:
           [
@@ -192,22 +186,6 @@ extension GutterView {
 
     let selectedLines = textView?.selectedLines ?? Set(1..<2)
 
-    // Currently only supported on macOS as `UITextView` is less configurable
-    #if os(macOS)
-
-    // Highlight the current line in the gutter
-    if let location               = textView?.insertionPoint,
-       let textLocation           = textContentStorage.textLocation(for: location),
-       let (y: y, height: height) = textLayoutManager.textLayoutFragmentExtent(for: NSTextRange(location: textLocation))
-    {
-
-      theme.currentLineColour.setFill()
-      
-      let intersectionRect = rect.intersection(gutterRectFrom(y: y, height: height))
-      if !intersectionRect.isEmpty { NSBezierPath(rect: intersectionRect).fill() }
-
-    }
-
     // FIXME: Eventually, we want this in the minimap, too.
     if !isMinimapGutter {
 
@@ -223,13 +201,11 @@ extension GutterView {
 
           messageView.value.colour.withAlphaComponent(0.1).setFill()
           let intersectionRect = rect.intersection(gutterRectFrom(y: y, height: height))
-          if !intersectionRect.isEmpty { NSBezierPath(rect: intersectionRect).fill() }
+          if !intersectionRect.isEmpty { OSBezierPath(rect: intersectionRect).fill() }
 
         }
       }
     }
-
-    #endif
 
     // Determine the character range whose line numbers need to be drawn by narrowing down the viewport range
     guard var textRange = textLayoutManager.textViewportLayoutController.viewportRange else { return }

@@ -122,4 +122,18 @@ extension NSTextLayoutManager {
     }
     return boundingBox
   }
+  
+  /// Determine the bounding rect of the first text segment of a given text range.
+  ///
+  /// - Parameter textRange: The text range for which we want to determine the first segment.
+  /// - Returns: The bounding rect of the first text segment if any.
+  ///
+  func boundingRectOfFirstTextSegment(for textRange: NSTextRange) -> CGRect? {
+    var result: CGRect?
+    enumerateTextSegments(in: textRange, type: .standard, options: .rangeNotRequired) { (_, rect, _, _) in
+      result = rect
+      return false
+    }
+    return result
+  }
 }

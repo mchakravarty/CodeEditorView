@@ -92,13 +92,14 @@ extension TextView {
     } else { return nil }
   }
 
-  /// Determine the bounding rectangle for the charcters in the given range.
+  /// Determine the bounding rectangle for fragments containing the characters in the given range.
   ///
-  /// - Parameter range: The range of chracters whose bounding rectangle we desire. If nil, the entire text is used.
+  /// - Parameter range: The range of characters whose fragment bounding rectangle we desire. If nil, the entire text is
+  ///     used.
   /// - Returns: The bounding rectangle if the character range is valid. The coordinates are relative to the origin of
   ///     the text view.
   ///
-  func boundingRect(for range: NSRange? = nil) -> CGRect? {
+  func fragmentBoundingRect(for range: NSRange? = nil) -> CGRect? {
     guard let textLayoutManager = optTextLayoutManager,
           let textContentStorage = textLayoutManager.textContentManager as? NSTextContentStorage
     else { return nil }
@@ -106,7 +107,7 @@ extension TextView {
     let textRange = if let range,
                        let textRange = textContentStorage.textRange(for: range) { textRange }
                     else { textContentStorage.documentRange },
-    rect      = textLayoutManager.textLayoutFragmentBoundingRect(for: textRange)
+        rect      = textLayoutManager.textLayoutFragmentBoundingRect(for: textRange)
     return rect.offsetBy(dx: textContainerOrigin.x, dy: textContainerOrigin.y)
   }
 
@@ -136,8 +137,8 @@ extension TextView {
   /// Draw the background of an entire line of text with a highlight colour.
   ///
   func drawBackgroundHighlight(within rect: CGRect,
-                                       forLineContaining textLocation: NSTextLocation,
-                                       withColour colour: OSColor)
+                               forLineContaining textLocation: NSTextLocation,
+                               withColour colour: OSColor)
   {
     guard let textLayoutManager = optTextLayoutManager else { return }
 
@@ -203,18 +204,21 @@ extension UITextView: TextView {
   // method is called again, the old view should be removed right away. This is a bit awkward to implement, as we cannot
   // add a stored property in an extension, but it should happen eventually as it does look better.
   func showFindIndicator(for range: NSRange) {
+    guard let textLayoutManager  = optTextLayoutManager,
+          let textContentStorage = textLayoutManager.textContentManager as? NSTextContentStorage,
+          let visibleTextRange   = textLayoutManager.textViewportLayoutController.viewportRange
+    else { return }
 
     // Determine the visible portion of the range
-    let visibleGlyphRange = layoutManager.glyphRange(forBoundingRectWithoutAdditionalLayout: documentVisibleRect,
-                                                     in: textContainer),
-        visibleCharRange  = layoutManager.characterRange(forGlyphRange: visibleGlyphRange, actualGlyphRange: nil),
-        visibleRange      = NSIntersectionRange(visibleCharRange, range)
+    let visibleCharRange = textContentStorage.range(for: visibleTextRange),
+        visibleRange     = NSIntersectionRange(visibleCharRange, range)
 
     // Set up a label view to animate as the indicator view
-    let glyphRange = layoutManager.glyphRange(forCharacterRange: visibleRange, actualCharacterRange: nil),
-        glyphRect  = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer),
-        label      = UILabel(frame: glyphRect.offsetBy(dx: textContainerOrigin.x, dy: textContainerOrigin.y)),
-        text       = NSMutableAttributedString(attributedString: textStorage.attributedSubstring(from: visibleRange))
+    guard let visibleTextRange = textContentStorage.textRange(for: visibleRange),
+          let rect           = textLayoutManager.boundingRectOfFirstTextSegment(for: visibleTextRange)
+    else { return }
+    let label = UILabel(frame: rect),
+        text  = NSMutableAttributedString(attributedString: textStorage.attributedSubstring(from: visibleRange))
     text.addAttributes(highlightingAttributes, range: NSRange(location: 0, length: text.length))
     label.attributedText      = text
     label.layer.cornerRadius  = 3

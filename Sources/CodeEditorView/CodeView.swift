@@ -61,30 +61,37 @@ final class CodeView: UITextView {
   fileprivate let minimapContentStorageDelegate    = MinimapContentStorageDelegate()
 
   // Subviews
-  var gutterView:         GutterView?
-  var minimapView:        UITextView?
-  var minimapGutterView:  GutterView?
-  var documentVisibleBox: UIView?
-  var minimapDividerView: UIView?
+  var gutterView:               GutterView?
+  var currentLineHighlightView: CodeBackgroundHighlightView?
+  var minimapView:              UITextView?
+  var minimapGutterView:        GutterView?
+  var documentVisibleBox:       UIView?
+  var minimapDividerView:       UIView?
 
   // Notification observer
   private var didChangeNotificationObserver: NSObjectProtocol?
+
+  /// Contains the line on which the insertion point was located, the last time the selection range got set (if the
+  /// selection was an insertion point at all; i.e., it's length was 0).
+  ///
+  var oldLastLineOfInsertionPoint: Int? = 1
 
   /// The current highlighting theme
   ///
   var theme: Theme {
     didSet {
-      font                                 = UIFont(name: theme.fontName, size: theme.fontSize)
-      backgroundColor                      = theme.backgroundColour
-      tintColor                            = theme.tintColour
-      (textStorage as? CodeStorage)?.theme = theme
-      gutterView?.theme                    = theme
-      minimapView?.backgroundColor         = theme.backgroundColour
-      minimapGutterView?.theme             = theme
-      documentVisibleBox?.backgroundColor  = theme.textColour.withAlphaComponent(0.1)
-//      minimapDividerView?.backgroundColor        = theme.backgroundColour.blended(withFraction: 0.15, of: .systemGray)!
+      font                                  = UIFont(name: theme.fontName, size: theme.fontSize)
+      backgroundColor                       = theme.backgroundColour
+      tintColor                             = theme.tintColour
+      (textStorage as? CodeStorage)?.theme  = theme
+      currentLineHighlightView?.color       = theme.currentLineColour
+      gutterView?.theme                     = theme
+      minimapView?.backgroundColor          = theme.backgroundColour
+      minimapGutterView?.theme              = theme
+      documentVisibleBox?.backgroundColor   = theme.textColour.withAlphaComponent(0.1)
+//      minimapDividerView?.backgroundColor   = theme.backgroundColour.blended(withFraction: 0.15, of: .systemGray)!
       // FIXME: How to mix the colours?
-      minimapDividerView?.backgroundColor  = .red
+      minimapDividerView?.backgroundColor   = .red
       tile()
       setNeedsDisplay(bounds)
     }
@@ -160,6 +167,11 @@ final class CodeView: UITextView {
     self.gutterView              = gutterView
     addSubview(gutterView)
 
+    let currentLineHighlightView = CodeBackgroundHighlightView(color: theme.currentLineColour)
+    self.currentLineHighlightView = currentLineHighlightView
+    addSubview(currentLineHighlightView)
+    sendSubviewToBack(currentLineHighlightView)
+
     // Create the minimap with its own gutter, but sharing the code storage with the code view
     //
     let minimapView        = MinimapView(),
@@ -221,12 +233,22 @@ final class CodeView: UITextView {
     fatalError("init(coder:) has not been implemented")
   }
 
+  deinit {
+    if let observer = didChangeNotificationObserver { NotificationCenter.default.removeObserver(observer) }
+  }
+
   override func layoutSubviews() {
     gutterView?.frame.size.height = contentSize.height
   }
+
+  override func draw(_ rect: CGRect) {
+    drawBackgroundHighlights(in: rect)
+
+    super.draw(rect)
+  }
 }
 
-class CodeViewDelegate: NSObject, UITextViewDelegate {
+final class CodeViewDelegate: NSObject, UITextViewDelegate {
 
   // Hooks for events
   //
@@ -252,16 +274,35 @@ class CodeViewDelegate: NSObject, UITextViewDelegate {
 
     selectionDidChange?(textView)
 
-    // NB: Invalidation of the two ranges needs to happen separately. If we were to union them, an insertion point
-    //     (range length = 0) at the start of a line would be absorbed into the previous line, which results in a lack
-    //     of invalidation of the line on which the insertion point is located.
-    codeView.gutterView?.invalidateGutter(for: codeView.selectedRange)
-    codeView.gutterView?.invalidateGutter(for: oldSelectedRange)
+    codeView.invalidateBackgroundFor(oldSelection: oldSelectedRange, newSelection: codeView.selectedRange)
     oldSelectedRange = textView.selectedRange
   }
 
   func scrollViewDidScroll(_ scrollView: UIScrollView) { didScroll?(scrollView) }
 }
+
+/// Custom view for background highlights.
+///
+final class CodeBackgroundHighlightView: UIView {
+  
+  /// The background colour displayed by this view.
+  ///
+  var color: UIColor {
+    get { backgroundColor ?? .clear }
+    set { backgroundColor = newValue }
+  }
+
+  init(color: UIColor) {
+    super.init(frame: .zero)
+    self.color = color
+  }
+  
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+}
+
 
 #elseif os(macOS)
 
@@ -282,11 +323,12 @@ final class CodeView: NSTextView {
   fileprivate let minimapContentStorageDelegate    = MinimapContentStorageDelegate()
 
   // Subviews
-  var gutterView:         GutterView?
-  var minimapView:        NSTextView?
-  var minimapGutterView:  GutterView?
-  var documentVisibleBox: NSBox?
-  var minimapDividerView: NSBox?
+  var gutterView:               GutterView?
+  var currentLineHighlightView: CodeBackgroundHighlightView?
+  var minimapView:              NSTextView?
+  var minimapGutterView:        GutterView?
+  var documentVisibleBox:       NSBox?
+  var minimapDividerView:       NSBox?
 
   // Notification observer
   private var frameChangedNotificationObserver: NSObjectProtocol?
@@ -307,6 +349,7 @@ final class CodeView: NSTextView {
       selectedTextAttributes               = [.backgroundColor: theme.selectionColour]
       (textStorage as? CodeStorage)?.theme = theme
       gutterView?.theme                    = theme
+      currentLineHighlightView?.color      = theme.currentLineColour
       minimapView?.backgroundColor         = theme.backgroundColour
       minimapGutterView?.theme             = theme
       documentVisibleBox?.fillColor        = theme.textColour.withAlphaComponent(0.1)
@@ -419,6 +462,10 @@ final class CodeView: NSTextView {
     self.gutterView              = gutterView
     // NB: The gutter view is floating. We cannot add it now, as we don't have an `enclosingScrollView` yet.
 
+    let currentLineHighlightView = CodeBackgroundHighlightView(color: theme.currentLineColour)
+    addSubview(currentLineHighlightView, positioned: .below, relativeTo: nil)
+    self.currentLineHighlightView = currentLineHighlightView
+
     // Create the minimap with its own gutter, but sharing the code storage with the code view
     //
     let minimapView        = MinimapView(),
@@ -527,87 +574,14 @@ final class CodeView: NSTextView {
     super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelectingFlag)
     minimapView?.selectedRanges = selectedRanges    // minimap mirrors the selection of the main code view
 
-    let lineOfInsertionPoint = insertionPoint.flatMap{ optLineMap?.lineOf(index: $0) }
-
-    // If the insertion point changed lines, we need to redraw at the old and new location to fix the line highlighting.
-    // NB: We retain the last line and not the character index as the latter may be inaccurate due to editing that let
-    //     to the selected range change.
-    if lineOfInsertionPoint != oldLastLineOfInsertionPoint {
-
-      if let oldLine      = oldLastLineOfInsertionPoint,
-         let oldLineRange = optLineMap?.lookup(line: oldLine)?.range
-      {
-
-        if let textLocation = textContentStorage?.textLocation(for: oldLineRange.location) {
-          invalidateBackground(forLineContaining: textLocation)
-          minimapView?.invalidateBackground(forLineContaining: textLocation)
-        }
-
-      }
-      if let newLine      = lineOfInsertionPoint,
-         let newLineRange = optLineMap?.lookup(line: newLine)?.range
-      {
-
-        if let textLocation = textContentStorage?.textLocation(for: newLineRange.location) {
-          invalidateBackground(forLineContaining: textLocation)
-          minimapView?.invalidateBackground(forLineContaining: textLocation)
-        }
-
-      }
-    }
-    oldLastLineOfInsertionPoint = lineOfInsertionPoint
-
-    // NB: The following needs to happen after calling `super`, as redrawing depends on the correctly set new set of
-    //     ranges.
-
-    // Needed as the selection affects line number highlighting.
-    // NB: Invalidation of the old and new ranges needs to happen separately. If we were to union them, an insertion
-    //     point (range length = 0) at the start of a line would be absorbed into the previous line, which results in
-    //     a lack of invalidation of the line on which the insertion point is located.
-    gutterView?.invalidateGutter(for: combinedRanges(ranges: oldSelectedRanges))
-    gutterView?.invalidateGutter(for: combinedRanges(ranges: ranges))
-    minimapGutterView?.invalidateGutter(for: combinedRanges(ranges: oldSelectedRanges))
-    minimapGutterView?.invalidateGutter(for: combinedRanges(ranges: ranges))
-
-    DispatchQueue.main.async {
-      self.collapseMessageViews()
-    }
+    invalidateBackgroundFor(oldSelection: combinedRanges(ranges: oldSelectedRanges),
+                            newSelection: combinedRanges(ranges: ranges))
   }
 
   override func drawBackground(in rect: NSRect) {
     super.drawBackground(in: rect)
 
-    guard let textLayoutManager  = optTextLayoutManager,
-          let textContentStorage = textContentStorage
-    else { return }
-
-    let viewportRange = textLayoutManager.textViewportLayoutController.viewportRange
-
-    // If the selection is an insertion point, highlight the corresponding line
-    if let location     = insertionPoint,
-       let textLocation = textContentStorage.textLocation(for: location)
-    {
-      if viewportRange == nil
-          || viewportRange!.contains(textLocation)
-          || viewportRange!.endLocation.compare(textLocation) == .orderedSame
-      {
-        drawBackgroundHighlight(within: rect, forLineContaining: textLocation, withColour: theme.currentLineColour)
-      }
-    }
-
-    // Highlight each line that has a message view
-    for messageView in messageViews {
-
-      if let location = textContentStorage.textLocation(for: messageView.value.characterIndex),
-         viewportRange == nil || viewportRange!.contains(location)
-      {
-
-        drawBackgroundHighlight(within: rect,
-                                forLineContaining: location,
-                                withColour: messageView.value.colour.withAlphaComponent(0.1))
-
-      }
-    }
+    drawBackgroundHighlights(in: rect)
   }
 }
 
@@ -633,6 +607,30 @@ class CodeViewDelegate: NSObject, NSTextViewDelegate {
   }
 }
 
+/// Custom view for background highlights.
+///
+final class CodeBackgroundHighlightView: NSBox {
+
+  /// The background colour displayed by this view.
+  ///
+  var color: NSColor {
+    get { fillColor }
+    set { fillColor = newValue }
+  }
+
+  init(color: NSColor) {
+    super.init(frame: .zero)
+    self.color  = color
+    boxType     = .custom
+    borderWidth = 0
+  }
+
+  @available(*, unavailable)
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+}
+
 
 #endif
 
@@ -641,6 +639,101 @@ class CodeViewDelegate: NSObject, NSTextViewDelegate {
 // MARK: Shared code
 
 extension CodeView {
+
+  // MARK: Background highlights
+
+  func invalidateBackgroundFor(oldSelection oldRange: NSRange, newSelection newRange: NSRange) {
+    guard let textContentStorage = optTextContentStorage else { return }
+
+    let lineOfInsertionPoint = insertionPoint.flatMap{ optLineMap?.lineOf(index: $0) }
+
+    // If the insertion point changed lines, we need to redraw at the old and new location to fix the line highlighting.
+    // NB: We retain the last line and not the character index as the latter may be inaccurate due to editing that let
+    //     to the selected range change.
+    if lineOfInsertionPoint != oldLastLineOfInsertionPoint {
+
+      if let oldLine      = oldLastLineOfInsertionPoint,
+         let oldLineRange = optLineMap?.lookup(line: oldLine)?.range
+      {
+
+        if let textLocation = textContentStorage.textLocation(for: oldLineRange.location) {
+          invalidateBackground(forLineContaining: textLocation)
+          minimapView?.invalidateBackground(forLineContaining: textLocation)
+        }
+
+      }
+      if let newLine      = lineOfInsertionPoint,
+         let newLineRange = optLineMap?.lookup(line: newLine)?.range
+      {
+
+        if let textLocation = textContentStorage.textLocation(for: newLineRange.location) {
+          invalidateBackground(forLineContaining: textLocation)
+          minimapView?.invalidateBackground(forLineContaining: textLocation)
+        }
+
+      }
+    }
+    oldLastLineOfInsertionPoint = lineOfInsertionPoint
+
+    // Needed as the selection affects line number highlighting.
+    // NB: Invalidation of the old and new ranges needs to happen separately. If we were to union them, an insertion
+    //     point (range length = 0) at the start of a line would be absorbed into the previous line, which results in
+    //     a lack of invalidation of the line on which the insertion point is located.
+    gutterView?.invalidateGutter(for: oldRange)
+    gutterView?.invalidateGutter(for: newRange)
+    minimapGutterView?.invalidateGutter(for: oldRange)
+    minimapGutterView?.invalidateGutter(for: newRange)
+
+    DispatchQueue.main.async {
+      self.collapseMessageViews()
+    }
+  }
+
+  func drawBackgroundHighlights(in rect: CGRect) {
+    guard let textLayoutManager  = optTextLayoutManager,
+          let textContentStorage = optTextContentStorage
+    else { return }
+
+    let viewportRange = textLayoutManager.textViewportLayoutController.viewportRange
+
+    // If the selection is an insertion point, highlight the corresponding line
+    if let location     = insertionPoint,
+       let textLocation = textContentStorage.textLocation(for: location)
+    {
+
+      currentLineHighlightView?.isHidden = false
+      if viewportRange == nil
+          || viewportRange!.contains(textLocation)
+          || viewportRange!.endLocation.compare(textLocation) == .orderedSame
+      {
+
+        guard let textLayoutManager = optTextLayoutManager else { return }
+
+        if let (y: y, height: height) = textLayoutManager.textLayoutFragmentExtent(for: NSTextRange(location: textLocation)),
+           let highlightRect          = lineBackgroundRect(y: y, height: height)
+        {
+          currentLineHighlightView?.frame = highlightRect
+        }
+
+      }
+    } else {
+      currentLineHighlightView?.isHidden = true
+    }
+
+    // Highlight each line that has a message view
+    for messageView in messageViews {
+
+      if let location = textContentStorage.textLocation(for: messageView.value.characterIndex),
+         viewportRange == nil || viewportRange!.contains(location)
+      {
+
+        drawBackgroundHighlight(within: rect,
+                                forLineContaining: location,
+                                withColour: messageView.value.colour.withAlphaComponent(0.1))
+
+      }
+    }
+  }
 
   // MARK: Tiling
 
@@ -794,9 +887,11 @@ extension CodeView {
     textLayoutManager?.textViewportLayoutController.layoutViewport()
     minimapTextLayoutManager.textViewportLayoutController.layoutViewport()
 
+    guard let visibleRange   = minimapTextLayoutManager.textViewportLayoutController.viewportRange,
+          let codeHeight     = textLayoutManager?.textLayoutFragmentExtent(for: visibleRange)?.height,
+          let minimapHeight  = minimapTextLayoutManager.textLayoutFragmentExtent(for: visibleRange)?.height
+    else { return }
     let codeViewHeight = frame.size.height,
-        codeHeight     = boundingRect()?.height ?? 0,
-        minimapHeight  = minimapView?.boundingRect()?.height ?? 0,
         visibleHeight  = documentVisibleRect.size.height
 
     let scrollFactor: CGFloat = if minimapHeight < visibleHeight || codeHeight <= visibleHeight { 1 }
