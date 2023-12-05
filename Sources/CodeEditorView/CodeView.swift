@@ -28,6 +28,7 @@ import LanguageSupport
 ///
 struct MessageInfo {
   let view:              StatefulMessageView.HostingView
+  let backgroundView:    CodeBackgroundHighlightView
   var characterIndex:    Int                            // The starting character index for the line hosting the message
   var lineFragementRect: CGRect                         // The *full* line fragement rectangle (incl. message)
   var geometry:          MessageView.Geometry?
@@ -239,12 +240,6 @@ final class CodeView: UITextView {
 
   override func layoutSubviews() {
     gutterView?.frame.size.height = contentSize.height
-  }
-
-  override func draw(_ rect: CGRect) {
-    drawBackgroundHighlights(in: rect)
-
-    super.draw(rect)
   }
 }
 
@@ -577,12 +572,6 @@ final class CodeView: NSTextView {
     updateBackgroundFor(oldSelection: combinedRanges(ranges: oldSelectedRanges),
                             newSelection: combinedRanges(ranges: ranges))
   }
-
-  override func drawBackground(in rect: NSRect) {
-    super.drawBackground(in: rect)
-
-    drawBackgroundHighlights(in: rect)
-  }
 }
 
 class CodeViewDelegate: NSObject, NSTextViewDelegate {
@@ -701,28 +690,23 @@ extension CodeView {
     }
   }
 
-  func drawBackgroundHighlights(in rect: CGRect) {
-    guard let textLayoutManager  = optTextLayoutManager,
-          let textContentStorage = optTextContentStorage
-    else { return }
+  func updateMessageLineHighlights() {
+    guard let textLayoutManager  = optTextLayoutManager else { return }
 
-    let viewportRange = textLayoutManager.textViewportLayoutController.viewportRange
+    textLayoutManager.textViewportLayoutController.layoutViewport()
 
-    // Highlight each line that has a message view
     for messageView in messageViews {
 
-      if let location = textContentStorage.textLocation(for: messageView.value.characterIndex),
-         viewportRange == nil || viewportRange!.contains(location)
+      if let textLocation  = optTextContentStorage?.textLocation(for: messageView.value.characterIndex),
+         let fragmentFrame = optTextLayoutManager?.textLayoutFragment(for: textLocation)?.layoutFragmentFrameWithoutExtraLineFragment,
+         let highlightRect = lineBackgroundRect(y: fragmentFrame.minY, height: fragmentFrame.height)
       {
-
-        drawBackgroundHighlight(within: rect,
-                                forLineContaining: location,
-                                withColour: messageView.value.colour.withAlphaComponent(0.1))
-
+        messageView.value.backgroundView.frame = highlightRect
       }
     }
   }
 
+  
   // MARK: Tiling
 
   /// Position and size the gutter and minimap and set the text container sizes and exclusion paths. Take the current
@@ -856,10 +840,11 @@ extension CodeView {
     //     more pleasing, especially when resizing the window or similar.
     adjustScrollPositionOfMinimap()
 
-    // Only after tiling can we get the correct frame for the highlight view.
+    // Only after tiling can we get the correct frame for the highlight views.
     if let textLocation = optTextContentStorage?.textLocation(for: selectedRange.location) {
       updateCurrentLineHighlight(for: textLocation)
     }
+    updateMessageLineHighlights()
 
 #if os(iOS)
     setNeedsLayout()
@@ -951,6 +936,8 @@ extension CodeView {
         messageViews[id]?.rightAnchorConstraint = rightAnchorConstraint
         NSLayoutConstraint.activate([topAnchorConstraint, rightAnchorConstraint])
 
+        // Also add the corresponding background highlight view
+        addSubview(messageBundle.backgroundView)
 
       } else {
 
@@ -1012,9 +999,11 @@ extension CodeView {
                                                       fontSize: font?.pointSize ?? OSFont.systemFontSize,
                                                       colourScheme: theme.colourScheme),
         principalCategory = messagesByCategory(messageBundle.messages)[0].key,
-        colour            = messageTheme(principalCategory).colour
+        colour            = messageTheme(principalCategory).colour,
+        backgroundView    = CodeBackgroundHighlightView(color: colour.withAlphaComponent(0.1))
 
     messageViews[messageBundle.id] = MessageInfo(view: messageView,
+                                                 backgroundView: backgroundView,
                                                  characterIndex: 0,
                                                  lineFragementRect: .zero,
                                                  geometry: nil,
@@ -1025,10 +1014,9 @@ extension CodeView {
     if let textRange = optTextContentStorage?.textRange(for: charRange) {
 
       optTextLayoutManager?.invalidateLayout(for: textRange)
-      invalidateBackground(forLinesContaining: textRange)
 
     }
-    gutterView?.invalidateGutter(for: charRange)
+    updateMessageLineHighlights()
   }
 
   /// Remove the messages associated with a specified range of lines.
@@ -1065,7 +1053,10 @@ extension CodeView {
 
     for id in ids ?? Array<LineInfo.MessageBundle.ID>(messageViews.keys) {
 
-      if let info = messageViews[id] { info.view.removeFromSuperview() }
+      if let info = messageViews[id] {
+        info.view.removeFromSuperview()
+        info.backgroundView.removeFromSuperview()
+      }
       messageViews.removeValue(forKey: id)
 
     }
