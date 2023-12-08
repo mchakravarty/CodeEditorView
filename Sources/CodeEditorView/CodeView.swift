@@ -205,13 +205,14 @@ final class CodeView: UITextView {
     }
     minimapView.textLayoutManager?.delegate = minimapTextLayoutManagerDelegate
 
+    minimapView.isScrollEnabled                    = false
     minimapView.backgroundColor                    = theme.backgroundColour
     minimapView.tintColor                          = theme.tintColour
     minimapView.isEditable                         = false
     minimapView.isSelectable                       = false
     minimapView.textContainerInset                 = .zero
     minimapView.textContainer.widthTracksTextView  = false    // we need to be able to control the size (see `tile()`)
-    minimapView.textContainer.heightTracksTextView = false
+    minimapView.textContainer.heightTracksTextView = true
     minimapView.textContainer.lineBreakMode        = .byWordWrapping
     self.minimapView = minimapView
     addSubview(minimapView)
@@ -696,7 +697,7 @@ extension CodeView {
   func updateCurrentLineHighlight(for location: NSTextLocation) {
     guard let textLayoutManager  = optTextLayoutManager else { return }
 
-    ensureLayout()
+    ensureLayout(includingMinimap: false)
 
     // The current line highlight view needs to be visible if we have an insertion point (and not a selection range).
     currentLineHighlightView?.isHidden = insertionPoint == nil
@@ -709,7 +710,7 @@ extension CodeView {
   }
 
   func updateMessageLineHighlights() {
-    ensureLayout()
+    ensureLayout(includingMinimap: false)
 
     for messageView in messageViews {
 
@@ -727,8 +728,13 @@ extension CodeView {
   
   /// Ensure that layout of the viewport region is complete.
   ///
-  func ensureLayout() {
+  func ensureLayout(includingMinimap: Bool = true) {
     if let textLayoutManager {
+      textLayoutManager.ensureLayout(for: textLayoutManager.textViewportLayoutController.viewportBounds)
+    }
+    if includingMinimap,
+       let textLayoutManager = minimapView?.textLayoutManager 
+    {
       textLayoutManager.ensureLayout(for: textLayoutManager.textViewportLayoutController.viewportBounds)
     }
   }
@@ -812,10 +818,16 @@ extension CodeView {
       if minimapDividerView?.frame != minimapDividerRect { minimapDividerView?.frame = minimapDividerRect }
       if minimapViewFrame.origin.x != minimapX || minimapViewFrame.width != minimapWidth {
 
+#if os(iOS)
+        // FIXME: see Issue #83
+        let minimapHeight = bounds.height
+#elseif os(macOS)
+        let minimapHeight = minimapViewFrame.height
+#endif
         minimapView?.frame        = CGRect(x: minimapX,
                                            y: minimapViewFrame.origin.y,
                                            width: minimapWidth,
-                                           height: minimapViewFrame.height)
+                                           height: minimapHeight)
         minimapGutterView?.frame  = minimapGutterRect
 #if os(macOS)
         minimapView?.minSize      = CGSize(width: minimapFontWidth, height: visibleRect.height)
