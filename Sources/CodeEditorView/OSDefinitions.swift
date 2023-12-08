@@ -46,6 +46,19 @@ extension UIColor {
   }
 }
 
+extension UIView {
+
+  /// Add a subview such that it is layered below its siblings.
+  ///
+  /// - Parameter view: The subview to add.
+  ///
+  func addBackgroundSubview(_ view: UIView) {
+    addSubview(view)
+    sendSubviewToBack(view)
+  }
+}
+
+
 #elseif os(macOS)
 
 import AppKit
@@ -76,6 +89,29 @@ extension NSColor {
   convenience init?(color: Color) {
     guard let cgColor = color.cgColor else { return nil }
     self.init(cgColor: cgColor)
+  }
+}
+
+extension NSView {
+
+  /// Add a subview such that it is layered below its siblings.
+  ///
+  /// - Parameter view: The subview to add.
+  ///
+  func addBackgroundSubview(_ view: NSView) {
+    addSubview(view, positioned: .below, relativeTo: nil)
+  }
+  
+  /// Imitate UIKit interface.
+  ///
+  func insertSubview(_ view: NSView, aboveSubview siblingSubview: NSView) {
+    addSubview(view, positioned: .above, relativeTo: siblingSubview)
+  }
+
+  /// Imitate UIKit interface.
+  ///
+  func insertSubview(_ view: NSView, belowSubview siblingSubview: NSView) {
+    addSubview(view, positioned: .below, relativeTo: siblingSubview)
   }
 }
 

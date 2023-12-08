@@ -56,10 +56,10 @@ final class CodeView: UITextView {
   let codeContentStorage: CodeContentStorage
 
   // Delegates
-  fileprivate var codeViewDelegate:                  CodeViewDelegate?
-  fileprivate var codeStorageDelegate:               CodeStorageDelegate
-  fileprivate let minimapTextLayoutManagerDelegate = MinimapTextLayoutManagerDelegate()
-  fileprivate let minimapContentStorageDelegate    = MinimapContentStorageDelegate()
+  fileprivate var codeViewDelegate:                     CodeViewDelegate?
+  fileprivate var codeStorageDelegate:                  CodeStorageDelegate
+  fileprivate let minimapTextLayoutManagerDelegate      = MinimapTextLayoutManagerDelegate()
+  fileprivate let minimapContentStorageDelegate         = MinimapContentStorageDelegate()
 
   // Subviews
   var gutterView:               GutterView?
@@ -133,6 +133,15 @@ final class CodeView: UITextView {
     super.init(frame: frame, textContainer: codeContainer)
     codeContainer.textView = self
 
+    // We can't do this — see [Note NSTextViewportLayoutControllerDelegate].
+    //
+    //    if let systemDelegate = codeLayoutManager.textViewportLayoutController.delegate {
+    //      let codeViewportLayoutControllerDelegate = CodeViewportLayoutControllerDelegate(systemDelegate: systemDelegate,
+    //                                                                                      codeView: self)
+    //      self.codeViewportLayoutControllerDelegate               = codeViewportLayoutControllerDelegate
+    //      codeLayoutManager.textViewportLayoutController.delegate = codeViewportLayoutControllerDelegate
+    //    }
+
     // Set basic display and input properties
     font                   = theme.font
     backgroundColor        = theme.backgroundColour
@@ -170,8 +179,7 @@ final class CodeView: UITextView {
 
     let currentLineHighlightView = CodeBackgroundHighlightView(color: theme.currentLineColour)
     self.currentLineHighlightView = currentLineHighlightView
-    addSubview(currentLineHighlightView)
-    sendSubviewToBack(currentLineHighlightView)
+    addBackgroundSubview(currentLineHighlightView)
 
     // Create the minimap with its own gutter, but sharing the code storage with the code view
     //
@@ -408,6 +416,15 @@ final class CodeView: NSTextView {
 
     super.init(frame: frame, textContainer: codeContainer)
 
+    // We can't do this — see [Note NSTextViewportLayoutControllerDelegate].
+    //
+    //    if let systemDelegate = codeLayoutManager.textViewportLayoutController.delegate {
+    //      let codeViewportLayoutControllerDelegate = CodeViewportLayoutControllerDelegate(systemDelegate: systemDelegate,
+    //                                                                                      codeView: self)
+    //      self.codeViewportLayoutControllerDelegate = codeViewportLayoutControllerDelegate
+    //      codeLayoutManager.textViewportLayoutController.delegate = codeViewportLayoutControllerDelegate
+    //    }
+
     // Set basic display and input properties
     font                                 = theme.font
     backgroundColor                      = theme.backgroundColour
@@ -458,7 +475,7 @@ final class CodeView: NSTextView {
     // NB: The gutter view is floating. We cannot add it now, as we don't have an `enclosingScrollView` yet.
 
     let currentLineHighlightView = CodeBackgroundHighlightView(color: theme.currentLineColour)
-    addSubview(currentLineHighlightView, positioned: .below, relativeTo: nil)
+    addBackgroundSubview(currentLineHighlightView)
     self.currentLineHighlightView = currentLineHighlightView
 
     // Create the minimap with its own gutter, but sharing the code storage with the code view
@@ -670,15 +687,16 @@ extension CodeView {
     minimapGutterView?.invalidateGutter(for: oldRange)
     minimapGutterView?.invalidateGutter(for: newRange)
 
-    DispatchQueue.main.async {
-      self.collapseMessageViews()
+    DispatchQueue.main.async { [self] in
+      collapseMessageViews()
+      updateMessageLineHighlights()
     }
   }
 
   func updateCurrentLineHighlight(for location: NSTextLocation) {
     guard let textLayoutManager  = optTextLayoutManager else { return }
 
-    textLayoutManager.textViewportLayoutController.layoutViewport()
+    ensureLayout()
 
     // The current line highlight view needs to be visible if we have an insertion point (and not a selection range).
     currentLineHighlightView?.isHidden = insertionPoint == nil
@@ -691,9 +709,7 @@ extension CodeView {
   }
 
   func updateMessageLineHighlights() {
-    guard let textLayoutManager  = optTextLayoutManager else { return }
-
-    textLayoutManager.textViewportLayoutController.layoutViewport()
+    ensureLayout()
 
     for messageView in messageViews {
 
@@ -708,6 +724,14 @@ extension CodeView {
 
   
   // MARK: Tiling
+  
+  /// Ensure that layout of the viewport region is complete.
+  ///
+  func ensureLayout() {
+    if let textLayoutManager {
+      textLayoutManager.ensureLayout(for: textLayoutManager.textViewportLayoutController.viewportBounds)
+    }
+  }
 
   /// Position and size the gutter and minimap and set the text container sizes and exclusion paths. Take the current
   /// view layout in `viewLayout` into account.
@@ -726,8 +750,7 @@ extension CodeView {
   private func tile() {
     guard let codeContainer = optTextContainer as? CodeContainer else { return }
 
-    // We wait with tiling until the layout is done unless this is the initial tiling.
-    textLayoutManager?.textViewportLayoutController.layoutViewport()
+    ensureLayout()
 
 #if os(macOS)
     // Add the floating views if they are not yet in the view hierachy.
@@ -853,6 +876,7 @@ extension CodeView {
 #endif
   }
 
+
   // MARK: Scrolling
 
   /// Sets the scrolling position of the minimap in dependence of the scroll position of the main code view.
@@ -891,6 +915,7 @@ extension CodeView {
                                       height: minimapVisibleHeight).integral
     if documentVisibleBox?.frame != documentVisibleFrame { documentVisibleBox?.frame = documentVisibleFrame }  // don't update frames in vain
   }
+
 
   // MARK: Message views
 
@@ -936,8 +961,10 @@ extension CodeView {
         messageViews[id]?.rightAnchorConstraint = rightAnchorConstraint
         NSLayoutConstraint.activate([topAnchorConstraint, rightAnchorConstraint])
 
-        // Also add the corresponding background highlight view
-        addSubview(messageBundle.backgroundView)
+        // Also add the corresponding background highlight view, such that it lies on top of the current line highlight.
+        if let currentLineHighlightView {
+          insertSubview(messageBundle.backgroundView, aboveSubview: currentLineHighlightView)
+        }
 
       } else {
 
@@ -1069,7 +1096,6 @@ extension CodeView {
       messageView.value.view.unfolded = false
     }
   }
-
 }
 
 
@@ -1134,6 +1160,57 @@ final class CodeContainer: NSTextContainer {
 }
 
 
+// MARK: [Note NSTextViewportLayoutControllerDelegate]
+//
+// According to the TextKit 2 documentation, a 'NSTextViewportLayoutControllerDelegate' is the right place to be
+// notified of the start and end of a layout pass. When using TextKit 2 with a standard 'NS/UITextView' there curiously
+// is already a delegate set for the 'NSTextViewportLayoutController'. It uses a private class, so we cannot subclass
+// it. The obvious alternative is to wrap it as in the code below. However, this leads to redraw problems on iOS (when
+// repeatedly inserting and again deleting lines).
+//
+//final class CodeViewportLayoutControllerDelegate: NSObject, NSTextViewportLayoutControllerDelegate {
+//
+//  /// When TextKit 2 initialises a text view, it provides a default delegate for the `NSTextViewportLayoutController`.
+//  /// We keep that here when overwriting it with an instance of this very class.
+//  ///
+//  let systemDelegate: any NSTextViewportLayoutControllerDelegate
+//  
+//  /// The code view to which this delegate belongs.
+//  ///
+//  weak var codeView: CodeView?
+//
+//  init(systemDelegate: any NSTextViewportLayoutControllerDelegate, codeView: CodeView) {
+//    self.systemDelegate = systemDelegate
+//    self.codeView       = codeView
+//  }
+//
+//  public func viewportBounds(for textViewportLayoutController: NSTextViewportLayoutController) -> CGRect {
+//    systemDelegate.viewportBounds(for: textViewportLayoutController)
+//  }
+//
+//  public func textViewportLayoutController(_ textViewportLayoutController: NSTextViewportLayoutController,
+//                                           configureRenderingSurfaceFor textLayoutFragment: NSTextLayoutFragment)
+//  {
+//    systemDelegate.textViewportLayoutController(textViewportLayoutController,
+//                                                configureRenderingSurfaceFor: textLayoutFragment)
+//  }
+//
+//  public func textViewportLayoutControllerWillLayout(_ textViewportLayoutController: NSTextViewportLayoutController) {
+//    systemDelegate.textViewportLayoutControllerWillLayout?(textViewportLayoutController)
+//  }
+//
+//  public func textViewportLayoutControllerDidLayout(_ textViewportLayoutController: NSTextViewportLayoutController) {
+//    systemDelegate.textViewportLayoutControllerDidLayout?(textViewportLayoutController)
+//
+//    if let location     = codeView?.selectedRange.location,
+//       let textLocation = codeView?.optTextContentStorage?.textLocation(for: location) {
+//      codeView?.updateCurrentLineHighlight(for: textLocation)
+//    }
+//    codeView?.updateMessageLineHighlights()
+//  }
+//}
+
+
 // MARK: Selection change management
 
 /// Common code view actions triggered on a selection change.
@@ -1161,5 +1238,3 @@ private func combinedRanges(ranges: [NSValue]) -> NSRange {
     NSUnionRange($0, $1)
   }
 }
-
-

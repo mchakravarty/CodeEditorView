@@ -222,30 +222,15 @@ extension GutterView {
                                     .paragraphStyle: lineNumberStyle,
                                     .kern: NSNumber(value: Float(-theme.fontSize / 11))]
 
-      // TODO: CodeEditor needs to be parameterised by message theme
-      let theme = Message.defaultTheme
-
       for line in lineRange {  // NB: These are zero-based line numbers
 
         guard let lineStartLocation  = textContentStorage.textLocation(for: lineMap.lines[line].range.location),
               let textLayoutFragment = textLayoutManager.textLayoutFragment(for: lineStartLocation)
         else { continue }
 
-        let gutterRect = gutterRectForLineNumbersFrom(textRect: textLayoutFragment.layoutFragmentFrameWithoutExtraLineFragment)
-
-        var attributes = selectedLines.contains(line) ? textAttributesSelected : textAttributesDefault
-
-        #if os(iOS)
-
-        // Highlight line numbers as we don't have line background highlighting on iOS.
-        if let messageBundle = lineMap.lines[line].info?.messages, let message = messagesByCategory(messageBundle.messages).first {
-          let themeColour = theme(message.key).colour,
-              colour      = selectedLines.contains(line) ? themeColour : themeColour.withAlphaComponent(0.5)
-          attributes.updateValue(colour, forKey: .foregroundColor)
-        }
-
-        #endif
-
+        let gutterRect = gutterRectForLineNumbersFrom(textRect: 
+                                                        textLayoutFragment.layoutFragmentFrameWithoutExtraLineFragment),
+           attributes  = selectedLines.contains(line) ? textAttributesSelected : textAttributesDefault
         ("\(line + 1)" as NSString).draw(in: gutterRect, withAttributes: attributes)
       }
 
