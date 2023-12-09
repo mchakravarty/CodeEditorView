@@ -90,9 +90,6 @@ final class CodeView: UITextView {
       minimapView?.backgroundColor          = theme.backgroundColour
       minimapGutterView?.theme              = theme
       documentVisibleBox?.backgroundColor   = theme.textColour.withAlphaComponent(0.1)
-//      minimapDividerView?.backgroundColor   = theme.backgroundColour.blended(withFraction: 0.15, of: .systemGray)!
-      // FIXME: How to mix the colours?
-      minimapDividerView?.backgroundColor   = .red
       tile()
       setNeedsDisplay(bounds)
     }
@@ -193,9 +190,7 @@ final class CodeView: UITextView {
         minimapDividerView = UIView()
     minimapView.codeView = self
 
-//    minimapDividerView.backgroundColor   = theme.backgroundColour.blended(withFraction: 0.15, of: .systemGray)!
-    minimapDividerView.backgroundColor   = .red
-    // FIXME: colour blending???
+    minimapDividerView.backgroundColor   = .separator
     self.minimapDividerView              = minimapDividerView
     addSubview(minimapDividerView)
 
@@ -357,7 +352,6 @@ final class CodeView: NSTextView {
       minimapView?.backgroundColor         = theme.backgroundColour
       minimapGutterView?.theme             = theme
       documentVisibleBox?.fillColor        = theme.textColour.withAlphaComponent(0.1)
-      minimapDividerView?.fillColor        = theme.backgroundColour.blended(withFraction: 0.15, of: .systemGray)!
       tile()
       setNeedsDisplay(visibleRect)
     }
@@ -492,7 +486,7 @@ final class CodeView: NSTextView {
     minimapView.codeView = self
 
     minimapDividerView.boxType     = .custom
-    minimapDividerView.fillColor   = theme.backgroundColour.blended(withFraction: 0.15, of: .systemGray)!
+    minimapDividerView.fillColor   = .separatorColor
     minimapDividerView.borderWidth = 0
     self.minimapDividerView = minimapDividerView
     // NB: The divider view is floating. We cannot add it now, as we don't have an `enclosingScrollView` yet.
