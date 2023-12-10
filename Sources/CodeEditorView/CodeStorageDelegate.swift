@@ -519,10 +519,14 @@ extension CodeStorageDelegate {
             }
 
             // Request redrawing for those lines
-// FIXME: adapt to TextKit 2: we might need a callback to invalidate character ranges
-//            for layoutManager in textStorage.layoutManagers {
-//              layoutManager.invalidateDisplay(forCharacterRange: lineMap.charRangeOf(lines: lines))
-//            }
+            if let textStorageObserver = textStorage.textStorageObserver {
+              let range = lineMap.charRangeOf(lines: lines)
+              textStorageObserver.processEditing(for: textStorage,
+                                                 edited: .editedAttributes,
+                                                 range: range,
+                                                 changeInLength: 0,
+                                                 invalidatedRange: range)
+            }
           }
 
         }

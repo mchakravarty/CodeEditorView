@@ -109,31 +109,19 @@ class CodeStorage: NSTextStorage {
     beginEditing()
 
     // We are deleting one character => check whether it is a one-character bracket and if so also delete its matching
-    // bracket if it is directly adjascent
+    // bracket if it is directly adjacent
     if range.length == 1 && str == "",
        let deletedToken = token(at: range.location).token,
-       let language     = (delegate as? CodeStorageDelegate)?.language
+       let language     = (delegate as? CodeStorageDelegate)?.language,
+       deletedToken.token.isOpenBracket
+        && range.location + 1 < string.utf16.count
+        && language.lexeme(of: deletedToken.token)?.count == 1
+        && token(at: range.location + 1).token?.token == deletedToken.token.matchingBracket
     {
 
-      let isOpen    = deletedToken.token.isOpenBracket,
-          isBracket = isOpen || deletedToken.token.isCloseBracket,
-          isSafe    = (isOpen && range.location + 1 < string.utf16.count) || range.location > 0,
-          offset    = isOpen ? 1 : -1
-      if isBracket && isSafe && language.lexeme(of: deletedToken.token)?.count == 1 &&
-          token(at: range.location + offset).token?.token == deletedToken.token.matchingBracket
-      {
-
-        let extendedRange = NSRange(location: isOpen ? range.location : range.location - 1, length: 2)
-        textStorage.replaceCharacters(in: extendedRange, with: "")
-        edited(.editedCharacters, range: extendedRange, changeInLength: -2)
-        setInsertionPointAfterDeletion(of: extendedRange)
-
-      } else {
-
-        textStorage.replaceCharacters(in: range, with: str)
-        edited(.editedCharacters, range: range, changeInLength: (str as NSString).length - range.length)
-
-      }
+      let extendedRange = NSRange(location: range.location, length: 2)
+      textStorage.replaceCharacters(in: extendedRange, with: "")
+      edited(.editedCharacters, range: extendedRange, changeInLength: -2)
 
     } else {
 
@@ -298,27 +286,6 @@ extension CodeStorage {
 
       #endif
     }
-  }
-
-  /// Set the insertion point of all attached text views, where the selection intersects the given range, to the start
-  /// of the range. This is safe in an editing cycle, as the selection setting is deferred until completion.
-  ///
-  /// - Parameter range: The deleted chracter range.
-  ///
-  func setInsertionPointAfterDeletion(of range: NSRange) {
-
-// FIXME: adapt to TextKit 2
-//    for layoutManager in self.layoutManagers {
-//      for textContainer in layoutManager.textContainers {
-//
-//        if let codeContainer = textContainer as? CodeContainer,
-//           let textView      = codeContainer.textView,
-//           NSIntersectionRange(textView.selectedRange, range).length != 0
-//        {
-//          Dispatch.DispatchQueue.main.async{ textView.selectedRange = NSRange(location: range.location, length: 0) }
-//        }
-//      }
-//    }
   }
 }
 
