@@ -3,7 +3,14 @@
 [![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fmchakravarty%2FCodeEditorView%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/mchakravarty/CodeEditorView)
 [![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fmchakravarty%2FCodeEditorView%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/mchakravarty/CodeEditorView)
 
-The `CodeEditorView` Swift package provides a SwiftUI view implementing a rich code editor for iOS and macOS whose visual style is inspired by Xcode. The currently supported functionality includes syntax highlighting with configurable themes, inline message (warnings, errors, etc) reporting, bracket matching, matching bracket insertion, current line highlighting, and a minimap (only on macOS).
+The `CodeEditorView` Swift package provides a SwiftUI view implementing a rich code editor for iOS and macOS whose visual style is inspired by Xcode. The currently supported functionality includes syntax highlighting with configurable themes, inline message (warnings, errors, etc) reporting, bracket matching, matching bracket insertion, current line highlighting, and a minimap.
+
+**Update:**
+
+* I am currently porting `CodeEditorView` over to TextKit 2. You find the ongoing progress on `main`.
+* The main work is done, which (among other things) results in performance improvements and additional functionality on iOS (line highlights and minimap).
+* There are still some problems, though. On iOS, redrawing of the gutter and the minimap is broken. And on macOS, text editing performance on larger files is bad. These issues are going to be fixed next.
+* The TextKit 2 implementation requires the latest versions of macOS (14) and iOS (17). If want to use `CodeEditorView` on earlier version of macOS or iOS, you need to use release 0.12.0 or the `textkit1` branch of this repository. (I don't have the bandwidth to support TextKit 2 on earlier OS versions, but I am happy to accept PRs that add support for it. They need to use Swift 5.9, though.)
 
 ## Screenshots of the demo app
 
