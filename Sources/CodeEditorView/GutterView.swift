@@ -124,7 +124,11 @@ extension GutterView {
   ///
   func invalidateGutter(for charRange: NSRange? = nil) {
     guard let charRange else {
+#if os(macOS)
+      needsDisplay = true
+#else
       setNeedsDisplay()
+#endif
       return
     }
 
