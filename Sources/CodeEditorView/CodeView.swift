@@ -277,7 +277,14 @@ final class CodeViewDelegate: NSObject, UITextViewDelegate {
     oldSelectedRange = textView.selectedRange
   }
 
-  func scrollViewDidScroll(_ scrollView: UIScrollView) { didScroll?(scrollView) }
+  func scrollViewDidScroll(_ scrollView: UIScrollView) {
+    guard let codeView = scrollView as? CodeView else { return }
+
+    didScroll?(scrollView)
+
+    codeView.adjustScrollPositionOfMinimap()
+    codeView.gutterView?.invalidateGutter()
+  }
 }
 
 /// Custom view for background highlights.
@@ -579,10 +586,16 @@ final class CodeView: NSTextView {
   {
     let oldSelectedRanges = selectedRanges
     super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelectingFlag)
-    minimapView?.selectedRanges = selectedRanges    // minimap mirrors the selection of the main code view
 
-    updateBackgroundFor(oldSelection: combinedRanges(ranges: oldSelectedRanges),
-                            newSelection: combinedRanges(ranges: ranges))
+    // Updates only if there is an actual selection change.
+    if oldSelectedRanges != selectedRanges {
+
+      minimapView?.selectedRanges = selectedRanges    // minimap mirrors the selection of the main code view
+
+      updateBackgroundFor(oldSelection: combinedRanges(ranges: oldSelectedRanges),
+                          newSelection: combinedRanges(ranges: ranges))
+
+    }
   }
 }
 
@@ -877,6 +890,7 @@ extension CodeView {
 
 #if os(iOS)
     setNeedsLayout()
+    gutterView?.setNeedsDisplay()   // needs to be explicitly triggered
 #elseif os(macOS)
     needsLayout = true
 #endif

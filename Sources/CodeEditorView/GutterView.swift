@@ -88,9 +88,6 @@ final class GutterView: OSView {
 #if os(iOS)
     isOpaque        = false
     backgroundColor = .clear
-    contentMode     = .redraw
-#elseif os(macOS)
-    // NB: If would decide to use layer backing, we need to set the `layerContentsRedrawPolicy` to redraw on resizing
 #endif
   }
 
@@ -120,12 +117,17 @@ extension GutterView {
   ///
   /// - Parameters:
   ///   - charRange: The invalidated range of characters. It will be trimmed to be within the valid character range of
-  ///     the underlying text storage.
+  ///     the underlying text storage. If this argument is `nil`, the entire gutter view is invalidated.
   ///
   /// We invalidate the area corresponding to entire paragraphs. This makes a difference in the presence of line
   /// breaks.
   ///
-  func invalidateGutter(for charRange: NSRange) {
+  func invalidateGutter(for charRange: NSRange? = nil) {
+    guard let charRange else {
+      setNeedsDisplay()
+      return
+    }
+
     guard let textLayoutManager   = optTextLayoutManager,
           let textContentStorage  = textLayoutManager.textContentManager as? NSTextContentStorage,
           let viewPortRange       = textLayoutManager.textViewportLayoutController.viewportRange,
@@ -137,11 +139,11 @@ extension GutterView {
     // We call `paragraphRange(for:_)` safely by boxing `charRange` to the allowed range.
     let extendedCharRange = string.paragraphRange(for: charRangeInViewPort.clamped(to: string.length))
 
-    if let textRange = textContentStorage.textRange(for: extendedCharRange) {
-
-      if let (y: y, height: height) = textLayoutManager.textLayoutFragmentExtent(for: textRange), height > 0  {
-        setNeedsDisplay(gutterRectFrom(y: y, height: height))
-      }
+    if let textRange              = textContentStorage.textRange(for: extendedCharRange),
+       let (y: y, height: height) = textLayoutManager.textLayoutFragmentExtent(for: textRange), 
+        height > 0
+    {
+      setNeedsDisplay(gutterRectFrom(y: y, height: height))
     }
   }
 
@@ -186,23 +188,10 @@ extension GutterView {
 
     let selectedLines = textView?.selectedLines ?? Set(1..<2)
 
-    // Determine the character range whose line numbers need to be drawn by narrowing down the viewport range
-    guard var textRange = textLayoutManager.textViewportLayoutController.viewportRange else { return }
-    if let firstLineFragmentRange = textLayoutManager.lineFragmentRange(for: CGPoint(x: 1, y: rect.minY),
-                                                                        inContainerAt: textRange.location),
-       textRange.location.compare(firstLineFragmentRange.location) == .orderedAscending,
-       let newTextRange = NSTextRange(location: firstLineFragmentRange.location, end: textRange.endLocation)
-    {
-      textRange = newTextRange
-    }
-    if let lastLineFragmentRange = textLayoutManager.lineFragmentRange(for: CGPoint(x: 1, y: rect.maxY),
-                                                                       inContainerAt: textRange.endLocation),
-       lastLineFragmentRange.endLocation.compare(textRange.endLocation) == .orderedAscending,
-       let newTextRange = NSTextRange(location: textRange.location, end: lastLineFragmentRange.endLocation)
-    {
-      textRange = newTextRange
-    }
-    let characterRange = textContentStorage.range(for: textRange)
+    // We always enumerate all lines that are in the viewport (but we don't draw if they fall outside of `rect`).
+    let textRange = textLayoutManager.textViewportLayoutController.viewportRange
+                    ?? textLayoutManager.documentRange,
+        characterRange = textContentStorage.range(for: textRange)
 
     // Draw line numbers unless this is a gutter for a minimap
     if !isMinimapGutter {
@@ -231,7 +220,9 @@ extension GutterView {
         let gutterRect = gutterRectForLineNumbersFrom(textRect: 
                                                         textLayoutFragment.layoutFragmentFrameWithoutExtraLineFragment),
            attributes  = selectedLines.contains(line) ? textAttributesSelected : textAttributesDefault
-        ("\(line + 1)" as NSString).draw(in: gutterRect, withAttributes: attributes)
+        if gutterRect.intersects(rect) {
+          ("\(line + 1)" as NSString).draw(in: gutterRect, withAttributes: attributes)
+        }
       }
 
       // If we are at the end, we also draw a line number for the extra line fragement if that exists
@@ -248,8 +239,9 @@ extension GutterView {
         let attributes = textView?.insertionPoint == textContentStorage.textStorage?.length
                          ? textAttributesSelected
                          : textAttributesDefault
-        ("\(lineMap.lines.count)" as NSString).draw(in: gutterRect, withAttributes: attributes)
-
+        if gutterRect.intersects(rect) {
+          ("\(lineMap.lines.count)" as NSString).draw(in: gutterRect, withAttributes: attributes)
+        }
       }
     }
 
