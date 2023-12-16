@@ -100,7 +100,7 @@ extension TextView {
   ///     the text view.
   ///
   func fragmentBoundingRect(for range: NSRange? = nil) -> CGRect? {
-    guard let textLayoutManager = optTextLayoutManager,
+    guard let textLayoutManager  = optTextLayoutManager,
           let textContentStorage = textLayoutManager.textContentManager as? NSTextContentStorage
     else { return nil }
 

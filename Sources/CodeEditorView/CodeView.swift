@@ -906,18 +906,18 @@ extension CodeView {
           let minimapTextLayoutManager = minimapView?.textLayoutManager
     else { return }
 
-    textLayoutManager?.textViewportLayoutController.layoutViewport()
-    minimapTextLayoutManager.textViewportLayoutController.layoutViewport()
+    textLayoutManager?.ensureLayout(for: textLayoutManager!.documentRange)
+    minimapTextLayoutManager.ensureLayout(for: minimapTextLayoutManager.documentRange)
 
-    guard let visibleRange   = minimapTextLayoutManager.textViewportLayoutController.viewportRange,
-          let codeHeight     = textLayoutManager?.textLayoutFragmentExtent(for: visibleRange)?.height,
-          let minimapHeight  = minimapTextLayoutManager.textLayoutFragmentExtent(for: visibleRange)?.height
+    guard let textRange     = textLayoutManager?.documentRange,
+          let codeHeight    = textLayoutManager?.textLayoutFragmentExtent(for: textRange)?.height,
+          let minimapHeight = minimapTextLayoutManager.textLayoutFragmentExtent(for: textRange)?.height
     else { return }
     let codeViewHeight = frame.size.height,
         visibleHeight  = documentVisibleRect.size.height
 
     let scrollFactor: CGFloat = if minimapHeight < visibleHeight || codeHeight <= visibleHeight { 1 }
-    else { 1 - (minimapHeight - visibleHeight) / (codeHeight - visibleHeight) }
+                                else { 1 - (minimapHeight - visibleHeight) / (codeHeight - visibleHeight) }
 
     // We box the positioning of the minimap at the top and the bottom of the code view (with the `max` and `min`
     // expessions. This is necessary as the minimap will otherwise be partially cut off by the enclosing clip view.
