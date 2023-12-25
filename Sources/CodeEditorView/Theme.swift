@@ -11,7 +11,7 @@ import SwiftUI
 
 /// A code highlighting theme. Different syntactic elements are purely distinguished by colour.
 ///
-public struct Theme: Identifiable {
+public struct Theme: Identifiable, Equatable {
   public let id = UUID()
 
   /// The colour scheme of the theme.

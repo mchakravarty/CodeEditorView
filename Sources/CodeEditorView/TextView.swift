@@ -46,6 +46,10 @@ protocol TextView {
   /// and hence, a non-contiguous range.)
   ///
   var selectedLines: Set<Int> { get }
+  
+  /// The bounds of the view.
+  ///
+  var bounds: CGRect { get set }
 
   /// The visible portion of the text view. (This only accounts for portions of the text view that are obscured through
   /// visibility in a scroll view.)
@@ -158,11 +162,10 @@ extension TextView {
   /// container's right hand side and the divider of the minimap (if the minimap is visible).
   ///
   func lineBackgroundRect(y: CGFloat, height: CGFloat) -> CGRect? {
-    guard let textContainer = optTextContainer else { return nil }
 
     // We start at x = 0 as it looks nicer in case we overscoll when horizontal scrolling is enabled (i.e., when lines
     // are not wrapped).
-    return CGRect(x: 0, y: y, width: textContainer.size.width, height: height)
+    return CGRect(x: 0, y: y, width: bounds.size.width, height: height)
   }
 }
 

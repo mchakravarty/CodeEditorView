@@ -70,7 +70,7 @@ final class CodeView: UITextView {
   var minimapDividerView:       UIView?
 
   // Notification observer
-  private var didChangeNotificationObserver: NSObjectProtocol?
+  private var didChangeObserver: NSObjectProtocol?
 
   /// Contains the line on which the insertion point was located, the last time the selection range got set (if the
   /// selection was an insertion point at all; i.e., it's length was 0).
@@ -79,7 +79,8 @@ final class CodeView: UITextView {
 
   /// The current highlighting theme
   ///
-  var theme: Theme {
+  @Invalidating(.layout, .display)
+  var theme: Theme = .defaultLight {
     didSet {
       font                                  = UIFont(name: theme.fontName, size: theme.fontSize)
       backgroundColor                       = theme.backgroundColour
@@ -90,19 +91,13 @@ final class CodeView: UITextView {
       minimapView?.backgroundColor          = theme.backgroundColour
       minimapGutterView?.theme              = theme
       documentVisibleBox?.backgroundColor   = theme.textColour.withAlphaComponent(0.1)
-      tile()
-      setNeedsDisplay(bounds)
     }
   }
 
   /// The current view layout.
   ///
-  var viewLayout: CodeEditor.LayoutConfiguration {
-    didSet {
-      tile()
-      adjustScrollPositionOfMinimap()
-    }
-  }
+  @Invalidating(.layout)
+  var viewLayout: CodeEditor.LayoutConfiguration = .standard
 
   /// Keeps track of the set of message views.
   ///
@@ -222,16 +217,12 @@ final class CodeView: UITextView {
 
     // We need to check whether we need to look up completions or cancel a running completion process after every text
     // change. We also need to remove evicted message views.
-    didChangeNotificationObserver
-      = NotificationCenter.default.addObserver(forName: UITextView.textDidChangeNotification, object: self, queue: .main){ [weak self] _ in
-
+    didChangeObserver
+      = NotificationCenter.default.addObserver(forName: UITextView.textDidChangeNotification, 
+                                               object: self,
+                                               queue: .main){ [weak self] _ in
         self?.removeMessageViews(withIDs: self!.codeStorageDelegate.lastEvictedMessageIDs)
       }
-
-    // Perform an initial tiling run when the view hierarchy has been set up.
-    Task {
-      tile()
-    }
   }
 
   required init?(coder: NSCoder) {
@@ -239,11 +230,12 @@ final class CodeView: UITextView {
   }
 
   deinit {
-    if let observer = didChangeNotificationObserver { NotificationCenter.default.removeObserver(observer) }
+    if let observer = didChangeObserver { NotificationCenter.default.removeObserver(observer) }
   }
 
   override func layoutSubviews() {
-    gutterView?.frame.size.height = contentSize.height
+    tile()
+    super.layoutSubviews()
   }
 }
 
@@ -347,7 +339,8 @@ final class CodeView: NSTextView {
 
   /// The current highlighting theme
   ///
-  var theme: Theme {
+  @Invalidating(.layout, .display)
+  var theme: Theme = .defaultLight {
     didSet {
       font                                 = theme.font
       backgroundColor                      = theme.backgroundColour
@@ -359,19 +352,13 @@ final class CodeView: NSTextView {
       minimapView?.backgroundColor         = theme.backgroundColour
       minimapGutterView?.theme             = theme
       documentVisibleBox?.fillColor        = theme.textColour.withAlphaComponent(0.1)
-      tile()
-      setNeedsDisplay(visibleRect)
     }
   }
 
   /// The current view layout.
   ///
-  var viewLayout: CodeEditor.LayoutConfiguration {
-    didSet {
-      tile()
-      adjustScrollPositionOfMinimap()
-    }
-  }
+  @Invalidating(.layout)
+  var viewLayout: CodeEditor.LayoutConfiguration = .standard
 
   /// Keeps track of the set of message views.
   ///
@@ -531,30 +518,24 @@ final class CodeView: NSTextView {
 
     // We need to re-tile the subviews whenever the frame of the text view changes.
     frameChangedNotificationObserver
-    = NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification,
-                                             object: self,
-                                             queue: .main){ _ in
-      self.tile()
+      = NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification,
+                                               object: self,
+                                               queue: .main){ _ in
 
-      // NB: When resizing the window, where the text container doesn't completely fill the text view (i.e., the text
-      //     is short), we need to explicitly redraw the gutter, as line wrapping may have changed, which affects
-      //     line numbering.
-      gutterView.needsDisplay = true
-    }
+        // NB: When resizing the window, where the text container doesn't completely fill the text view (i.e., the text
+        //     is short), we need to explicitly redraw the gutter, as line wrapping may have changed, which affects
+        //     line numbering.
+        gutterView.needsDisplay = true
+      }
 
     // We need to check whether we need to look up completions or cancel a running completion process after every text
     // change. We also need to remove evicted message views.
     didChangeNotificationObserver
-    = NotificationCenter.default.addObserver(forName: NSText.didChangeNotification, object: self, queue: .main){ [weak self] _ in
+      = NotificationCenter.default.addObserver(forName: NSText.didChangeNotification, object: self, queue: .main){ [weak self] _ in
 
-      self?.considerCompletionFor(range: self!.rangeForUserCompletion)
-      self?.removeMessageViews(withIDs: self!.codeStorageDelegate.lastEvictedMessageIDs)
-    }
-
-    // Perform an initial tiling run when the view hierarchy has been set up.
-    Task {
-      tile()
-    }
+        self?.considerCompletionFor(range: self!.rangeForUserCompletion)
+        self?.removeMessageViews(withIDs: self!.codeStorageDelegate.lastEvictedMessageIDs)
+      }
 
     // Try to initialise a language service.
     if let languageService = codeStorageDelegate.languageServiceInit() {
@@ -596,6 +577,11 @@ final class CodeView: NSTextView {
                           newSelection: combinedRanges(ranges: ranges))
 
     }
+  }
+
+  override func layout() {
+    tile()
+    super.layout()
   }
 }
 
@@ -723,7 +709,8 @@ extension CodeView {
 
       if let textLocation  = optTextContentStorage?.textLocation(for: messageView.value.characterIndex),
          let fragmentFrame = optTextLayoutManager?.textLayoutFragment(for: textLocation)?.layoutFragmentFrameWithoutExtraLineFragment,
-         let highlightRect = lineBackgroundRect(y: fragmentFrame.minY, height: fragmentFrame.height)
+         let highlightRect = lineBackgroundRect(y: fragmentFrame.minY, height: fragmentFrame.height),
+         messageView.value.backgroundView.frame != highlightRect
       {
         messageView.value.backgroundView.frame = highlightRect
       }
@@ -889,10 +876,7 @@ extension CodeView {
     updateMessageLineHighlights()
 
 #if os(iOS)
-    setNeedsLayout()
     gutterView?.setNeedsDisplay()   // needs to be explicitly triggered
-#elseif os(macOS)
-    needsLayout = true
 #endif
   }
 
