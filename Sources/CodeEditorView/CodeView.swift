@@ -887,12 +887,26 @@ extension CodeView {
     textLayoutManager?.ensureLayout(for: textLayoutManager!.documentRange)
     minimapTextLayoutManager.ensureLayout(for: minimapTextLayoutManager.documentRange)
 
-    guard let textRange     = textLayoutManager?.documentRange,
-          let codeHeight    = textLayoutManager?.textLayoutFragmentExtent(for: textRange)?.height,
-          let minimapHeight = minimapTextLayoutManager.textLayoutFragmentExtent(for: textRange)?.height
-    else { return }
-    let codeViewHeight = frame.size.height,
+    let codeHeight     = contentSize.height,
+        codeViewHeight = frame.size.height,
         visibleHeight  = documentVisibleRect.size.height
+
+#if os(iOS)
+    let minimapHeight: CGFloat
+    if let textRange = textLayoutManager?.documentRange,
+       let height    = minimapTextLayoutManager.textLayoutFragmentExtent(for: textRange)?.height
+    {
+
+      // We need to force the scroll view (superclass of `UITextView`) to accomodate the while content without scrolling.
+      if height != minimapView?.frame.size.height { minimapView?.frame.size.height = height }
+      minimapHeight = height
+
+    } else {
+      minimapHeight = minimapView?.contentSize.height ?? 0
+    }
+#elseif os(macOS)
+    let minimapHeight = minimapView?.contentSize.height ?? .zero
+#endif
 
     let scrollFactor: CGFloat = if minimapHeight < visibleHeight || codeHeight <= visibleHeight { 1 }
                                 else { 1 - (minimapHeight - visibleHeight) / (codeHeight - visibleHeight) }
