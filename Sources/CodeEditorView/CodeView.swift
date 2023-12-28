@@ -776,7 +776,7 @@ extension CodeView {
         fontWidth               = theFont.maximumHorizontalAdvancement,  // NB: we deal only with fixed width fonts
         gutterWidthInCharacters = CGFloat(7),
         gutterWidth             = ceil(fontWidth * gutterWidthInCharacters),
-        gutterSize              = CGSize(width: gutterWidth, height: frame.height),
+        gutterSize              = CGSize(width: gutterWidth, height: contentSize.height),
         lineFragmentPadding     = CGFloat(5)
 
     if gutterView?.frame.size != gutterSize { gutterView?.frame = CGRect(origin: .zero, size: gutterSize) }
@@ -787,7 +787,7 @@ extension CodeView {
         minimapGutterWidth   = ceil(minimapFontWidth * gutterWidthInCharacters),
         dividerWidth         = CGFloat(1),
         minimapGutterRect    = CGRect(origin: CGPoint.zero,
-                                      size: CGSize(width: minimapGutterWidth, height: frame.height)).integral,
+                                      size: CGSize(width: minimapGutterWidth, height: contentSize.height)).integral,
         minimapExtras        = minimapGutterWidth + dividerWidth,
         gutterWithPadding    = gutterWidth + lineFragmentPadding,
         visibleWidth         = documentVisibleRect.width,
@@ -801,7 +801,7 @@ extension CodeView {
         minimapCodeWidth     = minimapGutterWidth + numberOfCharacters * minimapFontWidth - 1,  // no rounding for the container
         minimapX             = floor(visibleWidth - minimapWidth),
         minimapExclusionPath = OSBezierPath(rect: minimapGutterRect),
-        minimapDividerRect   = CGRect(x: minimapX - dividerWidth, y: 0, width: dividerWidth, height: frame.height).integral
+        minimapDividerRect   = CGRect(x: minimapX - dividerWidth, y: 0, width: dividerWidth, height: contentSize.height).integral
 
     minimapDividerView?.isHidden = !viewLayout.showMinimap
     minimapView?.isHidden        = !viewLayout.showMinimap
@@ -812,19 +812,13 @@ extension CodeView {
       if minimapDividerView?.frame != minimapDividerRect { minimapDividerView?.frame = minimapDividerRect }
       if minimapViewFrame.origin.x != minimapX || minimapViewFrame.width != minimapWidth {
 
-#if os(iOS)
-        // FIXME: see Issue #83
-        let minimapHeight = bounds.height
-#elseif os(macOS)
-        let minimapHeight = minimapViewFrame.height
-#endif
-        minimapView?.frame        = CGRect(x: minimapX,
-                                           y: minimapViewFrame.origin.y,
-                                           width: minimapWidth,
-                                           height: minimapHeight)
-        minimapGutterView?.frame  = minimapGutterRect
+        minimapView?.frame       = CGRect(x: minimapX,
+                                          y: minimapViewFrame.origin.y,
+                                          width: minimapWidth,
+                                          height: minimapView!.contentSize.height)
+        minimapGutterView?.frame = minimapGutterRect
 #if os(macOS)
-        minimapView?.minSize      = CGSize(width: minimapFontWidth, height: visibleRect.height)
+        minimapView?.minSize     = CGSize(width: minimapFontWidth, height: visibleRect.height)
 #endif
 
       }

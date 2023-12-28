@@ -55,6 +55,10 @@ protocol TextView {
   /// visibility in a scroll view.)
   ///
   var documentVisibleRect: CGRect { get }
+  
+  /// The size of the whole document (after layout).
+  ///
+  var contentSize: CGSize { get }
 
   /// Temporarily highlight the visible part of the given range.
   ///
@@ -201,7 +205,7 @@ extension UITextView: TextView {
     return Set(codeStorageDelegate.lineMap.linesContaining(range: selectedRange))
   }
 
-  var documentVisibleRect: CGRect { return bounds }
+  var documentVisibleRect: CGRect { return CGRect(origin: contentOffset, size: bounds.size) }
 
   // This implementation currently comes with an infelicity. If there is already a indicator view visible, while this
   // method is called again, the old view should be removed right away. This is a bit awkward to implement, as we cannot
@@ -286,6 +290,8 @@ extension NSTextView: TextView {
   }
 
   var documentVisibleRect: CGRect { enclosingScrollView?.documentVisibleRect ?? bounds }
+
+  var contentSize: CGSize { bounds.size }
 }
 
 #endif
