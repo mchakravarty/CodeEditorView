@@ -887,9 +887,8 @@ extension CodeView {
     textLayoutManager?.ensureLayout(for: textLayoutManager!.documentRange)
     minimapTextLayoutManager.ensureLayout(for: minimapTextLayoutManager.documentRange)
 
-    let codeHeight     = contentSize.height,
-        codeViewHeight = frame.size.height,
-        visibleHeight  = documentVisibleRect.size.height
+    let codeHeight    = contentSize.height,
+        visibleHeight = documentVisibleRect.size.height
 
 #if os(iOS)
     let minimapHeight: CGFloat
@@ -915,7 +914,7 @@ extension CodeView {
     // expessions. This is necessary as the minimap will otherwise be partially cut off by the enclosing clip view.
     // To get Xcode-like behaviour, where the minimap sticks to the top, it being a floating view is not sufficient.
     let newOriginY = floor(min(max(documentVisibleRect.origin.y * scrollFactor, 0),
-                               codeViewHeight - minimapHeight))
+                               codeHeight - minimapHeight))
     if minimapView?.frame.origin.y != newOriginY { minimapView?.frame.origin.y = newOriginY }  // don't update frames in vain
 
     let heightRatio: CGFloat = if codeHeight <= minimapHeight { 1 } else { minimapHeight / codeHeight }
