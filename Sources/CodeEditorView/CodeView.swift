@@ -892,21 +892,19 @@ extension CodeView {
     let codeHeight    = contentSize.height,
         visibleHeight = documentVisibleRect.size.height
 
+    // NB: We don't use `minimapView?.contentSize.height`, because it is too large if the code doesn't fill the whole
+    //     visible portion of the minimap view.
+    guard let minimapHeight
+                = minimapTextLayoutManager.textLayoutFragmentExtent(for: minimapTextLayoutManager.documentRange)?.height
+    else { return }
+
 #if os(iOS)
-    let minimapHeight: CGFloat
-    if let textRange = textLayoutManager?.documentRange,
-       let height    = minimapTextLayoutManager.textLayoutFragmentExtent(for: textRange)?.height
+      // We need to force the scroll view (superclass of `UITextView`) to accomodate the whole content without scrolling.
+      if let currentHeight = minimapView?.frame.size.height,
+         minimapHeight > currentHeight 
     {
-
-      // We need to force the scroll view (superclass of `UITextView`) to accomodate the while content without scrolling.
-      if height != minimapView?.frame.size.height { minimapView?.frame.size.height = height }
-      minimapHeight = height
-
-    } else {
-      minimapHeight = minimapView?.contentSize.height ?? 0
-    }
-#elseif os(macOS)
-    let minimapHeight = minimapView?.contentSize.height ?? .zero
+        minimapView?.frame.size.height = minimapHeight
+      }
 #endif
 
     let scrollFactor: CGFloat = if minimapHeight < visibleHeight || codeHeight <= visibleHeight { 1 }
