@@ -223,6 +223,10 @@ final class CodeView: UITextView {
                                                queue: .main){ [weak self] _ in
         self?.removeMessageViews(withIDs: self!.codeStorageDelegate.lastEvictedMessageIDs)
       }
+
+    Task { @MainActor in
+      adjustScrollPositionOfMinimap()
+    }
   }
 
   required init?(coder: NSCoder) {
@@ -550,6 +554,10 @@ final class CodeView: NSTextView {
 
         }
     }
+
+    Task { @MainActor in
+      adjustScrollPositionOfMinimap()
+    }
   }
 
   required init?(coder: NSCoder) {
@@ -856,12 +864,6 @@ extension CodeView {
       minimapTextContainer?.lineFragmentPadding = 0
 
     }
-
-    // NB: We can't generally set the height of the box highlighting the document visible area here as it depends on
-    //     the document and minimap height, which requires document layout to be completed. However, we still invoke
-    //     `adjustScrollPositionOfMinimap()` here as it does little work and an intermediate update is visually
-    //     more pleasing, especially when resizing the window or similar.
-    adjustScrollPositionOfMinimap()
 
     // Only after tiling can we get the correct frame for the highlight views.
     if let textLocation = optTextContentStorage?.textLocation(for: selectedRange.location) {
