@@ -523,13 +523,12 @@ final class CodeView: NSTextView {
     frameChangedNotificationObserver
       = NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification,
                                                object: enclosingScrollView,
-                                               queue: .main){ [weak self] _ in
+                                               queue: .main){ _ in
 
         // NB: When resizing the window, where the text container doesn't completely fill the text view (i.e., the text
         //     is short), we need to explicitly redraw the gutter, as line wrapping may have changed, which affects
         //     line numbering.
         gutterView.needsDisplay = true
-        self?.adjustScrollPositionOfMinimap()
       }
 
     // We need to check whether we need to look up completions or cancel a running completion process after every text
@@ -589,6 +588,7 @@ final class CodeView: NSTextView {
 
   override func layout() {
     tile()
+    adjustScrollPositionOfMinimap()
     super.layout()
   }
 }

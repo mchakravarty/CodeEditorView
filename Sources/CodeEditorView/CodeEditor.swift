@@ -297,8 +297,6 @@ extension CodeEditor: NSViewRepresentable {
                                              object: scrollView.contentView,
                                              queue: .main){ _ in
 
-        codeView.adjustScrollPositionOfMinimap()
-
         // FIXME: we would like to get less fine-grained updates here, but `NSScrollView.didEndLiveScrollNotification` doesn't happen when moving the cursor around
         context.coordinator.scrollPositionDidChange(scrollView)
       }
