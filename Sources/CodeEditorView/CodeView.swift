@@ -70,7 +70,7 @@ final class CodeView: UITextView {
   var minimapDividerView:       UIView?
 
   // Notification observer
-  private var didChangeObserver: NSObjectProtocol?
+  private var textDidChangeObserver: NSObjectProtocol?
 
   /// Contains the line on which the insertion point was located, the last time the selection range got set (if the
   /// selection was an insertion point at all; i.e., it's length was 0).
@@ -217,16 +217,13 @@ final class CodeView: UITextView {
 
     // We need to check whether we need to look up completions or cancel a running completion process after every text
     // change. We also need to remove evicted message views.
-    didChangeObserver
+    textDidChangeObserver
       = NotificationCenter.default.addObserver(forName: UITextView.textDidChangeNotification, 
                                                object: self,
                                                queue: .main){ [weak self] _ in
+
         self?.removeMessageViews(withIDs: self!.codeStorageDelegate.lastEvictedMessageIDs)
       }
-
-    Task { @MainActor in
-      adjustScrollPositionOfMinimap()
-    }
   }
 
   required init?(coder: NSCoder) {
@@ -234,11 +231,14 @@ final class CodeView: UITextView {
   }
 
   deinit {
-    if let observer = didChangeObserver { NotificationCenter.default.removeObserver(observer) }
+    if let observer = textDidChangeObserver { NotificationCenter.default.removeObserver(observer) }
   }
 
+  // NB: Trying to do tiling and minimap adjusting on specific events, instead of here, leads to lots of tricky corner
+  //     case.
   override func layoutSubviews() {
     tile()
+    adjustScrollPositionOfMinimap()
     super.layoutSubviews()
   }
 }
@@ -278,7 +278,6 @@ final class CodeViewDelegate: NSObject, UITextViewDelegate {
 
     didScroll?(scrollView)
 
-    codeView.adjustScrollPositionOfMinimap()
     codeView.gutterView?.invalidateGutter()
   }
 }
@@ -785,7 +784,8 @@ extension CodeView {
         fontWidth               = theFont.maximumHorizontalAdvancement,  // NB: we deal only with fixed width fonts
         gutterWidthInCharacters = CGFloat(7),
         gutterWidth             = ceil(fontWidth * gutterWidthInCharacters),
-        gutterSize              = CGSize(width: gutterWidth, height: contentSize.height),
+        minimumHeight           = max(contentSize.height, documentVisibleRect.height),
+        gutterSize              = CGSize(width: gutterWidth, height: minimumHeight),
         lineFragmentPadding     = CGFloat(5)
 
     if gutterView?.frame.size != gutterSize { gutterView?.frame = CGRect(origin: .zero, size: gutterSize) }
@@ -796,7 +796,7 @@ extension CodeView {
         minimapGutterWidth   = ceil(minimapFontWidth * gutterWidthInCharacters),
         dividerWidth         = CGFloat(1),
         minimapGutterRect    = CGRect(origin: CGPoint.zero,
-                                      size: CGSize(width: minimapGutterWidth, height: contentSize.height)).integral,
+                                      size: CGSize(width: minimapGutterWidth, height: minimumHeight)).integral,
         minimapExtras        = minimapGutterWidth + dividerWidth,
         gutterWithPadding    = gutterWidth + lineFragmentPadding,
         visibleWidth         = documentVisibleRect.width,
@@ -810,7 +810,7 @@ extension CodeView {
         minimapCodeWidth     = minimapGutterWidth + numberOfCharacters * minimapFontWidth - 1,  // no rounding for the container
         minimapX             = floor(visibleWidth - minimapWidth),
         minimapExclusionPath = OSBezierPath(rect: minimapGutterRect),
-        minimapDividerRect   = CGRect(x: minimapX - dividerWidth, y: 0, width: dividerWidth, height: contentSize.height).integral
+        minimapDividerRect   = CGRect(x: minimapX - dividerWidth, y: 0, width: dividerWidth, height: minimumHeight).integral
 
     minimapDividerView?.isHidden = !viewLayout.showMinimap
     minimapView?.isHidden        = !viewLayout.showMinimap
@@ -822,9 +822,9 @@ extension CodeView {
       if minimapViewFrame.origin.x != minimapX || minimapViewFrame.width != minimapWidth {
 
         minimapView?.frame       = CGRect(x: minimapX,
-                                          y: minimapViewFrame.origin.y,
+                                          y: minimapViewFrame.minY,
                                           width: minimapWidth,
-                                          height: minimapView!.contentSize.height)
+                                          height: minimapViewFrame.height)
         minimapGutterView?.frame = minimapGutterRect
 #if os(macOS)
         minimapView?.minSize     = CGSize(width: minimapFontWidth, height: visibleRect.height)
@@ -900,12 +900,14 @@ extension CodeView {
     else { return }
 
 #if os(iOS)
-      // We need to force the scroll view (superclass of `UITextView`) to accomodate the whole content without scrolling.
-      if let currentHeight = minimapView?.frame.size.height,
-         minimapHeight > currentHeight 
+    // We need to force the scroll view (superclass of `UITextView`) to accomodate the whole content without scrolling
+    // and to extent over the whole visible height. (On macOS, the latter is enforced by setting `minSize` in `tile()`.)
+    let minimapMinimalHeight = max(minimapHeight, documentVisibleRect.height)
+    if let currentHeight = minimapView?.frame.size.height,
+       minimapMinimalHeight > currentHeight
     {
-        minimapView?.frame.size.height = minimapHeight
-      }
+      minimapView?.frame.size.height = minimapMinimalHeight
+    }
 #endif
 
     let scrollFactor: CGFloat = if minimapHeight < visibleHeight || codeHeight <= visibleHeight { 1 }
