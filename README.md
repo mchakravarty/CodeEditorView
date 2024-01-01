@@ -18,7 +18,7 @@ This is the default dark theme on macOS. Like in Xcode, messages have got an inl
 
 <img src="app-demo-images/macOS-dark-example.png">
 
-The following is the default light theme on iOS. Both line highlighting and the minimap are currently not supported on iOS due to limitations in the iOS version of TextKit. Instead of the line highlight, both the current line (or the current selection range) and lines with messages are indicated with differently coloured line numbers in the gutter.
+The following is the default light theme on iOS. 
 
 <img src="app-demo-images/iOS-light-example.png">
 
