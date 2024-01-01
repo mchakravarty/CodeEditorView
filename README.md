@@ -61,6 +61,6 @@ I consider this to be pre-release quality. It is sufficient to start building so
 
 ## License
 
-Copyright [2021..2023] Manuel M. T. Chakravarty. 
+Copyright [2021..2024] Manuel M. T. Chakravarty. 
 
 Distributed under the Apache-2.0 license — see the [license file](LICENSE) for details.
