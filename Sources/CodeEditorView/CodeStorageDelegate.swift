@@ -121,10 +121,11 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
   ///
   private var lastTypedToken: LanguageConfiguration.Tokeniser.Token?
 
-  /// Flag that indicates that the current editing round is for a one-character addition to the text. This property
-  /// needs to be determined before attribute fixing and the like.
+  /// Indicates that the current editing round is for a one-character addition to the text and at which index into the
+  /// text storage that added character us located. This property needs to be determined before attribute fixing and the
+  /// like.
   ///
-  private(set) var processingOneCharacterEdit: Bool?
+  private(set) var processingOneCharacterAddition: Int?
 
 
   // MARK: Initialisers
@@ -171,7 +172,11 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
                    range editedRange: NSRange,
                    changeInLength delta: Int)
   {
-    processingOneCharacterEdit = delta == 1 && editedRange.length == 1
+    if delta == 1 && editedRange.length == 1 {  // One character has been added (nothing else)
+      processingOneCharacterAddition = editedRange.location
+    } else {
+      processingOneCharacterAddition = nil
+    }
   }
 
   // NB: The choice of `didProcessEditing` versus `willProcessEditing` is crucial on macOS. The reason is that
@@ -218,8 +223,8 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
     }
 
     // If a single character was added, process token-level completion steps.
-    if delta == 1 && processingOneCharacterEdit == true {
-      tokenCompletion(for: codeStorage, at: editedRange.location)
+    if let location = processingOneCharacterAddition {
+      tokenCompletion(for: codeStorage, at: location)
     }
 
     // Notify language service (if attached)
@@ -645,7 +650,7 @@ extension CodeStorageDelegate {
 
           } else {
 
-            // Insertion of a unrelated or non-bracket token => just complete the previous opening bracket
+            // Insertion of an unrelated or non-bracket token => just complete the previous opening bracket
             completingString = matchingPreviousLexeme
 
           }
