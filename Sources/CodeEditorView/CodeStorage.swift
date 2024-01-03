@@ -249,48 +249,6 @@ final class TextStorageObserver: NSTextStorage {
 
 
 // MARK: -
-// MARK: Custom handling of the insertion point
-
-extension CodeStorage {
-
-  /// Insert the given string, such that it is safe in an ongoing insertion cycle and does leave the cursor (insertion
-  /// point) in place if the insertion is at the location of the insertion point.
-  ///
-  func cursorInsert(string: String, at index: Int) {
-
-    Dispatch.DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + DispatchTimeInterval.milliseconds(10)){
-
-      #if os(iOS)
-
-      self.replaceCharacters(in: NSRange(location: index, length: 0), with: string)
-
-      #elseif os(macOS)
-
-      // Collect the text views, where we insert at the insertion point
-      var affectedTextViews: [NSTextView] = []
-// FIXME: adapt to TextKit 2 : HOPEFULLY, we don't need that anymore
-//      for layoutManager in self.layoutManagers {
-//        for textContainer in layoutManager.textContainers {
-//
-//          if let textView = textContainer.textView, textView.selectedRange() == NSRange(location: index, length: 0) {
-//            affectedTextViews.append(textView)
-//          }
-//        }
-//      }
-
-      self.replaceCharacters(in: NSRange(location: index, length: 0), with: string)
-
-      // Reset the insertion point to the original (pre-insertion) position (as it will move after the inserted text on
-      // macOS otherwise)
-      for textView in affectedTextViews { textView.setSelectedRange(NSRange(location: index, length: 0)) }
-
-      #endif
-    }
-  }
-}
-
-
-// MARK: -
 // MARK: Token attributes
 
 extension CodeStorage {

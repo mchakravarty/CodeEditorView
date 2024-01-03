@@ -470,7 +470,7 @@ extension CodeView {
     // Stop any already running completion task
     completionTask?.cancel()
 
-    if range.length > 0 && codeStorageDelegate.processingOneCharacterAddition != nil {
+    if range.length > 0 && codeStorageDelegate.processingOneCharacterAddition {
 
       completionTask = Task {
 

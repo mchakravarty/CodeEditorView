@@ -121,11 +121,13 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
   ///
   private var lastTypedToken: LanguageConfiguration.Tokeniser.Token?
 
-  /// Indicates that the current editing round is for a one-character addition to the text and at which index into the
-  /// text storage that added character us located. This property needs to be determined before attribute fixing and the
-  /// like.
+  /// Indicates whether the current editing round is for a one-character addition to the text.
   ///
-  private(set) var processingOneCharacterAddition: Int?
+  private(set) var processingOneCharacterAddition: Bool = false
+  
+  /// Indicates the number of characters added by token completion in the current editing round.
+  /// 
+  private(set) var tokenCompletionCharacters: Int = 0
 
 
   // MARK: Initialisers
@@ -172,27 +174,6 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
                    range editedRange: NSRange,
                    changeInLength delta: Int)
   {
-    if delta == 1 && editedRange.length == 1 {  // One character has been added (nothing else)
-      processingOneCharacterAddition = editedRange.location
-    } else {
-      processingOneCharacterAddition = nil
-    }
-  }
-
-  // NB: The choice of `didProcessEditing` versus `willProcessEditing` is crucial on macOS. The reason is that
-  //     the text storage performs "attribute fixing" between `willProcessEditing` and `didProcessEditing`. If we
-  //     modify attributes outside of `editedRange` (which we often do), then this triggers the movement of the
-  //     current selection to the end of the entire text.
-  //
-  //     By doing the highlighting work *after* attribute fixing, we avoid affecting the selection. However, it now
-  //     becomes *very* important to (a) refrain from any character changes and (b) from any attribute changes that
-  //     result in attributes that need to be fixed; otherwise, we end up with an inconsistent attributed string.
-  //     (In particular, changing the font attribute at this point is potentially dangerous.)
-  func textStorage(_ textStorage: NSTextStorage,
-                   didProcessEditing editedMask: TextStorageEditActions,
-                   range editedRange: NSRange,  // Apple docs are incorrect here: this is the range *after* editing
-                   changeInLength delta: Int)
-  {
     guard let codeStorage = textStorage as? CodeStorage else { return }
 
     // If only attributes change, the line map and syntax highlighting remains the same => nothing for us to do
@@ -218,13 +199,33 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
     lineMap.updateAfterEditing(string: textStorage.string, range: editedRange, changeInLength: delta)
     tokenise(range: editedRange, in: textStorage)
 
-    if visualDebugging {
-      textStorage.addAttribute(.backgroundColor, value: visualDebuggingEditedColour, range: editedRange)
+    // If a single character was added, process token-level completion steps (and remember that we are processing a
+    // one character addition).
+    processingOneCharacterAddition = delta == 1 && editedRange.length == 1
+    var editedRange = editedRange
+    var delta       = delta
+    if processingOneCharacterAddition {
+
+      tokenCompletionCharacters = tokenCompletion(for: codeStorage, at: editedRange.location)
+      if tokenCompletionCharacters > 0 {
+
+        // Update line map with completion characters.
+        lineMap.updateAfterEditing(string: textStorage.string, range: NSRange(location: editedRange.location + 1,
+                                                                              length: tokenCompletionCharacters),
+                                   changeInLength: tokenCompletionCharacters)
+
+        // Adjust the editing range and delta
+        editedRange.length += tokenCompletionCharacters
+        delta              += tokenCompletionCharacters
+
+        // Re-tokenise the whole lot with the completion characters included
+        tokenise(range: editedRange, in: textStorage)
+
+      }
     }
 
-    // If a single character was added, process token-level completion steps.
-    if let location = processingOneCharacterAddition {
-      tokenCompletion(for: codeStorage, at: location)
+    if visualDebugging {
+      textStorage.addAttribute(.backgroundColor, value: visualDebuggingEditedColour, range: editedRange)
     }
 
     // Notify language service (if attached)
@@ -237,7 +238,7 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
                        {
                          editedRange.max - info.range.location - endColumn
                        } else { 0 }
-    Task {
+    Task { [editedRange, delta] in
       try await languageService?.documentDidChange(position: editedRange.location,
                                                    changeInLength: delta,
                                                    lineChange: lineChange,
@@ -583,15 +584,16 @@ extension CodeStorageDelegate {
 extension CodeStorageDelegate {
 
   /// Handle token completion actions after a single character was inserted.
-  ///
+  /// 
   /// - Parameters:
-  ///   - textStorage: The text storage where the edit action occured.
+  ///   - codeStorage: The code storage where the edit action occured.
   ///   - index: The location within the text storage where the single character was inserted.
+  /// - Returns: The number of characters added.
   ///
-  /// Any change to the `textStorage` is deferred, so that this function can also be used in the middle of an
-  /// in-progress, but not yet completed edit.
+  /// This function only adds characters right after `index`. (This is crucial so that the caller knows where to adjust
+  /// the line map and tokenisation.)
   ///
-  func tokenCompletion(for codeStorage: CodeStorage, at index: Int) {
+  func tokenCompletion(for codeStorage: CodeStorage, at index: Int) -> Int {
 
     /// If the given token is an opening bracket, return the lexeme of its matching closing bracket.
     ///
@@ -677,14 +679,16 @@ extension CodeStorageDelegate {
 
       } else { completingString = nil }
 
-      // Defer inserting the completion
+      // Insert completion, if any
       if let string = completingString {
 
         lastTypedToken = nil    // A completion renders the last token void
-        codeStorage.cursorInsert(string: string, at: index + 1)
+        codeStorage.replaceCharacters(in: NSRange(location: index + 1, length: 0), with: string)
 
       }
-    }
+      return completingString?.count ?? 0
+
+    } else { return 0 }
   }
 }
 

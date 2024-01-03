@@ -602,6 +602,26 @@ class CodeViewDelegate: NSObject, NSTextViewDelegate {
 
   // MARK: NSTextViewDelegate protocol
 
+  func textView(_ textView: NSTextView,
+                willChangeSelectionFromCharacterRanges oldSelectedCharRanges: [NSValue],
+                toCharacterRanges newSelectedCharRanges: [NSValue])
+  -> [NSValue]
+  {
+    guard let codeStorageDelegeate = textView.textStorage?.delegate as? CodeStorageDelegate
+    else { return newSelectedCharRanges }
+
+    // If token completion added characters, we don't want to include them in the advance of the insertion point.
+    if codeStorageDelegeate.tokenCompletionCharacters > 0,
+       let selectionRange = newSelectedCharRanges.first as? NSRange,
+       selectionRange.length == 0
+    {
+
+      let insertionPointWithoutCompletion = selectionRange.location - codeStorageDelegeate.tokenCompletionCharacters
+      return [NSRange(location: insertionPointWithoutCompletion, length: 0) as NSValue]
+
+    } else { return newSelectedCharRanges }
+  }
+
   func textDidChange(_ notification: Notification) {
     guard let textView = notification.object as? NSTextView else { return }
 
