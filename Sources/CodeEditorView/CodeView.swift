@@ -716,7 +716,7 @@ extension CodeView {
   }
 
   func updateCurrentLineHighlight(for location: NSTextLocation) {
-    guard let textLayoutManager  = optTextLayoutManager else { return }
+    guard let textLayoutManager = optTextLayoutManager else { return }
 
     ensureLayout(includingMinimap: false)
 
@@ -724,6 +724,12 @@ extension CodeView {
     currentLineHighlightView?.isHidden = insertionPoint == nil
 
     if let fragmentFrame = textLayoutManager.textLayoutFragment(for: location)?.layoutFragmentFrameWithoutExtraLineFragment,
+       let highlightRect = lineBackgroundRect(y: fragmentFrame.minY, height: fragmentFrame.height)
+    {
+      currentLineHighlightView?.frame = highlightRect
+    } else 
+    if let previousLocation = optTextContentStorage?.location(location, offsetBy: -1),
+       let fragmentFrame = textLayoutManager.textLayoutFragment(for: previousLocation)?.layoutFragmentFrameExtraLineFragment,
        let highlightRect = lineBackgroundRect(y: fragmentFrame.minY, height: fragmentFrame.height)
     {
       currentLineHighlightView?.frame = highlightRect

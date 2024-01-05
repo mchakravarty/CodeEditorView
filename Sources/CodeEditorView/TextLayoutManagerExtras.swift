@@ -22,6 +22,24 @@ extension NSTextLayoutFragment {
     }
     return frame
   }
+
+  /// Yield the frame of the layout fragment's extra line fragment if present (which is the case if this the last
+  /// line fragment and it is terminated by a newline character).
+  ///
+  var layoutFragmentFrameExtraLineFragment: CGRect? {
+
+    // If this layout fragment's last line fragment is for an empty string, then it is an extra line fragment and 
+    // return its bounds.
+    if let lastTextLineFragment = textLineFragments.last, lastTextLineFragment.characterRange.length == 0 {
+      let height = lastTextLineFragment.typographicBounds.height
+      return CGRect(x: layoutFragmentFrame.minX,
+                    y: layoutFragmentFrame.maxY - height,
+                    width: layoutFragmentFrame.width,
+                    height: height)
+    } else {
+      return nil
+    }
+  }
 }
 
 extension NSTextLayoutManager {
