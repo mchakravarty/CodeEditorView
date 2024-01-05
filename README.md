@@ -7,9 +7,7 @@ The `CodeEditorView` Swift package provides a SwiftUI view implementing a rich c
 
 **Update:**
 
-* I am currently porting `CodeEditorView` over to TextKit 2. You find the ongoing progress on `main`.
-* The main work is done, which (among other things) results in performance improvements and additional functionality on iOS (line highlights and minimap).
-* There are still some problems, though. On iOS, redrawing of the gutter and the minimap is broken. And on macOS, text editing performance on larger files is bad. These issues are going to be fixed next.
+* `CodeEditorView` is now based on TextKit 2.
 * The TextKit 2 implementation requires the latest versions of macOS (14) and iOS (17). If want to use `CodeEditorView` on earlier version of macOS or iOS, you need to use release 0.12.0 or the `textkit1` branch of this repository. (I don't have the bandwidth to support TextKit 2 on earlier OS versions, but I am happy to accept PRs that add support for it. They need to use Swift 5.9, though.)
 
 ## Screenshots of the demo app
