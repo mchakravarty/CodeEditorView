@@ -500,7 +500,7 @@ final class CodeView: NSTextView {
     minimapView.isSelectable                        = false
     minimapView.isHorizontallyResizable             = false
     minimapView.isVerticallyResizable               = true
-    minimapView.textContainerInset                  = CGSize(width: 0, height: 0)
+    minimapView.textContainerInset                  = .zero
     minimapView.textContainer?.widthTracksTextView  = false    // we need to be able to control the size (see `tile()`)
     minimapView.textContainer?.heightTracksTextView = false
     minimapView.textContainer?.lineBreakMode        = .byWordWrapping
@@ -866,13 +866,21 @@ extension CodeView {
     // NB: We use the `excess` width to capture the slack that arises when the window width admits a fractional
     //     number of characters. Adding the slack to the code view's text container size doesn't work as the line breaks
     //     of the minimap and main code view are then sometimes not entirely in sync.
-    let codeContainerWidth = if viewLayout.wrapText { codeViewWidth } else { CGFloat.greatestFiniteMagnitude }
+    let codeContainerWidth = if viewLayout.wrapText { codeViewWidth - gutterWidth } else { CGFloat.greatestFiniteMagnitude }
     if codeContainer.size.width != codeContainerWidth {
       codeContainer.size = CGSize(width: codeContainerWidth, height: CGFloat.greatestFiniteMagnitude)
     }
 
     codeContainer.lineFragmentPadding = lineFragmentPadding
-    codeContainer.gutterWidth         = gutterWidth
+#if os(macOS)
+    if textContainerInset.width != gutterWidth {
+      textContainerInset = CGSize(width: gutterWidth, height: 0)
+    }
+#elseif os(iOS)
+    if textContainerInset.left != gutterWidth {
+      textContainerInset = UIEdgeInsets(top: 0, left: gutterWidth, bottom: 0, right: 0)
+    }
+#endif
 
     // Set the text container area of the minimap text view
     let minimapTextContainerWidth = if viewLayout.wrapText { minimapCodeWidth } else { CGFloat.greatestFiniteMagnitude }
@@ -1141,10 +1149,6 @@ final class CodeContainer: NSTextContainer {
   weak var textView: UITextView?
   #endif
 
-  /// The amount of space that we need to leave blank at the left-hand side of the text for the gutter.
-  ///
-  var gutterWidth: CGFloat = 0
-
   // We adapt line fragment rects in two ways: (1) we leave `gutterWidth` space on the left hand side and (2) on every
   // line that contains a message, we leave `MessageView.minimumInlineWidth` space on the right hand side (but only for
   // the first line fragment of a layout fragment).
@@ -1158,10 +1162,7 @@ final class CodeContainer: NSTextContainer {
                                                 at: characterIndex,
                                                 writingDirection: baseWritingDirection,
                                                 remaining: remainingRect),
-        calculatedRect = CGRect(x: gutterWidth, 
-                                y: superRect.minY,
-                                width: size.width - gutterWidth,
-                                height: superRect.height)
+        calculatedRect = CGRect(x: 0, y: superRect.minY, width: size.width, height: superRect.height)
 
     guard let codeView    = textView as? CodeView,
           let codeStorage = codeView.optCodeStorage,

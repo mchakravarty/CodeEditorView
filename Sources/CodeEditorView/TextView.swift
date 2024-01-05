@@ -222,9 +222,9 @@ extension UITextView: TextView {
 
     // Set up a label view to animate as the indicator view
     guard let visibleTextRange = textContentStorage.textRange(for: visibleRange),
-          let rect           = textLayoutManager.boundingRectOfFirstTextSegment(for: visibleTextRange)
+          let rect             = textLayoutManager.boundingRectOfFirstTextSegment(for: visibleTextRange)
     else { return }
-    let label = UILabel(frame: rect),
+    let label = UILabel(frame: rect.offsetBy(dx: textContainerOrigin.x, dy: 0)),
         text  = NSMutableAttributedString(attributedString: textStorage.attributedSubstring(from: visibleRange))
     text.addAttributes(highlightingAttributes, range: NSRange(location: 0, length: text.length))
     label.attributedText      = text
