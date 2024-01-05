@@ -8,7 +8,8 @@ The `CodeEditorView` Swift package provides a SwiftUI view implementing a rich c
 **Update:**
 
 * `CodeEditorView` is now based on TextKit 2.
-* The TextKit 2 implementation requires the latest versions of macOS (14) and iOS (17). If want to use `CodeEditorView` on earlier version of macOS or iOS, you need to use release 0.12.0 or the `textkit1` branch of this repository. (I don't have the bandwidth to support TextKit 2 on earlier OS versions, but I am happy to accept PRs that add support for it. They need to use Swift 5.9, though.)
+* The TextKit 2 implementation requires the latest versions of macOS (14) and iOS (17). If you want to use `CodeEditorView` on earlier version of macOS or iOS, you need to use release 0.12.0 or the `textkit1` branch of this repository. (I don't have the bandwidth to support TextKit 2 on earlier OS versions, but I am happy to accept PRs that add support for it. They need to use Swift 5.9, though.)
+* On macOS, `CodeEditorView` also supports (1) displaying information about identifiers (such as type information and documentation provided in Markdown) as well as (2) code completion. This will eventually also be supported on iOS.
 
 ## Screenshots of the demo app
 
