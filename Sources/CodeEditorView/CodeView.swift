@@ -938,14 +938,16 @@ extension CodeView {
     textLayoutManager?.ensureLayout(for: textLayoutManager!.documentRange)
     minimapTextLayoutManager.ensureLayout(for: minimapTextLayoutManager.documentRange)
 
-    let codeHeight    = contentSize.height,
-        visibleHeight = documentVisibleRect.size.height
-
     // NB: We don't use `minimapView?.contentSize.height`, because it is too large if the code doesn't fill the whole
-    //     visible portion of the minimap view.
-    guard let minimapHeight
+    //     visible portion of the minimap view. Moreover, even for the code view, `contentSize` may not yet have been
+    //     adjusted, whereas we know that the layout is complete (as we ensure that above).
+    guard let codeHeight
+                = optTextLayoutManager?.textLayoutFragmentExtent(for: optTextLayoutManager!.documentRange)?.height,
+          let minimapHeight
                 = minimapTextLayoutManager.textLayoutFragmentExtent(for: minimapTextLayoutManager.documentRange)?.height
     else { return }
+
+    let visibleHeight = documentVisibleRect.size.height
 
 #if os(iOS)
     // We need to force the scroll view (superclass of `UITextView`) to accomodate the whole content without scrolling
