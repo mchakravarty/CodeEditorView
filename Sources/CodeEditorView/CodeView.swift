@@ -211,7 +211,7 @@ final class CodeView: UITextView {
     self.minimapGutterView = minimapGutterView
 
     let documentVisibleBox = UIView()
-    documentVisibleBox.backgroundColor   = theme.textColour.withAlphaComponent(0.1)
+    documentVisibleBox.backgroundColor = theme.textColour.withAlphaComponent(0.1)
     minimapView.addSubview(documentVisibleBox)
     self.documentVisibleBox = documentVisibleBox
 
@@ -223,6 +223,8 @@ final class CodeView: UITextView {
                                                queue: .main){ [weak self] _ in
 
         self?.removeMessageViews(withIDs: self!.codeStorageDelegate.lastEvictedMessageIDs)
+        self?.gutterView?.invalidateGutter()
+        self?.minimapGutterView?.invalidateGutter()
       }
   }
 
@@ -240,6 +242,8 @@ final class CodeView: UITextView {
     tile()
     adjustScrollPositionOfMinimap()
     super.layoutSubviews()
+    gutterView?.setNeedsDisplay()
+    minimapGutterView?.setNeedsDisplay()
   }
 }
 
@@ -352,6 +356,7 @@ final class CodeView: NSTextView {
       (textStorage as? CodeStorage)?.theme = theme
       gutterView?.theme                    = theme
       currentLineHighlightView?.color      = theme.currentLineColour
+      minimapView?.font                    = OSFont(name: theme.font.fontName, size: theme.font.pointSize / minimapRatio)!
       minimapView?.backgroundColor         = theme.backgroundColour
       minimapGutterView?.theme             = theme
       documentVisibleBox?.fillColor        = theme.textColour.withAlphaComponent(0.1)
@@ -494,6 +499,8 @@ final class CodeView: NSTextView {
     }
     minimapView.textLayoutManager?.delegate = minimapTextLayoutManagerDelegate
 
+    let font = theme.font
+    minimapView.font                                = OSFont(name: font.fontName, size: font.pointSize / minimapRatio)!
     minimapView.backgroundColor                     = backgroundColor
     minimapView.autoresizingMask                    = .none
     minimapView.isEditable                          = false
@@ -590,6 +597,8 @@ final class CodeView: NSTextView {
     tile()
     adjustScrollPositionOfMinimap()
     super.layout()
+    gutterView?.needsDisplay = true
+    minimapGutterView?.needsDisplay = true
   }
 }
 
@@ -723,14 +732,23 @@ extension CodeView {
     // The current line highlight view needs to be visible if we have an insertion point (and not a selection range).
     currentLineHighlightView?.isHidden = insertionPoint == nil
 
+    // The insertion point is inside the body of the text
     if let fragmentFrame = textLayoutManager.textLayoutFragment(for: location)?.layoutFragmentFrameWithoutExtraLineFragment,
        let highlightRect = lineBackgroundRect(y: fragmentFrame.minY, height: fragmentFrame.height)
     {
       currentLineHighlightView?.frame = highlightRect
     } else 
+    // OR the insertion point is behind the end of the text, which ends with a trailing newline (=> extra line fragement)
     if let previousLocation = optTextContentStorage?.location(location, offsetBy: -1),
-       let fragmentFrame = textLayoutManager.textLayoutFragment(for: previousLocation)?.layoutFragmentFrameExtraLineFragment,
-       let highlightRect = lineBackgroundRect(y: fragmentFrame.minY, height: fragmentFrame.height)
+       let fragmentFrame    = textLayoutManager.textLayoutFragment(for: previousLocation)?.layoutFragmentFrameExtraLineFragment,
+       let highlightRect    = lineBackgroundRect(y: fragmentFrame.minY, height: fragmentFrame.height)
+    {
+      currentLineHighlightView?.frame = highlightRect
+    } else
+    // OR the insertion point is behind the end of the text, which does NOT end with a trailing newline
+    if let previousLocation = optTextContentStorage?.location(location, offsetBy: -1),
+       let fragmentFrame    = textLayoutManager.textLayoutFragment(for: previousLocation)?.layoutFragmentFrame,
+       let highlightRect    = lineBackgroundRect(y: fragmentFrame.minY, height: fragmentFrame.height)
     {
       currentLineHighlightView?.frame = highlightRect
     }
@@ -905,10 +923,6 @@ extension CodeView {
       updateCurrentLineHighlight(for: textLocation)
     }
     updateMessageLineHighlights()
-
-#if os(iOS)
-    gutterView?.setNeedsDisplay()   // needs to be explicitly triggered
-#endif
   }
 
 

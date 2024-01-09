@@ -86,8 +86,7 @@ final class GutterView: OSView {
     self.isMinimapGutter = isMinimapGutter
     super.init(frame: frame)
 #if os(iOS)
-    isOpaque        = false
-    backgroundColor = .clear
+    isOpaque = false
 #endif
   }
 
@@ -135,7 +134,9 @@ extension GutterView {
     guard let textLayoutManager   = optTextLayoutManager,
           let textContentStorage  = textLayoutManager.textContentManager as? NSTextContentStorage,
           let viewPortRange       = textLayoutManager.textViewportLayoutController.viewportRange,
-          let charRangeInViewPort = textContentStorage.range(for: viewPortRange).intersection(charRange),
+          let viewPortRangeExt    = textContentStorage.range(for: viewPortRange).shifted(endBy: 1),
+          // with the above shift we allow for an insertion point at the end of the text
+          let charRangeInViewPort = viewPortRangeExt.intersection(charRange),
           let string              = textContentStorage.textStorage?.string as NSString?
     else { return }
 
@@ -144,10 +145,18 @@ extension GutterView {
     let extendedCharRange = string.paragraphRange(for: charRangeInViewPort.clamped(to: string.length))
 
     if let textRange              = textContentStorage.textRange(for: extendedCharRange),
-       let (y: y, height: height) = textLayoutManager.textLayoutFragmentExtent(for: textRange), 
+       let (y: y, height: height) = textLayoutManager.textLayoutFragmentExtent(for: textRange),
         height > 0
     {
       setNeedsDisplay(gutterRectFrom(y: y, height: height))
+    }
+
+    if charRange.max == string.length,
+       let endLocation        = textContentStorage.textLocation(for: charRange.max),
+       let textLayoutFragment = textLayoutManager.textLayoutFragment(for: endLocation),
+       let textRect           = textLayoutFragment.layoutFragmentFrameExtraLineFragment
+    {
+      setNeedsDisplay(gutterRectForLineNumbersFrom(textRect: textRect))
     }
   }
 
@@ -230,17 +239,12 @@ extension GutterView {
       // If we are at the end, we also draw a line number for the extra line fragement if that exists
       if lineRange.endIndex == lineMap.lines.count,
          let endLocation        = textContentStorage.location(textRange.endLocation, offsetBy: -1),
-         let textLayoutFragment = textLayoutManager.textLayoutFragment(for: endLocation)
+         let textLayoutFragment = textLayoutManager.textLayoutFragment(for: endLocation),
+         let textRect           = textLayoutFragment.layoutFragmentFrameExtraLineFragment
       {
 
-        let textRect = textLayoutFragment
-          .layoutFragmentFrame.divided(atDistance: textLayoutFragment.layoutFragmentFrameWithoutExtraLineFragment.height,
-                                       from: .minYEdge).remainder
-        let gutterRect = gutterRectForLineNumbersFrom(textRect: textRect)
-
-        let attributes = textView?.insertionPoint == textContentStorage.textStorage?.length
-                         ? textAttributesSelected
-                         : textAttributesDefault
+        let gutterRect = gutterRectForLineNumbersFrom(textRect: textRect),
+            attributes = selectedLines.contains(lineRange.endIndex - 1) ? textAttributesSelected : textAttributesDefault
         if gutterRect.intersects(rect) {
           ("\(lineMap.lines.count)" as NSString).draw(in: gutterRect, withAttributes: attributes)
         }

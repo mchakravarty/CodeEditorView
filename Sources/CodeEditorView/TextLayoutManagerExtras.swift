@@ -23,6 +23,31 @@ extension NSTextLayoutFragment {
     return frame
   }
 
+  /// This is a temporary kludge to fix the height of the extra line fragment in case the size of the font used in the
+  /// rest of the layout fragment is very from the standard font size. In TextKit 2, it is far from clear how to
+  /// indicate the metrics to be used in a nicer manner. (Just setting the default font of the text view doesn't seem
+  /// to work.)
+  ///
+  /// The solution here only works if there is at least one other line fragment (but that's always the case if the
+  /// displayed string is now empty) and we use them same font height everywhere (which is the case for a code view).
+  /// We simply use height of another line fragement for that of the extra line fragment and adjust the overall frame
+  /// accordingly.
+  ///
+  var layoutFragmentFrameAdjustedKludge: CGRect {
+    var frame = layoutFragmentFrame
+
+    // If this layout fragment's last line fragment is for an empty string, then it is an extra line fragment and we
+    // deduct its height from the layout fragment's height.
+    if let firstTextLineFragment = textLineFragments.first,
+       let lastTextLineFragment = textLineFragments.last,
+       lastTextLineFragment.characterRange.length == 0
+    {
+      frame.size.height -= lastTextLineFragment.typographicBounds.height
+      frame.size.height += firstTextLineFragment.typographicBounds.height
+    }
+    return frame
+  }
+
   /// Yield the frame of the layout fragment's extra line fragment if present (which is the case if this the last
   /// line fragment and it is terminated by a newline character).
   ///
@@ -49,14 +74,13 @@ extension NSTextLayoutManager {
   /// - Parameter textRange: The text range for which we want to compute the height of the text fragments.
   /// - Returns: The height of the text fragments.
   ///
-  /// If there are gaps, they are included. At the end of the text, if there is an extra line fragment, we return its
-  /// height, but we exclude the extra line fragment from the preceeding line's height. (It is in the same text layout
-  /// fragment.)
+  /// If there are gaps, they are included. If the range reaches until the end of the text and there is extra line
+  /// fragment, then it is included, too.
   ///
   func textLayoutFragmentExtent(for textRange: NSTextRange) -> (y: CGFloat, height: CGFloat)? {
     let location = textRange.location
 
-    if location.compare(documentRange.endLocation) == .orderedSame { // End of the document
+    if location.compare(documentRange.endLocation) == .orderedSame { // Start of range == end of the document
 
       if let lastLocation           = textContentManager?.location(textRange.endLocation, offsetBy: -1),
          let lastTextLayoutFragment = textLayoutFragment(for: lastLocation),
@@ -86,10 +110,10 @@ extension NSTextLayoutManager {
       let endLocation   = if textRange.isEmpty { nil as NSTextLocation? }
                           else { textContentManager?.location(textRange.endLocation, offsetBy: -1) },
           startFragment = textLayoutFragment(for: location),
-          startFrame    = startFragment?.layoutFragmentFrameWithoutExtraLineFragment,
+          startFrame    = startFragment?.layoutFragmentFrame,
           endFragment   = if let endLocation { textLayoutFragment(for: endLocation) }
                           else { nil as NSTextLayoutFragment? },
-          endFrame      = endFragment?.layoutFragmentFrameWithoutExtraLineFragment
+          endFrame      = endFragment?.layoutFragmentFrameAdjustedKludge
 
       switch (startFrame, endFrame) {
       case (nil, nil):                   return nil
