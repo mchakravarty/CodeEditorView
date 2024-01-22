@@ -82,7 +82,7 @@ final class CodeView: UITextView {
   @Invalidating(.layout, .display)
   var theme: Theme = .defaultLight {
     didSet {
-      font                                  = UIFont(name: theme.fontName, size: theme.fontSize)
+      font                                  = theme.font
       backgroundColor                       = theme.backgroundColour
       tintColor                             = theme.tintColour
       (textStorage as? CodeStorage)?.theme  = theme
