@@ -133,7 +133,7 @@ extension Theme {
 
   public static var defaultLight: Theme
     = Theme(colourScheme: .light,
-            fontName: "SFMono-Regular",
+            fontName: "SFMono-Medium",
             fontSize: 13.0,
             textColour: OSColor(red: 0.15, green: 0.15, blue: 0.15, alpha: 1.0),
             commentColour: OSColor(red: 0.45, green: 0.50, blue: 0.55, alpha: 1.0),
@@ -154,9 +154,9 @@ extension Theme {
   /// Font object on the basis of the font name and size of the theme.
   ///
   var font: OSFont {
-    if fontName.hasPrefix("SFMono") {
+    if fontName.hasPrefix("SFMono-") {
 
-      let weightString = fontName.dropFirst("SFMono".count)
+      let weightString = fontName.dropFirst("SFMono-".count)
       let weight       : OSFont.Weight
       switch weightString {
       case "UltraLight": weight = .ultraLight
