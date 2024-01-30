@@ -108,6 +108,13 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
   let              language:        LanguageConfiguration
   private      let tokeniser:       LanguageConfiguration.Tokeniser?  // cache the tokeniser
   private(set) var languageService: LanguageService?  // instantiated language service if available
+  
+  /// Call back to notify of invalidated highlighting ranges due to (re-)tokenisation of the code storage.
+  ///
+  /// NB: Especially for comment blocks, this range can be much longer than the edited text; hence, we do need explicit
+  ///     invalidation.
+  ///
+  var invalidateHighlighting: ((NSRange) -> Void)?
 
   private(set) var lineMap = LineMap<LineInfo>(string: "")
 
@@ -179,6 +186,7 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
     // If only attributes change, the line map and syntax highlighting remains the same => nothing for us to do
     guard editedMask.contains(.editedCharacters) else { return }
 
+    // FIXME: This (and the rest of visual debugging) needs to be rewritten to use rendering attributes.
     if visualDebugging {
       let wholeTextRange = NSRange(location: 0, length: textStorage.length)
       textStorage.removeAttribute(.backgroundColor, range: wholeTextRange)
@@ -197,7 +205,7 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
                     } else { 0 }
 
     lineMap.updateAfterEditing(string: textStorage.string, range: editedRange, changeInLength: delta)
-    tokenise(range: editedRange, in: textStorage)
+    var highlightingRange = tokenise(range: editedRange, in: textStorage)
 
     // If a single character was added, process token-level completion steps (and remember that we are processing a
     // one character addition).
@@ -219,10 +227,14 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
         delta              += tokenCompletionCharacters
 
         // Re-tokenise the whole lot with the completion characters included
-        tokenise(range: editedRange, in: textStorage)
+        let extraHighlightingRange = tokenise(range: editedRange, in: textStorage)
+        highlightingRange = highlightingRange.union(extraHighlightingRange)
 
       }
     }
+
+    // The range within which highlighting has to be re-rendered.
+    invalidateHighlighting?(highlightingRange)
 
     if visualDebugging {
       textStorage.addAttribute(.backgroundColor, value: visualDebuggingEditedColour, range: editedRange)
@@ -312,15 +324,17 @@ extension CodeStorageDelegate {
 
   /// Tokenise the substring of the given text storage that contains the specified lines and store tokens as part of the
   /// line information.
-  ///
+  /// 
   /// - Parameters:
   ///   - originalRange: The character range that contains all characters that have changed.
   ///   - textStorage: The text storage that contains the changed characters.
+  /// - Returns: The range of text affected by tokenisation. This can be more than the `originalRange` as changes in
+  ///     commenting and the like might affect large portions of text.
   ///
   /// Tokenisation happens at line granularity. Hence, the range is correspondingly extended. Moreover, tokens must not
   /// span across lines as they will always only associated with the line on which they start.
-  ///
-  func tokenise(range originalRange: NSRange, in textStorage: NSTextStorage) {
+  /// 
+  func tokenise(range originalRange: NSRange, in textStorage: NSTextStorage) -> NSRange {
 
     // NB: The range property of the tokens is in terms of the entire text (not just `line`).
     func tokeniseAndUpdateInfo<Tokens: Collection<Tokeniser<LanguageConfiguration.Token,
@@ -421,7 +435,7 @@ extension CodeStorageDelegate {
       }
     }
 
-    guard let tokeniser = tokeniser else { return }
+    guard let tokeniser = tokeniser else { return originalRange }
 
     // Extend the range to line boundaries. Because we cannot parse partial tokens, we at least need to go to word
     // boundaries, but because we have line bounded constructs like comments to the end of the line and it is easier to
@@ -482,7 +496,7 @@ extension CodeStorageDelegate {
                               commentDepth: &commentDepth,
                               lastCommentStart: &lastCommentStart)
 
-        // Keep track of the trailing range for debugging purpose
+        // Keep track of the trailing range to report back to the caller.
         highlightingRange = NSUnionRange(highlightingRange, lineEntry.range)
 
       }
@@ -495,6 +509,8 @@ extension CodeStorageDelegate {
       textStorage.addAttribute(.backgroundColor, value: visualDebuggingTrailingColour, range: highlightingRange)
       textStorage.addAttribute(.backgroundColor, value: visualDebuggingLinesColour, range: range)
     }
+
+    return highlightingRange
   }
 
   /// Query semantic tokens for the given lines from the language service (if available) and merge them into the token

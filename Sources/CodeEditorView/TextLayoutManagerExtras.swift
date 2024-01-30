@@ -144,6 +144,7 @@ extension NSTextLayoutManager {
                                     using block: (NSTextLayoutFragment) -> Bool)
   -> NSTextLocation?
   {
+    // FIXME: This doesn't work if the options include `.reverse`.
     enumerateTextLayoutFragments(from: textRange.location, options: options) { textLayoutFragment in
       textLayoutFragment.rangeInElement.location.compare(textRange.endLocation) == .orderedAscending
       && block(textLayoutFragment)
@@ -177,5 +178,55 @@ extension NSTextLayoutManager {
       return false
     }
     return result
+  }
+  
+  /// Enumerates the rendering attributes within a given range.
+  ///
+  /// - Parameters:
+  ///   - textRange: The text range whose rendering attributes are to be enumerated.
+  ///   - reverse: Whether to enumerate in reverse; i.e., right-to-left.
+  ///   - block: A closure invoked for each attribute run within the range.
+  ///
+  func enumerateRenderingAttributes(in textRange: NSTextRange,
+                                    reverse: Bool,
+                                    using block: (NSTextLayoutManager, [NSAttributedString.Key : Any], NSTextRange) -> Void)
+  {
+    if !reverse {
+
+      enumerateRenderingAttributes(from: textRange.location, reverse: false) { textLayoutManager, attributes, attributeRange in
+
+        if let clippedRange = attributeRange.intersection(textRange) {
+          block(textLayoutManager, attributes, clippedRange)
+        }
+        return attributeRange.endLocation.compare(textRange.endLocation) == .orderedAscending
+      }
+
+    } else {
+
+      enumerateRenderingAttributes(from: textRange.endLocation, reverse: true) { textLayoutManager, attributes, attributeRange in
+
+        if let clippedRange = attributeRange.intersection(textRange) {
+          block(textLayoutManager, attributes, clippedRange)
+        }
+        return attributeRange.location.compare(textRange.location) == .orderedDescending
+      }
+
+    }
+  }
+
+  /// A set of string attributes together with a text range to which theu apply.
+  ///
+  typealias AttributeRun = (attributes: [NSAttributedString.Key : Any], textRange: NSTextRange)
+
+  /// Collect all rendering attributes and their character ranges within a given text range.
+  ///
+  /// - Parameter textRange: The text range in which we want to collect rendering attributes.
+  /// - Returns: An array of pairs and associated range for all rendering attributes within the given text range.
+  ///
+  func renderingAttributes(in textRange: NSTextRange) -> [AttributeRun] {
+
+    var attributes: [(attributes: [NSAttributedString.Key : Any], textRange: NSTextRange)] = []
+    enumerateRenderingAttributes(in: textRange, reverse: false) { attributes.append((attributes: $1, textRange: $2)) }
+    return attributes
   }
 }

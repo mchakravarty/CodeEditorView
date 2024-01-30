@@ -63,44 +63,7 @@ class CodeStorage: NSTextStorage {
   override var fixesAttributesLazily: Bool { true }
 
   override func attributes(at location: Int, effectiveRange range: NSRangePointer?) -> [NSAttributedString.Key : Any] {
-
-    var attributes       = textStorage.attributes(at: location, effectiveRange: range)
-    var foregroundColour = theme.textColour
-    var tokenRange: NSRange
-
-    // Translate comment and token information to the appropriate foreground colour determined by the current theme.
-    if let commentRange = comment(at: location) {
-
-      tokenRange       = commentRange
-      foregroundColour = theme.commentColour
-
-    } else {
-
-      // NB: We always get a range, even if there is no token. In that case, the range is the space between the next
-      //     tokens (or a token and the line start or end).
-      let tokenWithEffectiveRange = token(at: location)
-      tokenRange = tokenWithEffectiveRange.effectiveRange
-
-      if let token = tokenWithEffectiveRange.token {
-
-        switch token.token {
-        case .string:     foregroundColour = theme.stringColour
-        case .character:  foregroundColour = theme.characterColour
-        case .number:     foregroundColour = theme.numberColour
-        case .identifier: foregroundColour = theme.identifierColour
-        case .keyword:    foregroundColour = theme.keywordColour
-        default: ()
-        }
-      }
-    }
-
-    // Crop the effective range to the token range.
-    if let rangePtr = range,
-       let newRange = rangePtr.pointee.intersection(tokenRange)
-    { rangePtr.pointee = newRange }
-
-    attributes[.foregroundColor] = foregroundColour
-    return attributes
+    return textStorage.attributes(at: location, effectiveRange: range)
   }
 
   // Extended to handle auto-deletion of adjacent matching brackets
@@ -110,7 +73,7 @@ class CodeStorage: NSTextStorage {
 
     // We are deleting one character => check whether it is a one-character bracket and if so also delete its matching
     // bracket if it is directly adjacent
-    if range.length == 1 && str == "",
+    if range.length == 1 && str.isEmpty,
        let deletedToken = token(at: range.location).token,
        let language     = (delegate as? CodeStorageDelegate)?.language,
        deletedToken.token.isOpenBracket
@@ -140,6 +103,63 @@ class CodeStorage: NSTextStorage {
   }
 }
 
+extension NSAttributedString.Key {
+
+  /// Attribute to indicate that an attribute run has the default styling and not a token-specific styling.
+  ///
+  static let hideInvisibles: NSAttributedString.Key = .init("hideInvisibles")
+}
+
+extension CodeStorage {
+  
+  /// Returns the theme colour for a line token.
+  ///
+  /// - Parameter linetoken: The line token whose colour is desired.
+  /// - Returns: The theme colour of the given line token.
+  ///
+  func colour(for linetoken: LineToken) -> OSColor {
+    switch linetoken.kind {
+    case .comment: theme.commentColour
+    case .token(let token):
+      switch token {
+      case .string:     theme.stringColour
+      case .character:  theme.characterColour
+      case .number:     theme.numberColour
+      case .identifier: theme.identifierColour
+      case .keyword:    theme.keywordColour
+      default:          theme.textColour
+      }
+    }
+  }
+
+  func setHighlightingAttributes(for range: NSRange, in layoutManager: NSTextLayoutManager)
+  {
+    // We cannot inline the body of the task, because `setRenderingAttributes` will not correctly interpret the text
+    // ranges in the case that we are in an edit operation. It is also undesirable to dispatch this block to the main
+    // queue as this will introduce a visible delay in the rendering of the highlighting.
+    //
+    // The "non-sendable type" warnings are rather unfortunate, but I don't have a better solution right now.
+    // Suggestions are welcome!
+    Task {
+      guard let contentStorage = layoutManager.textContentManager as? NSTextContentStorage
+      else { return }
+
+      if let textRange = contentStorage.textRange(for: range) {
+        layoutManager.setRenderingAttributes([.foregroundColor: theme.textColour, .hideInvisibles: ()],
+                                             for: textRange)
+      }
+      enumerateTokens(in: range) { lineToken in
+
+        if let documentRange = lineToken.range.intersection(range),
+           let textRange     = contentStorage.textRange(for: documentRange)
+        {
+          let colour = colour(for: lineToken)
+          layoutManager.setRenderingAttributes([.foregroundColor: colour], for: textRange)
+        }
+      }
+    }
+  }
+}
 
 // MARK: -
 // MARK: Text storage observation
@@ -344,6 +364,148 @@ extension CodeStorage {
       else if commentRange.contains(column) { return commentRange.shifted(by: lineInfo.range.location) }
     }
     return nil
+  }
+  
+  /// Token representation for token enumeration, which includes simple tokens and comment spans.
+  ///
+  /// NB: In this representation tokens and comments never extend across lines.
+  ///
+  struct LineToken {
+    enum Kind {
+      case comment
+      case token(LanguageConfiguration.Token)
+    }
+
+    /// Token range, relative to the start of the document.
+    ///
+    let range: NSRange
+
+    /// Token start position, relative to the line on which the token is located.
+    ///
+    let column: Int
+
+    /// The kind of token.
+    ///
+    let kind: Kind
+    
+    /// Whether the line token represents a comment.
+    ///
+    var isComment: Bool {
+      switch kind {
+      case .comment: true
+      default:       false
+      }
+    }
+  }
+  
+  /// Enumerate tokens and comment spans from the given location onwards.
+  ///
+  /// - Parameters:
+  ///   - location: The location where the enumeration starts.
+  ///   - block: A block invoked for every token that also determines if the enumeration finishes early.
+  ///
+  /// The first enumerated token may have a starting location smaller than `location` (but it will extent until at least
+  /// `location`). Enumeration proceeds until the end of the document or until `block` returns `false`.
+  ///
+  func enumerateTokens(from location: Int, using block: (LineToken) -> Bool) {
+
+    // Enumerate the comemnt ranges and tokens on one line and optionally skip everything before a given start
+    // location. We can have tokens inside comment ranges. These tokens are being skipped. (We don't highlight inside
+    // comments, so far.) If a token and a comment begin at the same location, the comment takes precedence.
+    func enumerate(tokens: [LanguageConfiguration.Tokeniser.Token],
+                   commentRanges: [NSRange],
+                   lineStart: Int,
+                   startLocation: Int?)
+    -> Bool
+    {
+      var skipUntil: Int? = startLocation  // tokens from this location onwards (even in part) are enumerated
+
+      var tokens        = tokens
+      var commentRanges = commentRanges
+      while !tokens.isEmpty || !commentRanges.isEmpty {
+
+        let token        = tokens.first,
+            commentRange = commentRanges.first
+        if let token,
+           (commentRange?.location ?? Int.max) > token.range.location {
+
+          if skipUntil ?? 0 <= token.range.max - 1,
+             let range = token.range.shifted(by: lineStart)
+          {
+            let doContinue = block(LineToken(range: range, column: token.range.location, kind: .token(token.token)))
+            if !doContinue { return false }
+          }
+          tokens.removeFirst()
+
+        } else if let commentRange {
+
+          if skipUntil ?? 0 <= commentRange.max - 1,
+             let range = commentRange.shifted(by: lineStart)
+          {
+            let doContinue = block(LineToken(range: range, column: commentRange.location, kind: .comment))
+            if !doContinue { return false }
+            skipUntil = commentRange.max      // skip tokens within the comment range
+          }
+          commentRanges.removeFirst()
+        }
+      }
+      return true
+    }
+
+    guard let lineMap   = (delegate as? CodeStorageDelegate)?.lineMap,
+          let startLine = lineMap.lineContaining(index: location)
+    else { return }
+
+    let firstLine = lineMap.lines[startLine]
+    if let info = firstLine.info {
+
+      let doContinue = enumerate(tokens: info.tokens,
+                                 commentRanges: info.commentRanges,
+                                 lineStart: firstLine.range.location,
+                                 startLocation: location - firstLine.range.location)
+      if !doContinue { return }
+
+    }
+
+    for line in lineMap.lines[startLine + 1 ..< lineMap.lines.count] {
+
+      if let info = line.info {
+
+        let doContinue = enumerate(tokens: info.tokens,
+                                   commentRanges: info.commentRanges,
+                                   lineStart: line.range.location,
+                                   startLocation: nil)
+        if !doContinue { return }
+
+      }
+    }
+  }
+  
+  /// Enumerate tokens and comment spans in the given range.
+  ///
+  /// - Parameters:
+  ///   - range: The range whose tokens are being enumerated. The first and last token may extend left and right
+  ///       outside the given range.
+  ///   - block: A block invoked foro every range.
+  ///
+  func enumerateTokens(in range: NSRange, using block: (LineToken) -> Void) {
+    enumerateTokens(from: range.location) { token in
+
+      block(token)
+      return token.range.max < range.max
+    }
+  }
+  
+  /// Return all tokens in the given range.
+  ///
+  /// - Parameter range: The range whose tokens are returned.
+  /// - Returns: An array containing the tokens in the range, where first and last token may extend left and right
+  ///     outside the given range.
+  ///
+  func tokens(in range: NSRange) -> [LineToken] {
+    var tokens: [LineToken] = []
+    enumerateTokens(in: range) { tokens.append($0) }
+    return tokens
   }
 
   /// If the given location is just past a bracket, return its matching bracket's token range if it exists and the

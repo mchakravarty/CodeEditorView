@@ -125,6 +125,16 @@ final class CodeView: UITextView {
     super.init(frame: frame, textContainer: codeContainer)
     codeContainer.textView = self
 
+    codeLayoutManager.renderingAttributesValidator = { [codeContentStorage] (codeLayoutManager, layoutFragment) in
+      codeStorage.setHighlightingAttributes(for: codeContentStorage.range(for: layoutFragment.rangeInElement),
+                                            in: codeLayoutManager)
+    }
+    codeStorageDelegate.invalidateHighlighting = { [codeContentStorage, weak textLayoutManager] highlightingRange in
+      if let textRange = codeContentStorage.textRange(for: highlightingRange) {
+        textLayoutManager?.invalidateRenderingAttributes(for: textRange)
+      }
+    }
+
     // We can't do this — see [Note NSTextViewportLayoutControllerDelegate].
     //
     //    if let systemDelegate = codeLayoutManager.textViewportLayoutController.delegate {
@@ -185,13 +195,28 @@ final class CodeView: UITextView {
         minimapDividerView = UIView()
     minimapView.codeView = self
 
-    minimapDividerView.backgroundColor   = .separator
-    self.minimapDividerView              = minimapDividerView
+    minimapDividerView.backgroundColor = .separator
+    self.minimapDividerView            = minimapDividerView
     addSubview(minimapDividerView)
 
     if let minimapContentStorage = minimapView.optTextContentStorage {
+
       minimapContentStorage.textStorage = minimapCodeStorage
       minimapContentStorage.delegate    = minimapContentStorageDelegate
+
+      minimapView.textLayoutManager?.renderingAttributesValidator = { [minimapContentStorage] (minimapLayoutManager, layoutFragment) in
+        codeStorage.setHighlightingAttributes(for: minimapContentStorage.range(for: layoutFragment.rangeInElement),
+                                              in: minimapLayoutManager)
+      }
+
+      let oldInvalidateHighlighting = codeStorageDelegate.invalidateHighlighting
+      codeStorageDelegate.invalidateHighlighting = { [minimapContentStorage, weak minimapView] highlightingRange in
+
+        oldInvalidateHighlighting?(highlightingRange)
+        if let textRange = minimapContentStorage.textRange(for: highlightingRange) {
+          minimapView?.textLayoutManager?.invalidateRenderingAttributes(for: textRange)
+        }
+      }
     }
     minimapView.textLayoutManager?.delegate = minimapTextLayoutManagerDelegate
 
@@ -413,6 +438,16 @@ final class CodeView: NSTextView {
 
     super.init(frame: frame, textContainer: codeContainer)
 
+    codeLayoutManager.renderingAttributesValidator = { [codeContentStorage] (codeLayoutManager, layoutFragment) in
+      codeStorage.setHighlightingAttributes(for: codeContentStorage.range(for: layoutFragment.rangeInElement),
+                                            in: codeLayoutManager)
+    }
+    codeStorageDelegate.invalidateHighlighting = { [codeContentStorage, weak textLayoutManager] highlightingRange in
+      if let textRange = codeContentStorage.textRange(for: highlightingRange) {
+        textLayoutManager?.invalidateRenderingAttributes(for: textRange)
+      }
+    }
+
     // We can't do this — see [Note NSTextViewportLayoutControllerDelegate].
     //
     //    if let systemDelegate = codeLayoutManager.textViewportLayoutController.delegate {
@@ -498,6 +533,26 @@ final class CodeView: NSTextView {
       minimapContentStorage.delegate    = minimapContentStorageDelegate
     }
     minimapView.textLayoutManager?.delegate = minimapTextLayoutManagerDelegate
+
+    if let minimapContentStorage = minimapView.optTextContentStorage {
+
+      minimapContentStorage.textStorage = minimapCodeStorage
+      minimapContentStorage.delegate    = minimapContentStorageDelegate
+
+      minimapView.textLayoutManager?.renderingAttributesValidator = { [minimapContentStorage] (minimapLayoutManager, layoutFragment) in
+        codeStorage.setHighlightingAttributes(for: minimapContentStorage.range(for: layoutFragment.rangeInElement),
+                                              in: minimapLayoutManager)
+      }
+
+      let oldInvalidateHighlighting = codeStorageDelegate.invalidateHighlighting
+      codeStorageDelegate.invalidateHighlighting = { [minimapContentStorage, weak minimapView] highlightingRange in
+
+        oldInvalidateHighlighting?(highlightingRange)
+        if let textRange = minimapContentStorage.textRange(for: highlightingRange) {
+          minimapView?.textLayoutManager?.invalidateRenderingAttributes(for: textRange)
+        }
+      }
+    }
 
     let font = theme.font
     minimapView.font                                = OSFont(name: font.fontName, size: font.pointSize / minimapRatio)!

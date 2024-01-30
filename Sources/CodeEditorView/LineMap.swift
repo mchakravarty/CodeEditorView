@@ -227,8 +227,8 @@ struct LineMap<LineInfo> {
     lines[line] = (range: lines[line].range, info: info)
   }
 
-  /// Update line map given the specified editing activity of the underlying string. It resets the info field for each
-  /// affected line.
+  /// Update the line map given the specified editing activity of the underlying string. It resets the info field for
+  /// each affected line.
   ///
   /// - Parameters:
   ///   - string: The string after editing.
