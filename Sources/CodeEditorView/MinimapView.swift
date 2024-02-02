@@ -152,14 +152,17 @@ class MinimapLineFragment: NSTextLineFragment {
            height: textLineFragment.typographicBounds.height / minimapRatio)
   }
 
-  override func characterIndex(for point: CGPoint) -> Int { textLineFragment.characterIndex(for: point) }
+  override func characterIndex(for point: CGPoint) -> Int {
+    textLineFragment.characterIndex(for: CGPoint(x: point.x * minimapRatio, y: point.y * minimapRatio))
+  }
 
   override func fractionOfDistanceThroughGlyph(for point: CGPoint) -> CGFloat {
     textLineFragment.fractionOfDistanceThroughGlyph(for: point)
   }
 
   override func locationForCharacter(at index: Int) -> CGPoint {
-    textLineFragment.locationForCharacter(at: index)
+    let point = textLineFragment.locationForCharacter(at: index)
+    return CGPoint(x: point.x / minimapRatio, y: point.y / minimapRatio)
   }
 
   // Draw boxes using a character's foreground colour instead of actual glyphs.
