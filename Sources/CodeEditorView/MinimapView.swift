@@ -10,16 +10,10 @@
 //  colour. Instead of actual glyphs, we draw fixed-sized rectangles. The size of the minimap rectangles corresponds
 //  to that of the main code view font, but at a fraction of the fontsize determined by `minimapRatio`.
 //
-//  The implementation generates custom `NSTextParagraph`s with a font scaled down by a factor of `minimapRatio`. We
-//  achieve this with a custom `NSTextContentStorageDelegate`. This implies that we cannot use the some
-//  `NSTextContentStorage` for a code view and for its associated minimap. This is somewhat of a problem, because
-//  TextKit 2 only supports a single `NSTextContentStorage` for a given `NSTextStorage`. To work around this
-//  limitation, we define two custom subclasses of `NSTextStorage`, namely `CodeContentStorage` and 
-//  `TextStorageObserver`, where the former serves as the principal code storage and the latter functions as a read-only
-//  forwarder for the minimap.
-//
-//  To replace the standard glyph drawing by drawing of the rectangle, we subclass `NSTextLineFragment` and use a
-//  subclass of `NSTextLayoutFragment` to generate the custom `NSTextLineFragment`.
+//  The implementation uses custom `NSTextLayoutFragment` and `NSTextLineFragment` subclasses, which, based on the
+//  full-sized layout, calculate the scaled down layout for the minimap. This implies that `NSTextLayoutFragment`
+//  generates the minimap versions of `NSTextLineFragment` whenever its array of line fragments changes. Moreover,
+//  we replace the standard glyph drawing by drawing of rectangles, in the minimap-subclass of `NSTextLineFragment`.
 
 import SwiftUI
 
@@ -111,28 +105,6 @@ class MinimapView: NSTextView {
 
 
 // MARK: -
-// MARK: Minimap attribute injection
-
-class MinimapContentStorageDelegate: NSObject, NSTextContentStorageDelegate {
-
-  func textContentStorage(_ textContentStorage: NSTextContentStorage, textParagraphWith range: NSRange)
-  -> NSTextParagraph?
-  {
-    let text = NSMutableAttributedString(attributedString: 
-                                         textContentStorage.attributedString!.attributedSubstring(from: range)),
-        font = if range.length > 0,
-                  let font = text.attribute(.font, at: 0, effectiveRange: nil) as? OSFont { font }
-               else { OSFont.monospacedSystemFont(ofSize: 0, weight: .regular) }
-    text.addAttribute(.font,
-                      value: OSFont(name: font.fontName, size: font.pointSize / minimapRatio)!,
-                      range: NSRange(location: 0, length: range.length))
-
-    return NSTextParagraph(attributedString: text)
-  }
-}
-
-
-// MARK: -
 // MARK: Minimap layout functionality 
 
 class MinimapLineFragment: NSTextLineFragment {
@@ -159,20 +131,26 @@ class MinimapLineFragment: NSTextLineFragment {
     let attributedString = textLineFragment.attributedString,
         range            = textLineFragment.characterRange
 
-    // Determine the advancement per glyph (assuming a monospaced font)
+    // Determine the advancement per glyph (assuming a monospaced font), scaling it down for the minimap.
     let font = if range.length > 0,
                   let font = attributedString.attribute(.font, at: range.location, effectiveRange: nil) as? OSFont { font }
                else { OSFont.monospacedSystemFont(ofSize: OSFont.systemFontSize, weight: .regular) }
-    advancement = font.maximumHorizontalAdvancement
+    advancement = font.maximumHorizontalAdvancement / minimapRatio
 
     super.init(attributedString: attributedString, range: range)
   }
 
   required init?(coder aDecoder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-  override var glyphOrigin: CGPoint { textLineFragment.glyphOrigin }
+  override var glyphOrigin: CGPoint { CGPoint(x: textLineFragment.glyphOrigin.x / minimapRatio,
+                                              y: textLineFragment.glyphOrigin.y / minimapRatio) }
 
-  override var typographicBounds: CGRect { textLineFragment.typographicBounds }
+  override var typographicBounds: CGRect {
+    CGRect(x: textLineFragment.typographicBounds.minX / minimapRatio,
+           y: textLineFragment.typographicBounds.minY / minimapRatio,
+           width: textLineFragment.typographicBounds.width / minimapRatio,
+           height: textLineFragment.typographicBounds.height / minimapRatio)
+  }
 
   override func characterIndex(for point: CGPoint) -> Int { textLineFragment.characterIndex(for: point) }
 
@@ -212,6 +190,15 @@ class MinimapLayoutFragment: NSTextLayoutFragment {
   private var _textLineFragments: [NSTextLineFragment] = []
 
   private var observation: NSKeyValueObservation?
+
+  override var layoutFragmentFrame: CGRect {
+    CGRect(x: super.layoutFragmentFrame.minX,
+           y: super.layoutFragmentFrame.minY,
+           width: super.layoutFragmentFrame.width / minimapRatio,
+           height: super.layoutFragmentFrame.height / minimapRatio)
+  }
+
+  // NB: We don't override `renderingSurfaceBounds` as that is calculated on the basis of `layoutFragmentFrame`.
 
   @objc override dynamic var textLineFragments: [NSTextLineFragment] {
     return _textLineFragments
