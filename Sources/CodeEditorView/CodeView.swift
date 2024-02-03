@@ -251,6 +251,12 @@ final class CodeView: UITextView {
         self?.gutterView?.invalidateGutter()
         self?.minimapGutterView?.invalidateGutter()
       }
+
+    // This is needed to redo layout of the minimap once all the views are laid out.
+    // FIXME: Unfortunately, this comes with a visible delay, though.
+    Task { @MainActor in
+      minimapView.textLayoutManager?.invalidateLayout(for: minimapView.textLayoutManager!.documentRange)
+    }
   }
 
   required init?(coder: NSCoder) {
@@ -575,6 +581,13 @@ final class CodeView: NSTextView {
 
     maxSize = CGSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
 
+
+    // This is needed to redo layout of the minimap once all the views are laid out.
+    // FIXME: Unfortunately, this comes with a visible delay, though.
+    Task { @MainActor in
+      minimapView.textLayoutManager?.invalidateLayout(for: minimapView.textLayoutManager!.documentRange)
+    }
+
     // We need to re-tile the subviews whenever the frame of the text view changes.
     frameChangedNotificationObserver
       = NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification,
@@ -608,10 +621,6 @@ final class CodeView: NSTextView {
           messages.forEach{ report(message: $0) }
 
         }
-    }
-
-    Task { @MainActor in
-      adjustScrollPositionOfMinimap()
     }
   }
 
