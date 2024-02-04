@@ -809,6 +809,12 @@ extension CodeView {
        let highlightRect    = lineBackgroundRect(y: fragmentFrame.minY, height: fragmentFrame.height)
     {
       currentLineHighlightView?.frame = highlightRect
+    } else
+    // OR the document is empty
+    if text.isEmpty,
+       let highlightRect = lineBackgroundRect(y: 0, height: font?.lineHeight ?? 0)
+    {
+      currentLineHighlightView?.frame = highlightRect
     }
   }
 

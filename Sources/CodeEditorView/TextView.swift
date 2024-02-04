@@ -138,7 +138,11 @@ extension TextView {
     if let (y: y, height: height) = textLayoutManager.textLayoutFragmentExtent(for: textRange),
        let invalidRect            = lineBackgroundRect(y: y, height: height)
     {
-      setNeedsDisplay(invalidRect)
+      if textRange.endLocation.compare(textLayoutManager.documentRange.endLocation) == .orderedSame {
+        setNeedsDisplay(CGRect(origin: invalidRect.origin, size: CGSize(width: invalidRect.width, height: bounds.height - invalidRect.minY)))
+      } else {
+        setNeedsDisplay(invalidRect)
+      }
     }
   }
 
@@ -153,6 +157,15 @@ extension TextView {
     colour.setFill()
     if let fragmentFrame = textLayoutManager.textLayoutFragment(for: textLocation)?.layoutFragmentFrameWithoutExtraLineFragment,
        let highlightRect = lineBackgroundRect(y: fragmentFrame.minY, height: fragmentFrame.height)
+    {
+
+      let clippedRect = highlightRect.intersection(rect)
+      if !clippedRect.isNull { OSBezierPath(rect: clippedRect).fill() }
+
+    } else
+    if let previousLocation = optTextContentStorage?.location(textLocation, offsetBy: -1),
+       let fragmentFrame    = textLayoutManager.textLayoutFragment(for: previousLocation)?.layoutFragmentFrameExtraLineFragment,
+       let highlightRect    = lineBackgroundRect(y: fragmentFrame.minY, height: fragmentFrame.height)
     {
 
       let clippedRect = highlightRect.intersection(rect)

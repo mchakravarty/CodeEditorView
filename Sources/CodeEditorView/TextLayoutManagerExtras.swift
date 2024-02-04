@@ -24,7 +24,7 @@ extension NSTextLayoutFragment {
   }
 
   /// This is a temporary kludge to fix the height of the extra line fragment in case the size of the font used in the
-  /// rest of the layout fragment is very from the standard font size. In TextKit 2, it is far from clear how to
+  /// rest of the layout fragment varies from the standard font size. In TextKit 2, it is far from clear how to
   /// indicate the metrics to be used in a nicer manner. (Just setting the default font of the text view doesn't seem
   /// to work.)
   ///

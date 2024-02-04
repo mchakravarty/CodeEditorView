@@ -248,6 +248,14 @@ extension GutterView {
         if gutterRect.intersects(rect) {
           ("\(lineMap.lines.count)" as NSString).draw(in: gutterRect, withAttributes: attributes)
         }
+
+      } else if textRange.isEmpty {  // Empty document (i.e., there is no layout fragment)
+
+        let firstTextRect = CGRect(x: 0, y: 0, width: 0, height: font.lineHeight),
+            gutterRect    = gutterRectForLineNumbersFrom(textRect: firstTextRect)
+        if gutterRect.intersects(rect) {
+          ("\(1)" as NSString).draw(in: gutterRect, withAttributes: textAttributesSelected)
+        }
       }
     }
 

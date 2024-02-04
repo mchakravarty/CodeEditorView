@@ -47,7 +47,7 @@ class MinimapView: UITextView {
     let viewportRange = textLayoutManager.textViewportLayoutController.viewportRange
 
     // If the selection is an insertion point, highlight the corresponding line
-    if let location     = insertionPoint,
+    if let location     = codeView?.insertionPoint,
        let textLocation = textContentStorage.textLocation(for: location)
     {
       if viewportRange == nil
