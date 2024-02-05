@@ -1,9 +1,9 @@
-# SwiftUI code editor view for iOS and macOS
+# SwiftUI code editor view for iOS, visionOS, and macOS
 
 [![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fmchakravarty%2FCodeEditorView%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/mchakravarty/CodeEditorView)
 [![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fmchakravarty%2FCodeEditorView%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/mchakravarty/CodeEditorView)
 
-The `CodeEditorView` Swift package provides a SwiftUI view implementing a rich code editor for iOS and macOS whose visual style is inspired by Xcode. The currently supported functionality includes syntax highlighting with configurable themes, inline message (warnings, errors, etc) reporting, bracket matching, matching bracket insertion, current line highlighting, and a minimap.
+The `CodeEditorView` Swift package provides a SwiftUI view implementing a rich code editor for iOS, visionOS, and macOS whose visual style is inspired by Xcode. The currently supported functionality includes syntax highlighting with configurable themes, inline message (warnings, errors, etc) reporting, bracket matching, matching bracket insertion, current line highlighting, and a minimap.
 
 **Update:**
 
