@@ -15,7 +15,7 @@ import LanguageSupport
 private let logger = Logger(subsystem: "co.applicative.notebook", category: "CodeActions")
 
 
-#if os(iOS)
+#if os(iOS) || os(visionOS)
 
 // MARK: -
 // MARK: UIKit version

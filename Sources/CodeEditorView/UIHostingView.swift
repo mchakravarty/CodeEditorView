@@ -8,7 +8,7 @@
 import SwiftUI
 
 
-#if os(iOS)
+#if os(iOS) || os(visionOS)
 
 class UIHostingView<Content: View>: UIView {
   private let hostingViewController: UIHostingController<Content>

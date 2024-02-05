@@ -14,7 +14,7 @@
 //
 //  Curent support here is only for the first stage.
 
-#if os(iOS)
+#if os(iOS) || os(visionOS)
 import UIKit
 #elseif os(macOS)
 import AppKit

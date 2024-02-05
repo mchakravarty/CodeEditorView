@@ -8,7 +8,7 @@
 import SwiftUI
 
 
-#if os(iOS)
+#if os(iOS) || os(visionOS)
 
 // MARK: -
 // MARK: UIKit version

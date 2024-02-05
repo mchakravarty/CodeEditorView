@@ -406,7 +406,7 @@ extension StatefulMessageView {
       self.colourScheme = colourScheme
       super.init(frame: .zero)
 
-#if os(iOS)
+#if os(iOS) || os(visionOS)
       isOpaque = false
 #endif
       translatesAutoresizingMaskIntoConstraints = false
@@ -418,7 +418,7 @@ extension StatefulMessageView {
                                                                 fontSize: fontSize,
                                                                 colourScheme: colourScheme,
                                                                 unfolded: unfoldedState))
-#if os(iOS)
+#if os(iOS) || os(visionOS)
       hostingView?.isOpaque = false
 #endif
       hostingView?.translatesAutoresizingMaskIntoConstraints = false

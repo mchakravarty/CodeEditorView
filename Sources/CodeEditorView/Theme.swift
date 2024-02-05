@@ -179,7 +179,7 @@ extension Theme {
     }
   }
 
-  #if os(iOS)
+  #if os(iOS) || os(visionOS)
 
   /// Tint colour on the basis of the cursor and selection colour of the theme.
   ///

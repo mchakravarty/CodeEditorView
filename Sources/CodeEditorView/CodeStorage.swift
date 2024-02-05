@@ -5,7 +5,7 @@
 //
 //  This file contains `NSTextStorage` extensions for code editing.
 
-#if os(iOS)
+#if os(iOS) || os(visionOS)
 import UIKit
 #elseif os(macOS)
 import AppKit
@@ -14,7 +14,7 @@ import AppKit
 import LanguageSupport
 
 
-#if os(iOS)
+#if os(iOS) || os(visionOS)
 typealias EditActions = NSTextStorage.EditActions
 #elseif os(macOS)
 typealias EditActions = NSTextStorageEditActions

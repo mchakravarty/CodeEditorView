@@ -23,7 +23,7 @@ import SwiftUI
 let minimapRatio = CGFloat(8)
 
 
-#if os(iOS)
+#if os(iOS) || os(visionOS)
 
 // MARK: -
 // MARK: Minimap view for iOS
