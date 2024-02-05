@@ -314,6 +314,7 @@ final class CodeViewDelegate: NSObject, UITextViewDelegate {
     didScroll?(scrollView)
 
     codeView.gutterView?.invalidateGutter()
+    codeView.adjustScrollPositionOfMinimap()
   }
 }
 
@@ -961,7 +962,7 @@ extension CodeView {
     if textContainerInset.width != gutterWidth {
       textContainerInset = CGSize(width: gutterWidth, height: 0)
     }
-#elseif os(iOS)
+#elseif os(iOS) || os(visionOS)
     if textContainerInset.left != gutterWidth {
       textContainerInset = UIEdgeInsets(top: 0, left: gutterWidth, bottom: 0, right: 0)
     }
