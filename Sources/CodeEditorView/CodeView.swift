@@ -227,7 +227,7 @@ final class CodeView: UITextView {
     textDidChangeObserver
       = NotificationCenter.default.addObserver(forName: UITextView.textDidChangeNotification, 
                                                object: self,
-                                               queue: .main){ [weak self, minimapView] _ in
+                                               queue: .main){ [weak self, minimapView, codeStorageDelegate] _ in
 
         self?.removeMessageViews(withIDs: self!.codeStorageDelegate.lastEvictedMessageIDs)
         self?.gutterView?.invalidateGutter()
@@ -237,6 +237,14 @@ final class CodeView: UITextView {
         // See [Note Minimap Redraw Voodoo]
         minimapView.textLayoutManager?.ensureLayout(for: minimapView.textLayoutManager!.documentRange)
         minimapView.textLayoutManager?.invalidateLayout(for: minimapView.textLayoutManager!.documentRange)
+#elseif os(iOS)
+        // This doesn't seem to help on visionOS.
+        if (codeStorageDelegate.tokenInvalidationRange?.length ?? 0) > 1 {
+          Task { @MainActor in
+            minimapView.setNeedsLayout()
+            minimapView.setNeedsDisplay(minimapView.bounds)
+          }
+        }
 #endif
       }
   }
