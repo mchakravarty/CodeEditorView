@@ -455,3 +455,64 @@ extension CodeStorage {
     return nil
   }
 }
+
+
+// MARK: -
+// MARK: Text content storage
+
+class CodeContentStorage: NSTextContentStorage {
+
+  override func processEditing(for textStorage: NSTextStorage,
+                               edited editMask: EditActions,
+                               range newCharRange: NSRange,
+                               changeInLength delta: Int,
+                               invalidatedRange invalidatedCharRange: NSRange)
+  {
+    super.processEditing(for: textStorage,
+                         edited: editMask,
+                         range: newCharRange,
+                         changeInLength: delta,
+                         invalidatedRange: invalidatedCharRange)
+
+    // NB: We need to wait until after the content storage has processed the edit before text locations (and ranges)
+    //     match characters counts in the backing store again.
+    if let codeStorageDelegate   = textStorage.delegate as? CodeStorageDelegate,
+       let invalidationRange     = codeStorageDelegate.tokenInvalidationRange,
+       let invalidationTextRange = textRange(for: invalidationRange)
+    {
+      for textLayoutManager in textLayoutManagers {
+
+        // Invalidate the rendering attributes for syntax highlighting in the entire invalidated token range.
+        textLayoutManager.invalidateRenderingAttributes(for: invalidationTextRange)
+        if delta > 1,
+           let textLayoutManagerDelegate = textLayoutManager.delegate,
+           textLayoutManagerDelegate.isKind(of: MinimapTextLayoutManagerDelegate.self)
+        {
+
+          // MARK: [Note Minimap Redraw Voodoo]
+          // Getting the minimap to redraw properly in case of changes affecting a larger area has proven difficult
+          // and OS-specific. It depends on timing and concurrency issues in the text system and I haven't been able to
+          // find a reliable way of tackling this problem.
+          //
+          // Below is a partial fix for macOS and iOS, but visionOS also requires invalidation code in the
+          // `textDidChangeNotification` observer configured in during initialisation of the `UITextView`-flavour of
+          // `CodeView`.
+          //
+          // If larger amounts of text are added, we need to invalidate the layout of the minimap (i.e., secondary)
+          // layout manager explicitly. We cannot do that inline, though, if we don't want to risk a deadlock (as
+          // experience shows). Hence, we delay that action by enqueueing this operation. This does, unfortunately, lead
+          // to a visible delay on macOS, which I don't know how to avoid at the moment.
+          Task { @MainActor in
+            if let invalidationTextRange = textRange(for: invalidationRange) {
+#if os(iOS) || os(visionOS)
+              // For some reason, for the voodoo to work, we need to ensure layour first on iOS...
+              textLayoutManager.ensureLayout(for: invalidationTextRange)
+#endif
+              textLayoutManager.invalidateLayout(for: invalidationTextRange)  // warning is bogus as this will run on the main thread
+            }
+          }
+        }
+      }
+    }
+  }
+}

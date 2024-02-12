@@ -110,10 +110,11 @@ final class CodeView: UITextView {
     let textLayoutManager  = NSTextLayoutManager(),
         codeContainer      = CodeContainer(size: frame.size),
         codeStorage        = CodeStorage(theme: theme),
-        textContentStorage = NSTextContentStorage()
+        textContentStorage = CodeContentStorage()
     textLayoutManager.textContainer = codeContainer
     textContentStorage.addTextLayoutManager(textLayoutManager)
-    textContentStorage.textStorage = codeStorage
+    textContentStorage.primaryTextLayoutManager = textLayoutManager
+    textContentStorage.textStorage              = codeStorage
 
     codeStorageDelegate = CodeStorageDelegate(with: language)
 
@@ -124,12 +125,6 @@ final class CodeView: UITextView {
       guard let textContentStorage = textLayoutManager.textContentManager as? NSTextContentStorage else { return }
       codeStorage.setHighlightingAttributes(for: textContentStorage.range(for: layoutFragment.rangeInElement),
                                             in: textLayoutManager)
-    }
-    codeStorageDelegate.invalidateHighlighting = { [weak textLayoutManager] highlightingRange in
-      guard let textContentStorage = textLayoutManager?.textContentManager as? NSTextContentStorage else { return }
-      if let textRange = textContentStorage.textRange(for: highlightingRange) {
-        textLayoutManager?.invalidateRenderingAttributes(for: textRange)
-      }
     }
 
     // We can't do this — see [Note NSTextViewportLayoutControllerDelegate].
@@ -198,25 +193,12 @@ final class CodeView: UITextView {
 
     // We register the text layout manager of the minimap view as a secondary layout manager of the code view's text
     // content storage, so that code view and minimap use the same content.
-    if let textContentStorage = optTextContentStorage {
-      minimapView.textLayoutManager?.replace(textContentStorage)
-      textContentStorage.primaryTextLayoutManager = textLayoutManager
-    }
+    minimapView.textLayoutManager?.replace(textContentStorage)
+    textContentStorage.primaryTextLayoutManager = textLayoutManager
     minimapView.textLayoutManager?.renderingAttributesValidator = { (minimapLayoutManager, layoutFragment) in
       guard let textContentStorage = minimapLayoutManager.textContentManager as? NSTextContentStorage else { return }
       codeStorage.setHighlightingAttributes(for: textContentStorage.range(for: layoutFragment.rangeInElement),
                                             in: minimapLayoutManager)
-    }
-
-    let oldInvalidateHighlighting = codeStorageDelegate.invalidateHighlighting
-    codeStorageDelegate.invalidateHighlighting = { [weak minimapView] highlightingRange in
-
-      guard let textContentStorage = minimapView?.textLayoutManager?.textContentManager as? NSTextContentStorage
-      else { return }
-      oldInvalidateHighlighting?(highlightingRange)
-      if let textRange = textContentStorage.textRange(for: highlightingRange) {
-        minimapView?.textLayoutManager?.invalidateRenderingAttributes(for: textRange)
-      }
     }
     minimapView.textLayoutManager?.delegate = minimapTextLayoutManagerDelegate
 
@@ -245,18 +227,18 @@ final class CodeView: UITextView {
     textDidChangeObserver
       = NotificationCenter.default.addObserver(forName: UITextView.textDidChangeNotification, 
                                                object: self,
-                                               queue: .main){ [weak self] _ in
+                                               queue: .main){ [weak self, minimapView] _ in
 
         self?.removeMessageViews(withIDs: self!.codeStorageDelegate.lastEvictedMessageIDs)
         self?.gutterView?.invalidateGutter()
         self?.minimapGutterView?.invalidateGutter()
-      }
 
-    // This is needed to redo layout of the minimap once all the views are laid out.
-    // FIXME: Unfortunately, this comes with a visible delay, though.
-    Task { @MainActor in
-      minimapView.textLayoutManager?.invalidateLayout(for: minimapView.textLayoutManager!.documentRange)
-    }
+#if os(visionOS)
+        // See [Note Minimap Redraw Voodoo]
+        minimapView.textLayoutManager?.ensureLayout(for: minimapView.textLayoutManager!.documentRange)
+        minimapView.textLayoutManager?.invalidateLayout(for: minimapView.textLayoutManager!.documentRange)
+#endif
+      }
   }
 
   required init?(coder: NSCoder) {
@@ -430,10 +412,11 @@ final class CodeView: NSTextView {
     let textLayoutManager  = NSTextLayoutManager(),
         codeContainer      = CodeContainer(size: frame.size),
         codeStorage        = CodeStorage(theme: theme),
-        textContentStorage = NSTextContentStorage()
+        textContentStorage = CodeContentStorage()
     textLayoutManager.textContainer = codeContainer
     textContentStorage.addTextLayoutManager(textLayoutManager)
-    textContentStorage.textStorage = codeStorage
+    textContentStorage.primaryTextLayoutManager = textLayoutManager
+    textContentStorage.textStorage              = codeStorage
 
     codeStorageDelegate = CodeStorageDelegate(with: language)
 
@@ -443,12 +426,6 @@ final class CodeView: NSTextView {
       guard let textContentStorage = textLayoutManager.textContentManager as? NSTextContentStorage else { return }
       codeStorage.setHighlightingAttributes(for: textContentStorage.range(for: layoutFragment.rangeInElement),
                                             in: textLayoutManager)
-    }
-    codeStorageDelegate.invalidateHighlighting = { [weak textLayoutManager] highlightingRange in
-      guard let textContentStorage = textLayoutManager?.textContentManager as? NSTextContentStorage else { return }
-      if let textRange = textContentStorage.textRange(for: highlightingRange) {
-        textLayoutManager?.invalidateRenderingAttributes(for: textRange)
-      }
     }
 
     // We can't do this — see [Note NSTextViewportLayoutControllerDelegate].
@@ -533,25 +510,12 @@ final class CodeView: NSTextView {
 
     // We register the text layout manager of the minimap view as a secondary layout manager of the code view's text
     // content storage, so that code view and minimap use the same content.
-    if let textContentStorage = optTextContentStorage {
-      minimapView.textLayoutManager?.replace(textContentStorage)
-      textContentStorage.primaryTextLayoutManager = textLayoutManager
-    }
+    minimapView.textLayoutManager?.replace(textContentStorage)
+    textContentStorage.primaryTextLayoutManager = textLayoutManager
     minimapView.textLayoutManager?.renderingAttributesValidator = { (minimapLayoutManager, layoutFragment) in
       guard let textContentStorage = minimapLayoutManager.textContentManager as? NSTextContentStorage else { return }
       codeStorage.setHighlightingAttributes(for: textContentStorage.range(for: layoutFragment.rangeInElement),
                                             in: minimapLayoutManager)
-    }
-
-    let oldInvalidateHighlighting = codeStorageDelegate.invalidateHighlighting
-    codeStorageDelegate.invalidateHighlighting = { [weak minimapView] highlightingRange in
-
-      guard let textContentStorage = minimapView?.textLayoutManager?.textContentManager as? NSTextContentStorage
-      else { return }
-      oldInvalidateHighlighting?(highlightingRange)
-      if let textRange = textContentStorage.textRange(for: highlightingRange) {
-        minimapView?.textLayoutManager?.invalidateRenderingAttributes(for: textRange)
-      }
     }
     minimapView.textLayoutManager?.delegate = minimapTextLayoutManagerDelegate
 

@@ -109,13 +109,6 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
   private      let tokeniser:       LanguageConfiguration.Tokeniser?  // cache the tokeniser
   private(set) var languageService: LanguageService?  // instantiated language service if available
   
-  /// Call back to notify of invalidated highlighting ranges due to (re-)tokenisation of the code storage.
-  ///
-  /// NB: Especially for comment blocks, this range can be much longer than the edited text; hence, we do need explicit
-  ///     invalidation.
-  ///
-  var invalidateHighlighting: ((NSRange) -> Void)?
-
   private(set) var lineMap = LineMap<LineInfo>(string: "")
 
   /// The message bundle IDs that got invalidated by the last editing operation because the lines to which they were
@@ -135,6 +128,10 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
   /// Indicates the number of characters added by token completion in the current editing round.
   /// 
   private(set) var tokenCompletionCharacters: Int = 0
+  
+  /// Contains the range of characters whose token information was invalidated by the last editing operation.
+  ///
+  private(set) var tokenInvalidationRange: NSRange? = nil
 
 
   // MARK: Initialisers
@@ -181,6 +178,7 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
                    range editedRange: NSRange,
                    changeInLength delta: Int)
   {
+    tokenInvalidationRange = nil
     guard let codeStorage = textStorage as? CodeStorage else { return }
 
     // If only attributes change, the line map and syntax highlighting remains the same => nothing for us to do
@@ -234,7 +232,7 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
     }
 
     // The range within which highlighting has to be re-rendered.
-    invalidateHighlighting?(highlightingRange)
+    tokenInvalidationRange = highlightingRange
 
     if visualDebugging {
       textStorage.addAttribute(.backgroundColor, value: visualDebuggingEditedColour, range: editedRange)
