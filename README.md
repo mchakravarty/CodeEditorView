@@ -55,8 +55,7 @@ For more information, see the [package documentation](Documentation/Overview.md)
 
 ## Status
 
-I consider this to be pre-release quality. It is sufficient to start building something on it, but it is not yet ready for production. While the `CodeEditor` view already supports quite a bit of advanced functionality (such as the inline messages and minimap), other components are still quite simple, such as the range of tokens covered by the language configuration. Moreover, performance is still an issue that needs to be addressed. The core architecture, such as the incremental tokenisation for syntax highlighting, is designed to handle larger files smoothly, but the overall implementation still needs some performance debugging.
-
+I consider this to be pre-release quality. It is sufficient to build something with it, but it is not yet ready for production. The `CodeEditor` view already supports quite a bit of advanced functionality (such as the inline messages, a minimap, and (on macOS) code completion). Other components are still quite simple, such as the range of tokens covered by the language configuration, but that is also something that is easily extended. Performance is still an issue for larger files.
 
 ## License
 
