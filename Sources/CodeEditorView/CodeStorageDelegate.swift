@@ -166,7 +166,7 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
   }
 
   deinit {
-    Task {
+    Task { [languageService] in
       try await languageService?.closeDocument()
     }
   }
@@ -441,6 +441,8 @@ extension CodeStorageDelegate {
     let lines = lineMap.linesContaining(range: originalRange),
         range = lineMap.charRangeOf(lines: lines)
 
+    guard let stringRange = Range<String.Index>(range, in: textStorage.string) else { return originalRange }
+
     // Determine the comment depth as determined by the preceeeding code. This is needed to determine the correct
     // tokeniser and to compute attribute information from the resulting tokens. NB: We need to get that info from
     // the previous line, because the line info of the current line was set to `nil` during updating the line map.
@@ -449,7 +451,7 @@ extension CodeStorageDelegate {
     // Set the token attribute in range.
     let initialTokeniserState: LanguageConfiguration.State
                = initialCommentDepth > 0 ? .tokenisingComment(initialCommentDepth) : .tokenisingCode,
-        tokens = textStorage.string.tokenise(with: tokeniser, state: initialTokeniserState, in: range)
+        tokens = textStorage.string[stringRange].tokenise(with: tokeniser, state: initialTokeniserState)
 
     // For all lines in range, collect the tokens line by line, while keeping track of nested comments
     //
@@ -477,7 +479,9 @@ extension CodeStorageDelegate {
     var highlightingRange = range
     trailingLineLoop: while currentLine < lineMap.lines.count {
 
-      if let lineEntry = lineMap.lookup(line: currentLine) {
+      if let lineEntry = lineMap.lookup(line: currentLine),
+         let lineEntryRange = Range<String.Index>(lineEntry.range, in: textStorage.string)
+      {
 
         // If this line has got a line info entry and the expected comment depth at the start of the line matches
         // the current comment depth, we reached the end of the range of lines affected by this edit => break the loop
@@ -486,7 +490,7 @@ extension CodeStorageDelegate {
         // Re-tokenise line
         let initialTokeniserState: LanguageConfiguration.State
                    = commentDepth > 0 ? .tokenisingComment(commentDepth) : .tokenisingCode,
-            tokens = textStorage.string.tokenise(with: tokeniser, state: initialTokeniserState, in: lineEntry.range)
+            tokens = textStorage.string[lineEntryRange].tokenise(with: tokeniser, state: initialTokeniserState)
 
         // Collect the tokens and update line info
         tokeniseAndUpdateInfo(for: currentLine,

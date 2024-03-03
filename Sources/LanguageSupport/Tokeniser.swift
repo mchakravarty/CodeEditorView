@@ -117,7 +117,7 @@ public struct Tokeniser<TokenType: Equatable, StateType: TokeniserState> {
 
     /// The matching regular expression
     ///
-    let regexp: NSRegularExpression
+    let regexp: Regex<AnyRegexOutput>
 
     /// The lookup table for single-lexeme tokens
     ///
@@ -182,7 +182,7 @@ public struct Tokeniser<TokenType: Equatable, StateType: TokeniserState> {
         if case .pattern(_) = pattern { return type } else { return nil }
       }
 
-      let regexp = try NSRegularExpression(pattern: pattern, options: [])
+      let regexp = try Regex(pattern)
       return Tokeniser.State(regexp: regexp,
                              stringTokenTypes: [String: TokenAction<TokenType, StateType>](stringTokenTypes){
         (left, right) in return left },
@@ -197,42 +197,39 @@ public struct Tokeniser<TokenType: Equatable, StateType: TokeniserState> {
   }
 }
 
-extension NSString {
+extension StringProtocol {
 
-  /// Parse the given range and set the corresponding token attribute values on all matching lexeme ranges.
+  /// Tokenise the given range and return the encountered tokens.
   ///
   /// - Parameters:
   ///   - tokeniser: Pre-compiled tokeniser.
   ///   - startState: Starting state of the tokeniser.
-  ///   - range: The range in the receiver that is to be parsed and attributed.
-  ///
-  /// All previously existing occurences of `attribute` in the given range are removed.
+  /// - Returns: The sequence of the encountered tokens.
   ///
   public func tokenise<TokenType, StateType>(with tokeniser: Tokeniser<TokenType, StateType>,
-                                             state startState: StateType,
-                                             in range: NSRange?)
+                                             state startState: StateType)
   -> [Tokeniser<TokenType, StateType>.Token]
   {
     var state        = startState
-    var currentRange = range ?? NSRange(location: 0, length: length)
+    var currentStart = startIndex
     var tokens       = [] as [Tokeniser<TokenType, StateType>.Token]
 
     // Tokenise and set appropriate attributes
-    while currentRange.length > 0 {
+    while count > 0 {
 
-      guard let stateTokeniser = tokeniser.states[state.tag],
-            let result         = stateTokeniser.regexp.firstMatch(in: self as String, options: [], range: currentRange)
+      guard let stateTokeniser   = tokeniser.states[state.tag],
+            let currentSubstring = self[currentStart...] as? Substring,
+            let result           = try? stateTokeniser.regexp.firstMatch(in: currentSubstring)
       else { break }  // no more match => stop
 
-      // The next lexeme we look for from just after the one we just found
-      currentRange = NSRange(location: result.range.max,
-                             length: currentRange.length - result.range.max + currentRange.location)
+      // We are going to look for the next lexeme from just after the one we just found
+      currentStart = result.range.upperBound
 
       // If a matching group in the regexp matched, select the action of the correpsonding pattern.
       var tokenAction: TokenAction<TokenType, StateType>?
-      for i in stride(from: result.numberOfRanges - 1, through: 1, by: -1) {
+      for i in stride(from: result.count - 1, through: 1, by: -1) {
 
-        if result.range(at: i).location != NSNotFound { // match by a capture group => complex pattern match
+        if result[i].range != nil { // match by a capture group => complex pattern match
 
           tokenAction = stateTokeniser.patternTokenTypes[i - 1]
         }
@@ -241,12 +238,12 @@ extension NSString {
       // If it wasn't a matching group, it must be a simple string match
       if tokenAction == nil {                           // no capture group matched => we matched a simple string lexeme
 
-        tokenAction = stateTokeniser.stringTokenTypes[substring(with: result.range)]
+        tokenAction = stateTokeniser.stringTokenTypes[String(self[result.range])]
       }
 
-      if let action = tokenAction, result.range.length > 0 {
+      if let action = tokenAction, !result.range.isEmpty {
 
-        tokens.append(.init(token: action.token, range: result.range))
+        tokens.append(.init(token: action.token, range: NSRange(result.range, in: self)))
 
         // If there is an associated state transition function, apply it to the tokeniser state
         if let transition = action.transition { state = transition(state) }
@@ -256,3 +253,4 @@ extension NSString {
     return tokens
   }
 }
+
