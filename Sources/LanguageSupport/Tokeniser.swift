@@ -11,6 +11,8 @@ import UIKit
 import AppKit
 #endif
 
+import RegexBuilder
+
 import Rearrange
 
 
@@ -20,24 +22,35 @@ private let logger = Logger(subsystem: "org.justtesting.CodeEditorView", categor
 // MARK: -
 // MARK: Regular expression-based tokenisers with explicit state management for context-free constructs
 
+/// Actions taken in response to matching a token
+///
+/// The `token` component determines the token type of the matched pattern and `transition` determines the state
+/// transition implied by the matched token. If the `transition` component is `nil`, the tokeniser stays in the current
+/// state.
+///
+public typealias TokenAction<TokenType, StateType> = (token: TokenType, transition: ((StateType) -> StateType)?)
+
 /// Token descriptions
 ///
-public enum TokenPattern: Hashable, Equatable, Comparable {
+public struct TokenDescription<TokenType, StateType> {
 
-  /// The token has multiple lexemes, specified in the form of a regular expression string.
+  /// The regex to match the token.
   ///
-  case pattern(String)  // This case needs to be the first one as we want it to compare as being smaller than the rest;
-                        // that ensures that it will appear last in the generated tokeniser regexp and hence match last
-                        // in case of overlap.
+  public let regex: Regex<Substring>
 
-  /// The token has only one lexeme, given as a simple string. We only match this string if it starts and ends at a
-  /// word boundary (as per the "\b" regular expression metacharacter).
+  /// If the token has only got a single lexeme, it is specified here.
   ///
-  case word(String)
+  public let singleLexeme: String?
 
-  /// The token has only one lexeme, given as a simple string.
+  /// The action to take when the token gets matched.
   ///
-  case string(String)
+  public let action: TokenAction<TokenType, StateType>
+
+  public init(regex: Regex<Substring>, singleLexeme: String? = nil, action: TokenAction<TokenType, StateType>) {
+    self.regex        = regex
+    self.singleLexeme = singleLexeme
+    self.action       = action
+  }
 }
 
 public protocol TokeniserState {
@@ -64,19 +77,15 @@ public struct TokenAttribute<TokenType> {
   public let token: TokenType
 }
 
-/// Actions taken in response to matching a token
-///
-/// The `token` component determines the token type of the matched pattern and `transition` determines the state
-/// transition implied by the matched token. If the `transition` component is `nil`, the tokeniser stays in the current
-/// state.
-///
-public typealias TokenAction<TokenType, StateType> = (token: TokenType, transition: ((StateType) -> StateType)?)
-
 /// For each possible state tag of the underlying tokeniser state, a mapping from token patterns to token kinds and
-/// maybe a state transition to determine a new tokeniser state
+/// maybe a state transition to determine a new tokeniser state.
+///
+/// The matching of single lexeme tokens takes precedence over tokens with multiple lexemes. Within each category
+/// (single or multiple lexeme tokens), the order of the token description in the array indicates the order of matching
+/// preference; i.e., earlier elements take precedence.
 ///
 public typealias TokenDictionary<TokenType, StateType: TokeniserState>
-  = [StateType.StateTag: [TokenPattern: TokenAction<TokenType, StateType>]]
+  = [StateType.StateTag: [TokenDescription<TokenType, StateType>]]
 
 /// Pre-compiled regular expression tokeniser.
 ///
@@ -115,15 +124,18 @@ public struct Tokeniser<TokenType: Equatable, StateType: TokeniserState> {
   ///
   struct State {
 
-    /// The matching regular expression
+    /// The regular expression used for matching in this state.
     ///
-    let regexp: Regex<AnyRegexOutput>
+    /// The first capture in this regex is for the whole lot of single-lexeme tokens. The rest is for the multi-lexeme
+    /// tokens, one each.
+    ///
+    let regex: Regex<AnyRegexOutput>
 
-    /// The lookup table for single-lexeme tokens
+    /// The lookup table for single-lexeme tokens.
     ///
     let stringTokenTypes: [String: TokenAction<TokenType, StateType>]
 
-    /// The token types for multi-lexeme tokens
+    /// The token types for multi-lexeme tokens.
     ///
     /// The order of the token types in the array is the same as that of the matching groups for those tokens in the
     /// regular expression.
@@ -131,7 +143,7 @@ public struct Tokeniser<TokenType: Equatable, StateType: TokeniserState> {
     let patternTokenTypes: [TokenAction<TokenType, StateType>]
   }
 
-  /// Sub-tokeniser for all states of the compound tokeniser
+  /// Sub-tokeniser for all states of the compound tokeniser.
   ///
   let states: [StateType.StateTag: State]
 
@@ -155,45 +167,64 @@ public struct Tokeniser<TokenType: Equatable, StateType: TokeniserState> {
   ///
   public init?(for tokenMap: TokenDictionary<TokenType, StateType>)
   {
-    func tokeniser(for stateMap: [TokenPattern: TokenAction<TokenType, StateType>])
-    throws -> Tokeniser<TokenType, StateType>.State
-    {
-
-      // NB: Be careful with the re-ordering, because the order in `patternTokenTypes` below must match the order of
-      //     the patterns in the alternatives of the regular expression. (We must re-order due to eager matching as
-      //     explained in the documentation of this function.)
-      let orderedMap = stateMap.sorted{ (lhs, rhs) in return lhs.key > rhs.key },
-          pattern    = orderedMap.reduce("") { (regexp, mapEntry) in
-
-            let regexpPattern: String
-            switch mapEntry.key {
-            case .string(let lexeme):   regexpPattern = NSRegularExpression.escapedPattern(for: lexeme)
-            case .word(let lexeme):     regexpPattern = "\\b" + NSRegularExpression.escapedPattern(for: lexeme) + "\\b"
-            case .pattern(let pattern): regexpPattern = "(" + pattern + ")"     // each pattern gets a capture group
-            }
-            if regexp.isEmpty { return regexpPattern } else { return regexp + "|" + regexpPattern}
-          }
-      let stringTokenTypes: [(String, TokenAction<TokenType, StateType>)] = orderedMap.compactMap{ (pattern, type) in
-        if case .string(let lexeme) = pattern { return (lexeme, type)  }
-        else if case .word(let lexeme) = pattern { return (lexeme, type)  }
-        else { return nil }
+    func combine(alternatives: [TokenDescription<TokenType, StateType>]) -> Regex<Substring>? {
+      switch alternatives.count {
+      case 0:  return nil
+      case 1:  return alternatives[0].regex
+      default: return alternatives[1...].reduce(alternatives[0].regex) { (regex, alternative) in
+        Regex { ChoiceOf { regex; alternative.regex } }
       }
-      let patternTokenTypes: [TokenAction<TokenType, StateType>] = orderedMap.compactMap{ (pattern, type) in
-        if case .pattern(_) = pattern { return type } else { return nil }
       }
-
-      let regexp = try Regex(pattern)
-      return Tokeniser.State(regexp: regexp,
-                             stringTokenTypes: [String: TokenAction<TokenType, StateType>](stringTokenTypes){
-        (left, right) in return left },
-                             patternTokenTypes: patternTokenTypes)
     }
 
-    do {
+    func combineWithCapture(alternatives: [TokenDescription<TokenType, StateType>]) -> Regex<AnyRegexOutput>? {
+      switch alternatives.count {
+      case 0:  return nil
+      case 1:  return Regex(Regex { Capture { alternatives[0].regex } })
+      default: return alternatives[1...].reduce(Regex(Regex { Capture { alternatives[0].regex } })) { (regex, alternative) in
+        Regex(Regex { ChoiceOf { regex; Capture { alternative.regex } } })
+      }
+      }
+    }
 
-      states = try tokenMap.mapValues{ try tokeniser(for: $0) }
+    func tokeniser(for stateMap: [TokenDescription<TokenType, StateType>]) -> Tokeniser<TokenType, StateType>.State?
+    {
 
-    } catch let err { logger.debug("failed to compile regexp: \(err.localizedDescription)"); return nil }
+      let singleLexemeTokens      = stateMap.filter{ $0.singleLexeme != nil },
+          multiLexemeTokens       = stateMap.filter{ $0.singleLexeme == nil },
+          singleLexemeTokensRegex = combine(alternatives: singleLexemeTokens),
+          multiLexemeTokensRegex  = combineWithCapture(alternatives: multiLexemeTokens)
+
+      let stringTokenTypes: [(String, TokenAction<TokenType, StateType>)] = singleLexemeTokens.compactMap {
+        if let lexeme = $0.singleLexeme { (lexeme, $0.action) } else { nil }
+      }
+      let patternTokenTypes = multiLexemeTokens.map{ $0.action }
+
+      let regex: Regex<AnyRegexOutput>?  = switch (singleLexemeTokensRegex, multiLexemeTokensRegex) {
+                                           case (nil, nil):
+                                             nil
+                                           case (.some(let single), nil):
+                                             Regex(Regex { Capture { single } })
+                                           case (nil, .some(let multi)):
+                                             multi
+                                           case (.some(let single), .some(let multi)):
+                                             Regex(Regex { ChoiceOf {
+                                               Capture { single }
+                                               multi
+                                             }})
+                                           }
+      return if let regex {
+
+        Tokeniser.State(regex: regex,
+                        stringTokenTypes: [String: TokenAction<TokenType, StateType>](stringTokenTypes){
+                                            (left, right) in return left },
+                        patternTokenTypes: patternTokenTypes)
+
+      } else { nil }
+    }
+
+    states = tokenMap.compactMapValues{ tokeniser(for: $0) }
+    if states.isEmpty { logger.debug("failed to compile regexp"); return nil }
   }
 }
 
@@ -215,30 +246,32 @@ extension StringProtocol {
     var tokens       = [] as [Tokeniser<TokenType, StateType>.Token]
 
     // Tokenise and set appropriate attributes
-    while count > 0 {
+    while currentStart < endIndex {
 
       guard let stateTokeniser   = tokeniser.states[state.tag],
             let currentSubstring = self[currentStart...] as? Substring,
-            let result           = try? stateTokeniser.regexp.firstMatch(in: currentSubstring)
+            let result           = try? stateTokeniser.regex.firstMatch(in: currentSubstring)
       else { break }  // no more match => stop
 
       // We are going to look for the next lexeme from just after the one we just found
       currentStart = result.range.upperBound
 
-      // If a matching group in the regexp matched, select the action of the correpsonding pattern.
       var tokenAction: TokenAction<TokenType, StateType>?
-      for i in stride(from: result.count - 1, through: 1, by: -1) {
-
-        if result[i].range != nil { // match by a capture group => complex pattern match
-
-          tokenAction = stateTokeniser.patternTokenTypes[i - 1]
-        }
-      }
-
-      // If it wasn't a matching group, it must be a simple string match
-      if tokenAction == nil {                           // no capture group matched => we matched a simple string lexeme
+      if result[1].range != nil {     // that is the capture for the whole lot of single lexeme tokens
 
         tokenAction = stateTokeniser.stringTokenTypes[String(self[result.range])]
+
+      } else {
+
+        // If a matching group in the regexp matched, select the action of the corresponding pattern.
+        for i in 2..<result.count {
+
+          if result[i].range != nil { // match by a capture group => complex pattern match
+
+            tokenAction = stateTokeniser.patternTokenTypes[i - 2]
+            break
+          }
+        }
       }
 
       if let action = tokenAction, !result.range.isEmpty {

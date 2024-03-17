@@ -28,6 +28,9 @@ let package = Package(
       name: "LanguageSupport",
       dependencies: [
         "Rearrange",
+      ],
+      swiftSettings: [
+        .enableUpcomingFeature("BareSlashRegexLiterals")
       ]),
     .target(
       name: "CodeEditorView",

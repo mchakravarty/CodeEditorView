@@ -12,7 +12,7 @@ import os
 import LanguageSupport
 
 
-private let logger = Logger(subsystem: "co.applicative.notebook", category: "CodeActions")
+private let logger = Logger(subsystem: "org.justtesting.CodeEditorView", category: "CodeActions")
 
 
 #if os(iOS) || os(visionOS)

@@ -14,11 +14,16 @@
 //
 //  Curent support here is only for the first stage.
 
+import RegexBuilder
+import os
 #if os(iOS) || os(visionOS)
 import UIKit
 #elseif os(macOS)
 import AppKit
 #endif
+
+
+private let logger = Logger(subsystem: "org.justtesting.CodeEditorView", category: "LanguageConfiguration")
 
 
 /// Specifies the language-dependent aspects of a code editor.
@@ -158,15 +163,15 @@ public struct LanguageConfiguration {
 
   /// Regular expression matching strings
   ///
-  public let stringRegexp: String?
+  public let stringRegexp: Regex<Substring>?
 
   /// Regular expression matching character literals
   ///
-  public let characterRegexp: String?
+  public let characterRegexp: Regex<Substring>?
 
   /// Regular expression matching numbers
   ///
-  public let numberRegexp: String?
+  public let numberRegexp: Regex<Substring>?
 
   /// Lexeme that introduces a single line comment
   ///
@@ -178,7 +183,7 @@ public struct LanguageConfiguration {
 
   /// Regular expression matching all identifiers (even if they are subgroupings)
   ///
-  public let identifierRegexp: String?
+  public let identifierRegexp: Regex<Substring>?
 
   /// Reserved identifiers (this does not include contextual keywords)
   ///
@@ -188,13 +193,15 @@ public struct LanguageConfiguration {
   ///
   public let languageService: LanguageServiceBuilder?
 
+  /// Defines a language configuration.
+  ///
   public init(name: String,
-              stringRegexp: String?,
-              characterRegexp: String?,
-              numberRegexp: String?,
+              stringRegexp: Regex<Substring>?,
+              characterRegexp: Regex<Substring>?,
+              numberRegexp: Regex<Substring>?,
               singleLineComment: String?,
               nestedComment: LanguageConfiguration.BracketPair?,
-              identifierRegexp: String?,
+              identifierRegexp: Regex<Substring>?,
               reservedIdentifiers: [String],
               languageService: LanguageServiceBuilder? = nil)
   {
@@ -207,6 +214,44 @@ public struct LanguageConfiguration {
     self.identifierRegexp     = identifierRegexp
     self.reservedIdentifiers  = reservedIdentifiers
     self.languageService      = languageService
+  }
+
+  /// Defines a language configuration.
+  ///
+  /// This string flavour intialiser exists mainly for backwards compatibility. Avoid it if possible.
+  ///
+  public init(name: String,
+              stringRegexp: String?,
+              characterRegexp: String?,
+              numberRegexp: String?,
+              singleLineComment: String?,
+              nestedComment: LanguageConfiguration.BracketPair?,
+              identifierRegexp: String?,
+              reservedIdentifiers: [String],
+              languageService: LanguageServiceBuilder? = nil)
+  {
+    func makeRegex(from pattern: String?) -> Regex<Substring>? {
+      if let pattern {
+
+        do { return try Regex<Substring>(pattern, as: Substring.self) }
+        catch let err {
+
+          logger.info("Failed to compile regex: \(err.localizedDescription)")
+          return nil
+
+        }
+      } else { return nil }
+    }
+
+    self = LanguageConfiguration(name: name,
+                                 stringRegexp: makeRegex(from: stringRegexp),
+                                 characterRegexp: makeRegex(from: characterRegexp),
+                                 numberRegexp: makeRegex(from: numberRegexp),
+                                 singleLineComment: singleLineComment,
+                                 nestedComment: nestedComment,
+                                 identifierRegexp: makeRegex(from: identifierRegexp),
+                                 reservedIdentifiers: reservedIdentifiers,
+                                 languageService: languageService)
   }
 
   /// Yields the lexeme of the given token under this language configuration if the token has got a unique lexeme.
@@ -238,7 +283,7 @@ extension LanguageConfiguration {
   /// Empty language configuration
   ///
   public static let none = LanguageConfiguration(name: "Text",
-                                                 stringRegexp: nil,
+                                                 stringRegexp: nil as Regex<Substring>?,
                                                  characterRegexp: nil,
                                                  numberRegexp: nil,
                                                  singleLineComment: nil,
@@ -343,51 +388,53 @@ extension LanguageConfiguration {
 
   public var tokenDictionary: TokenDictionary {
 
-    var tokenDictionary = TokenDictionary()
-
     // Populate the token dictionary for the code state (tokenising plain code)
     //
-    var codeTokenDictionary = [TokenPattern: TokenAction]()
-
-    codeTokenDictionary.updateValue(token(.roundBracketOpen), forKey: .string("("))
-    codeTokenDictionary.updateValue(token(.roundBracketClose), forKey: .string(")"))
-    codeTokenDictionary.updateValue(token(.squareBracketOpen), forKey: .string("["))
-    codeTokenDictionary.updateValue(token(.squareBracketClose), forKey: .string("]"))
-    codeTokenDictionary.updateValue(token(.curlyBracketOpen), forKey: .string("{"))
-    codeTokenDictionary.updateValue(token(.curlyBracketClose), forKey: .string("}"))
-    if let lexeme = stringRegexp { codeTokenDictionary.updateValue(token(.string), forKey: .pattern(lexeme)) }
-    if let lexeme = characterRegexp { codeTokenDictionary.updateValue(token(.character), forKey: .pattern(lexeme)) }
-    if let lexeme = numberRegexp { codeTokenDictionary.updateValue(token(.number), forKey: .pattern(lexeme)) }
+    var codeTokens = [ TokenDescription(regex: /\(/, singleLexeme: "(", action: token(.roundBracketOpen))
+                     , TokenDescription(regex: /\)/, singleLexeme: ")", action: token(.roundBracketClose))
+                     , TokenDescription(regex: /\[/, singleLexeme: "[", action: token(.squareBracketOpen))
+                     , TokenDescription(regex: /\]/, singleLexeme: "]", action: token(.squareBracketClose))
+                     , TokenDescription(regex: /{/, singleLexeme: "{", action: token(.curlyBracketOpen))
+                     , TokenDescription(regex: /}/, singleLexeme: "}", action: token(.squareBracketClose))
+                     ]
+    if let regex = stringRegexp { codeTokens.append(TokenDescription(regex: regex, action: token(.string))) }
+    if let regex = characterRegexp { codeTokens.append(TokenDescription(regex: regex, action: token(.character))) }
+    if let regex = numberRegexp { codeTokens.append(TokenDescription(regex: regex, action: token(.number))) }
     if let lexeme = singleLineComment {
-      codeTokenDictionary.updateValue(token(Token.singleLineComment), forKey: .string(lexeme))
+      codeTokens.append(TokenDescription(regex: Regex{ lexeme },
+                                         singleLexeme: lexeme,
+                                         action: token(Token.singleLineComment)))
     }
     if let lexemes = nestedComment {
-      codeTokenDictionary.updateValue((token: .nestedCommentOpen, transition: incNestedComment),
-                                      forKey: .string(lexemes.open))
-      codeTokenDictionary.updateValue((token: .nestedCommentClose, transition: decNestedComment),
-                                      forKey: .string(lexemes.close))
+      codeTokens.append(TokenDescription(regex: Regex{ lexemes.open },
+                                         singleLexeme: lexemes.open,
+                                         action: (token: .nestedCommentOpen, transition: incNestedComment)))
+      codeTokens.append(TokenDescription(regex: Regex{ lexemes.close },
+                                         singleLexeme: lexemes.close,
+                                         action: (token: .nestedCommentClose, transition: decNestedComment)))
     }
-    if let lexeme = identifierRegexp { codeTokenDictionary.updateValue(token(Token.identifier(nil)),
-                                                                       forKey: .pattern(lexeme)) }
+    if let regex = identifierRegexp { codeTokens.append(TokenDescription(regex: regex, action: token(.identifier(nil)))) }
     for reserved in reservedIdentifiers {
-      codeTokenDictionary.updateValue(token(.keyword), forKey: .word(reserved))
+      codeTokens.append(TokenDescription(regex: Regex{ Anchor.wordBoundary; reserved; Anchor.wordBoundary },
+                                         singleLexeme: reserved,
+                                         action: token(.keyword)))
     }
-
-    tokenDictionary.updateValue(codeTokenDictionary, forKey: .tokenisingCode)
 
     // Populate the token dictionary for the comment state (tokenising within a nested comment)
     //
-    var commentTokenDictionary = [TokenPattern: TokenAction]()
+    let commentTokens: [TokenDescription<LanguageConfiguration.Token, LanguageConfiguration.State>]
+      = if let lexemes = nestedComment {
+        [ TokenDescription(regex: Regex{ lexemes.open }, 
+                           singleLexeme: lexemes.open,
+                           action: (token: .nestedCommentOpen, transition: incNestedComment))
+        , TokenDescription(regex: Regex{ lexemes.close }, 
+                           singleLexeme: lexemes.close,
+                           action: (token: .nestedCommentClose, transition: decNestedComment))
+        ]
+      } else { [] }
 
-    if let lexemes = nestedComment {
-      commentTokenDictionary.updateValue((token: .nestedCommentOpen, transition: incNestedComment),
-                                         forKey: .string(lexemes.open))
-      commentTokenDictionary.updateValue((token: .nestedCommentClose, transition: decNestedComment),
-                                         forKey: .string(lexemes.close))
-    }
-
-    tokenDictionary.updateValue(commentTokenDictionary, forKey: .tokenisingComment)
-
-    return tokenDictionary
+    return [ .tokenisingCode:    codeTokens
+           , .tokenisingComment: commentTokens
+           ]
   }
 }
