@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import RegexBuilder
 
 
 private let swiftReservedIds =
@@ -20,41 +21,42 @@ extension LanguageConfiguration {
   /// Language configuration for Swift
   ///
   public static func swift(_ languageService: LanguageServiceBuilder? = nil) -> LanguageConfiguration {
+    let numberRegex: Regex<Substring> = Regex {
+      optNegation
+      ChoiceOf {
+        Regex { /0b/; binaryLit }
+        Regex { /0o/; octalLit }
+        Regex { /0x/; hexalLit }
+        Regex { /0x/; hexalLit; "."; hexalLit; Optionally { hexponentLit } }
+        Regex { decimalLit; "."; decimalLit; Optionally { exponentLit } }
+        Regex { decimalLit; exponentLit }
+        decimalLit
+      }
+    }
+    let plainIdentifierRegex: Regex<Substring> = Regex {
+      identifierHeadChar
+      ZeroOrMore {
+        ChoiceOf {
+          identifierHeadChar
+          identifierBodyChar
+        }
+      }
+    }
+    let identifierRegex = Regex {
+      ChoiceOf {
+        plainIdentifierRegex
+        Regex { "`"; plainIdentifierRegex; "`" }
+        Regex { "$"; decimalLit }
+        Regex { "$"; plainIdentifierRegex }
+      }
+    }
     return LanguageConfiguration(name: "Swift",
-                                 stringRegexp: "\"(?:\\\\\"|[^\"])*+\"",
-                                 characterRegexp: nil,
-                                 numberRegexp:
-                                  optNegation +
-                                 group(alternatives([
-                                  "0b" + binaryLit,
-                                  "0o" + octalLit,
-                                  "0x" + hexalLit,
-                                  "0x" + hexalLit + "\\." + hexalLit + hexponentLit + "?",
-                                  decimalLit + "\\." + decimalLit + exponentLit + "?",
-                                  decimalLit + exponentLit,
-                                  decimalLit
-                                 ])),
+                                 stringRegex: /\"(?:\\\\\"|[^\"])*+\"/,
+                                 characterRegex: nil,
+                                 numberRegex: numberRegex,
                                  singleLineComment: "//",
                                  nestedComment: (open: "/*", close: "*/"),
-                                 identifierRegexp:
-                                  alternatives([
-                                    identifierHeadChar +
-                                    group(alternatives([
-                                      identifierHeadChar,
-                                      identifierBodyChar,
-                                    ])) + "*",
-                                    "`" + identifierHeadChar +
-                                    group(alternatives([
-                                      identifierHeadChar,
-                                      identifierBodyChar,
-                                    ])) + "*`",
-                                    "\\\\$" + decimalLit,
-                                    "\\\\$" + identifierHeadChar +
-                                    group(alternatives([
-                                      identifierHeadChar,
-                                      identifierBodyChar,
-                                    ])) + "*"
-                                  ]),
+                                 identifierRegex: identifierRegex,
                                  reservedIdentifiers: swiftReservedIds,
                                  languageService: languageService)
   }

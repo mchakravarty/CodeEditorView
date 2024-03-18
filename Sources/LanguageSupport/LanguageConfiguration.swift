@@ -163,15 +163,15 @@ public struct LanguageConfiguration {
 
   /// Regular expression matching strings
   ///
-  public let stringRegexp: Regex<Substring>?
+  public let stringRegex: Regex<Substring>?
 
   /// Regular expression matching character literals
   ///
-  public let characterRegexp: Regex<Substring>?
+  public let characterRegex: Regex<Substring>?
 
   /// Regular expression matching numbers
   ///
-  public let numberRegexp: Regex<Substring>?
+  public let numberRegex: Regex<Substring>?
 
   /// Lexeme that introduces a single line comment
   ///
@@ -183,7 +183,7 @@ public struct LanguageConfiguration {
 
   /// Regular expression matching all identifiers (even if they are subgroupings)
   ///
-  public let identifierRegexp: Regex<Substring>?
+  public let identifierRegex: Regex<Substring>?
 
   /// Reserved identifiers (this does not include contextual keywords)
   ///
@@ -196,30 +196,31 @@ public struct LanguageConfiguration {
   /// Defines a language configuration.
   ///
   public init(name: String,
-              stringRegexp: Regex<Substring>?,
-              characterRegexp: Regex<Substring>?,
-              numberRegexp: Regex<Substring>?,
+              stringRegex: Regex<Substring>?,
+              characterRegex: Regex<Substring>?,
+              numberRegex: Regex<Substring>?,
               singleLineComment: String?,
               nestedComment: LanguageConfiguration.BracketPair?,
-              identifierRegexp: Regex<Substring>?,
+              identifierRegex: Regex<Substring>?,
               reservedIdentifiers: [String],
               languageService: LanguageServiceBuilder? = nil)
   {
-    self.name                 = name
-    self.stringRegexp         = stringRegexp
-    self.characterRegexp      = characterRegexp
-    self.numberRegexp         = numberRegexp
-    self.singleLineComment    = singleLineComment
-    self.nestedComment        = nestedComment
-    self.identifierRegexp     = identifierRegexp
-    self.reservedIdentifiers  = reservedIdentifiers
-    self.languageService      = languageService
+    self.name                = name
+    self.stringRegex         = stringRegex
+    self.characterRegex      = characterRegex
+    self.numberRegex         = numberRegex
+    self.singleLineComment   = singleLineComment
+    self.nestedComment       = nestedComment
+    self.identifierRegex     = identifierRegex
+    self.reservedIdentifiers = reservedIdentifiers
+    self.languageService     = languageService
   }
 
   /// Defines a language configuration.
   ///
   /// This string flavour intialiser exists mainly for backwards compatibility. Avoid it if possible.
   ///
+  @available(*, deprecated, message: "Use Regex")
   public init(name: String,
               stringRegexp: String?,
               characterRegexp: String?,
@@ -244,12 +245,12 @@ public struct LanguageConfiguration {
     }
 
     self = LanguageConfiguration(name: name,
-                                 stringRegexp: makeRegex(from: stringRegexp),
-                                 characterRegexp: makeRegex(from: characterRegexp),
-                                 numberRegexp: makeRegex(from: numberRegexp),
+                                 stringRegex: makeRegex(from: stringRegexp),
+                                 characterRegex: makeRegex(from: characterRegexp),
+                                 numberRegex: makeRegex(from: numberRegexp),
                                  singleLineComment: singleLineComment,
                                  nestedComment: nestedComment,
-                                 identifierRegexp: makeRegex(from: identifierRegexp),
+                                 identifierRegex: makeRegex(from: identifierRegexp),
                                  reservedIdentifiers: reservedIdentifiers,
                                  languageService: languageService)
   }
@@ -283,12 +284,12 @@ extension LanguageConfiguration {
   /// Empty language configuration
   ///
   public static let none = LanguageConfiguration(name: "Text",
-                                                 stringRegexp: nil as Regex<Substring>?,
-                                                 characterRegexp: nil,
-                                                 numberRegexp: nil,
+                                                 stringRegex: nil,
+                                                 characterRegex: nil,
+                                                 numberRegex: nil,
                                                  singleLineComment: nil,
                                                  nestedComment: nil,
-                                                 identifierRegexp: nil,
+                                                 identifierRegex: nil,
                                                  reservedIdentifiers: [])
 
 }
@@ -296,47 +297,54 @@ extension LanguageConfiguration {
 extension LanguageConfiguration {
 
   // General purpose numeric literals
-  public static let binaryLit    = "(?:[01]_*)+"
-  public static let octalLit     = "(?:[0-7]_*)+"
-  public static let decimalLit   = "(?:[0-9]_*)+"
-  public static let hexalLit     = "(?:[0-9A-Fa-f]_*)+"
-  public static let optNegation  = "(?:\\B-|\\b)"
-  public static let exponentLit  = "[eE](?:[+-])?" + decimalLit
-  public static let hexponentLit = "[pP](?:[+-])?" + decimalLit
+  public static let binaryLit: Regex<Substring>   = /(?:[01]_*)+/
+  public static let octalLit: Regex<Substring>    = /(?:[0-7]_*)+/
+  public static let decimalLit: Regex<Substring>  = /(?:[0-9]_*)+/
+  public static let hexalLit: Regex<Substring>    = /(?:[0-9A-Fa-f]_*)+/
+  public static let optNegation: Regex<Substring> = /(?:\\B-|\\b)/
+  public static let exponentLit: Regex<Substring> = Regex {
+    /[eE](?:[+-])?/
+    decimalLit
+  }
+  public static let hexponentLit: Regex<Substring> = Regex {
+    /[pP](?:[+-])?/
+    decimalLit
+  }
 
   // Identifier components following the Swift 5.4 reference
-  public static let identifierHeadChar
-    = "["
-    + "[a-zA-Z_]"
-// FIXME: when we use RegexBuilder here
-//    + "[\u{00A8}\u{00AA}\u{00AD}\u{00AF}\u{00B2}–\u{00B5}\u{00B7}–\u{00BA}]"
-//    + "[\u{00BC}–\u{00BE}\u{00C0}–\u{00D6}\u{00D8}–\u{00F6}\u{00F8}–\u{00FF}]"
-//    + "[\u{0100}–\u{02FF}\u{0370}–\u{167F}\u{1681}–\u{180D}\u{180F}–\u{1DBF}]"
-//    + "[\u{1E00}–\u{1FFF}]"
-//    + "[\u{200B}–\u{200D}\u{202A}–\u{202E}\u{203F}–\u{2040}\u{2054}\u{2060}–\u{206F}]"
-//    + "[\u{2070}–\u{20CF}\u{2100}–\u{218F}\u{2460}–\u{24FF}\u{2776}–\u{2793}]"
-//    + "[\u{2C00}–\u{2DFF}\u{2E80}–\u{2FFF}]"
-//    + "[\u{3004}–\u{3007}\u{3021}–\u{302F}\u{3031}–\u{303F}\u{3040}–\u{D7FF}]"
-//    + "[\u{F900}–\u{FD3D}\u{FD40}–\u{FDCF}\u{FDF0}–\u{FE1F}\u{FE30}–\u{FE44}]"
-//    + "[\u{FE47}–\u{FFFD}]"
-//    + "[\u{10000}–\u{1FFFD}\u{20000}–\u{2FFFD}\u{30000}–\u{3FFFD}\u{40000}–\u{4FFFD}]"
-//    + "[\u{50000}–\u{5FFFD}\u{60000}–\u{6FFFD}\u{70000}–\u{7FFFD}\u{80000}–\u{8FFFD}]"
-//    + "[\u{90000}–\u{9FFFD}\u{A0000}–\u{AFFFD}\u{B0000}–\u{BFFFD}\u{C0000}–\u{CFFFD}]"
-//    + "[\u{D0000}–\u{DFFFD}\u{E0000}–\u{EFFFD}]"
-    + "]"
+  public static let identifierHeadChar: Regex<Substring>
+  = Regex {
+    CharacterClass("a"..."z",
+                   "A"..."Z",
+                   .anyOf("_"),
+                   .anyOf("\u{A8}\u{AA}\u{AD}\u{AF}\u{B2}–\u{B5}\u{B7}–\u{BA}"),
+                   .anyOf("\u{BC}–\u{BE}\u{C0}–\u{D6}\u{D8}–\u{F6}\u{F8}–\u{FF}"),
+                   .anyOf("\u{100}–\u{2FF}\u{370}–\u{167F}\u{1681}–\u{180D}\u{180F}–\u{1DBF}"),
+                   .anyOf("\u{1E00}–\u{1FFF}"),
+                   .anyOf("\u{200B}–\u{200D}\u{202A}–\u{202E}\u{203F}–\u{2040}\u{2054}\u{2060}–\u{206F}"),
+                   .anyOf("\u{2070}–\u{20CF}\u{2100}–\u{218F}\u{2460}–\u{24FF}\u{2776}–\u{2793}"),
+                   .anyOf("\u{2C00}–\u{2DFF}\u{2E80}–\u{2FFF}"),
+                   .anyOf("\u{3004}–\u{3007}\u{3021}–\u{302F}\u{3031}–\u{303F}\u{3040}–\u{D7FF}"),
+                   .anyOf("\u{F900}–\u{FD3D}\u{FD40}–\u{FDCF}\u{FDF0}–\u{FE1F}\u{FE30}–\u{FE44}"),
+                   .anyOf("\u{FE47}–\u{FFFD}"),
+                   .anyOf("\u{10000}–\u{1FFFD}\u{20000}–\u{2FFFD}\u{30000}–\u{3FFFD}\u{40000}–\u{4FFFD}"),
+                   .anyOf("\u{50000}–\u{5FFFD}\u{60000}–\u{6FFFD}\u{70000}–\u{7FFFD}\u{80000}–\u{8FFFD}"),
+                   .anyOf("\u{90000}–\u{9FFFD}\u{A0000}–\u{AFFFD}\u{B0000}–\u{BFFFD}\u{C0000}–\u{CFFFD}"),
+                   .anyOf("\u{D0000}–\u{DFFFD}\u{E0000}–\u{EFFFD}"))
+  }
   public static let identifierBodyChar
-    = "["
-    + "[0-9]"
-// FIXME: when we use RegexBuilder here
-//    + "[\u{0300}–\u{036F}\u{1DC0}–\u{1DFF}\u{20D0}–\u{20FF}\u{FE20}–\u{FE2F}]"
-    + "]"
+  = Regex {
+    CharacterClass("0"..."9", .anyOf("\u{300}–\u{36F}\u{1DC0}–\u{1DFF}\u{20D0}–\u{20FF}\u{FE20}–\u{FE2F}"))
+  }
 
   /// Wrap a regular expression into grouping brackets.
   ///
+  @available(*, deprecated, message: "Use Regex builder")
   public static func group(_ regexp: String) -> String { "(?:" + regexp + ")" }
 
   /// Compose an array of regular expressions as alternatives.
   ///
+  @available(*, deprecated, message: "Use Regex builder")
   public static func alternatives(_ alts: [String]) -> String { alts.map{ group($0) }.joined(separator: "|") }
 }
 
@@ -397,9 +405,9 @@ extension LanguageConfiguration {
                      , TokenDescription(regex: /{/, singleLexeme: "{", action: token(.curlyBracketOpen))
                      , TokenDescription(regex: /}/, singleLexeme: "}", action: token(.squareBracketClose))
                      ]
-    if let regex = stringRegexp { codeTokens.append(TokenDescription(regex: regex, action: token(.string))) }
-    if let regex = characterRegexp { codeTokens.append(TokenDescription(regex: regex, action: token(.character))) }
-    if let regex = numberRegexp { codeTokens.append(TokenDescription(regex: regex, action: token(.number))) }
+    if let regex = stringRegex { codeTokens.append(TokenDescription(regex: regex, action: token(.string))) }
+    if let regex = characterRegex { codeTokens.append(TokenDescription(regex: regex, action: token(.character))) }
+    if let regex = numberRegex { codeTokens.append(TokenDescription(regex: regex, action: token(.number))) }
     if let lexeme = singleLineComment {
       codeTokens.append(TokenDescription(regex: Regex{ lexeme },
                                          singleLexeme: lexeme,
@@ -413,7 +421,7 @@ extension LanguageConfiguration {
                                          singleLexeme: lexemes.close,
                                          action: (token: .nestedCommentClose, transition: decNestedComment)))
     }
-    if let regex = identifierRegexp { codeTokens.append(TokenDescription(regex: regex, action: token(.identifier(nil)))) }
+    if let regex = identifierRegex { codeTokens.append(TokenDescription(regex: regex, action: token(.identifier(nil)))) }
     for reserved in reservedIdentifiers {
       codeTokens.append(TokenDescription(regex: Regex{ Anchor.wordBoundary; reserved; Anchor.wordBoundary },
                                          singleLexeme: reserved,

@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import RegexBuilder
 
 
 private let haskellReservedIds =
@@ -17,29 +18,35 @@ extension LanguageConfiguration {
   /// Language configuration for Haskell (including GHC extensions)
   ///
   public static func haskell(_ languageService: LanguageServiceBuilder? = nil) -> LanguageConfiguration {
+    let numberRegex = Regex {
+      optNegation
+      ChoiceOf {
+        Regex{ /0[bB]/; binaryLit }
+        Regex{ /0[oO]/; octalLit }
+        Regex{ /0[xX]/; hexalLit }
+        Regex{ /0[xX]/; hexalLit; "."; hexalLit; Optionally{ hexponentLit } }
+        Regex{ decimalLit; "."; decimalLit; Optionally{ exponentLit } }
+        Regex{ decimalLit; exponentLit }
+        decimalLit
+      }
+    }
+    let identifierRegex = Regex {
+      identifierHeadChar
+      ZeroOrMore {
+        ChoiceOf {
+          identifierHeadChar
+          identifierBodyChar
+          "'"
+        }
+      }
+    }
     return LanguageConfiguration(name: "Haskell",
-                                 stringRegexp: "\"(?:\\\\\"|[^\"])*+\"",
-                                 characterRegexp: "'(?:\\\\'|[^']|\\\\[^']*+)'",
-                                 numberRegexp:
-                                  optNegation +
-                                 group(alternatives([
-                                  "0[bB]" + binaryLit,
-                                  "0[oO]" + octalLit,
-                                  "0[xX]" + hexalLit,
-                                  "0[xX]" + hexalLit + "\\." + hexalLit + hexponentLit + "?",
-                                  decimalLit + "\\." + decimalLit + exponentLit + "?",
-                                  decimalLit + exponentLit,
-                                  decimalLit
-                                 ])),
+                                 stringRegex: /\"(?:\\\\\"|[^\"])*+\"/,
+                                 characterRegex: /'(?:\\\\'|[^']|\\\\[^']*+)'/,
+                                 numberRegex: numberRegex,
                                  singleLineComment: "--",
                                  nestedComment: (open: "{-", close: "-}"),
-                                 identifierRegexp:
-                                  identifierHeadChar +
-                                 group(alternatives([
-                                  identifierHeadChar,
-                                  identifierBodyChar,
-                                  "'"
-                                 ])) + "*",
+                                 identifierRegex: identifierRegex,
                                  reservedIdentifiers: haskellReservedIds,
                                  languageService: languageService)
   }
