@@ -451,7 +451,10 @@ extension CodeStorageDelegate {
     // Set the token attribute in range.
     let initialTokeniserState: LanguageConfiguration.State
                = initialCommentDepth > 0 ? .tokenisingComment(initialCommentDepth) : .tokenisingCode,
-        tokens = textStorage.string[stringRange].tokenise(with: tokeniser, state: initialTokeniserState)
+        tokens = textStorage
+                   .string[stringRange]
+                   .tokenise(with: tokeniser, state: initialTokeniserState)
+                   .map{ $0.shifted(by: range.location) }       // adjust tokens to be relative to the whole `string`
 
     // For all lines in range, collect the tokens line by line, while keeping track of nested comments
     //
@@ -490,7 +493,10 @@ extension CodeStorageDelegate {
         // Re-tokenise line
         let initialTokeniserState: LanguageConfiguration.State
                    = commentDepth > 0 ? .tokenisingComment(commentDepth) : .tokenisingCode,
-            tokens = textStorage.string[lineEntryRange].tokenise(with: tokeniser, state: initialTokeniserState)
+            tokens = textStorage
+                       .string[lineEntryRange]
+                       .tokenise(with: tokeniser, state: initialTokeniserState)
+                       .map{ $0.shifted(by: lineEntry.range.location) } // adjust tokens to be relative to the whole `string`
 
         // Collect the tokens and update line info
         tokeniseAndUpdateInfo(for: currentLine,

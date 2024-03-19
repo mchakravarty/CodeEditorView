@@ -230,12 +230,15 @@ public struct Tokeniser<TokenType: Equatable, StateType: TokeniserState> {
 
 extension StringProtocol {
 
-  /// Tokenise the given range and return the encountered tokens.
+  /// Tokenise `self` and return the encountered tokens.
   ///
   /// - Parameters:
   ///   - tokeniser: Pre-compiled tokeniser.
   ///   - startState: Starting state of the tokeniser.
   /// - Returns: The sequence of the encountered tokens.
+  ///
+  /// NB: If this function is applied to a `Substring`, the ranges of the tokens are relative to the start of the
+  ///     `Substring` (and not of the `String` of which this `Substring` is a part).
   ///
   public func tokenise<TokenType, StateType>(with tokeniser: Tokeniser<TokenType, StateType>,
                                              state startState: StateType)
