@@ -9,12 +9,15 @@ import Foundation
 import RegexBuilder
 
 
-private let swiftReservedIds =
+private let swiftReservedIdentifiers =
   ["actor", "associatedtype", "async", "await", "as", "break", "case", "catch", "class", "continue", "default", "defer",
    "deinit", "do", "else", "enum", "extension", "fallthrough", "fileprivate", "for", "func", "guard", "if", "import",
    "init", "inout", "internal", "in", "is", "let", "operator", "precedencegroup", "private", "protocol", "public",
    "repeat", "rethrows", "return", "self", "static", "struct", "subscript", "super", "switch", "throws", "throw", "try",
-   "typealias", "var", "where", "while"]
+   "typealias", "var", "where", "while", "#available", "#colorLiteral", "#else", "#elseif", "#endif", "#fileLiteral",
+   "#if", "#imageLiteral", "#keyPath", "#selector", "#sourceLocation", "#unavailable"]
+private let swiftReservedOperators =
+  [".", ",", ":", ";", "=", "@", "#", "&", "->", "`", "?", "!"]
 
 extension LanguageConfiguration {
 
@@ -34,12 +37,9 @@ extension LanguageConfiguration {
       }
     }
     let plainIdentifierRegex: Regex<Substring> = Regex {
-      identifierHeadChar
+      identifierHeadCharacters
       ZeroOrMore {
-        ChoiceOf {
-          identifierHeadChar
-          identifierBodyChar
-        }
+        identifierCharacters
       }
     }
     let identifierRegex = Regex {
@@ -50,14 +50,34 @@ extension LanguageConfiguration {
         Regex { "$"; plainIdentifierRegex }
       }
     }
+    let operatorRegex = Regex {
+      ChoiceOf {
+
+        Regex {
+          operatorHeadCharacters
+          ZeroOrMore {
+            operatorCharacters
+          }
+        }
+
+        Regex {
+          "."
+          OneOrMore {
+            CharacterClass(operatorCharacters, .anyOf("."))
+          }
+        }
+      }
+    }
     return LanguageConfiguration(name: "Swift",
-                                 stringRegex: /\"(?:\\\\\"|[^\"])*+\"/,
+                                 stringRegex: /\"(?:\\\"|[^\"])*+\"/,
                                  characterRegex: nil,
                                  numberRegex: numberRegex,
                                  singleLineComment: "//",
                                  nestedComment: (open: "/*", close: "*/"),
                                  identifierRegex: identifierRegex,
-                                 reservedIdentifiers: swiftReservedIds,
+                                 operatorRegex: operatorRegex,
+                                 reservedIdentifiers: swiftReservedIdentifiers,
+                                 reservedOperators: swiftReservedOperators,
                                  languageService: languageService)
   }
 }

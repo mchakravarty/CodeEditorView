@@ -81,6 +81,7 @@ public struct LanguageConfiguration {
     case identifier(Flavour?)
     case `operator`(Flavour?)
     case keyword
+    case symbol
     case regexp
 
     public var isOpenBracket: Bool {
@@ -185,9 +186,17 @@ public struct LanguageConfiguration {
   ///
   public let identifierRegex: Regex<Substring>?
 
+  /// Regular expression matching all user-definable operators if they are not included in the identifier category.
+  ///
+  public let operatorRegex: Regex<Substring>?
+
   /// Reserved identifiers (this does not include contextual keywords)
   ///
   public let reservedIdentifiers: [String]
+
+  /// Reserved operators (this does not include contextual operators)
+  ///
+  public let reservedOperators: [String]
 
   /// Dynamic language service that provides advanced syntactic as well as semantic information.
   ///
@@ -202,7 +211,9 @@ public struct LanguageConfiguration {
               singleLineComment: String?,
               nestedComment: LanguageConfiguration.BracketPair?,
               identifierRegex: Regex<Substring>?,
+              operatorRegex: Regex<Substring>?,
               reservedIdentifiers: [String],
+              reservedOperators: [String],
               languageService: LanguageServiceBuilder? = nil)
   {
     self.name                = name
@@ -212,7 +223,9 @@ public struct LanguageConfiguration {
     self.singleLineComment   = singleLineComment
     self.nestedComment       = nestedComment
     self.identifierRegex     = identifierRegex
+    self.operatorRegex       = operatorRegex
     self.reservedIdentifiers = reservedIdentifiers
+    self.reservedOperators   = reservedOperators
     self.languageService     = languageService
   }
 
@@ -251,7 +264,9 @@ public struct LanguageConfiguration {
                                  singleLineComment: singleLineComment,
                                  nestedComment: nestedComment,
                                  identifierRegex: makeRegex(from: identifierRegexp),
+                                 operatorRegex: nil,
                                  reservedIdentifiers: reservedIdentifiers,
+                                 reservedOperators: [],
                                  languageService: languageService)
   }
 
@@ -274,6 +289,7 @@ public struct LanguageConfiguration {
     case .identifier:         return nil
     case .operator:           return nil
     case .keyword:            return nil
+    case .symbol:      return nil
     case .regexp:             return nil
     }
   }
@@ -290,7 +306,9 @@ extension LanguageConfiguration {
                                                  singleLineComment: nil,
                                                  nestedComment: nil,
                                                  identifierRegex: nil,
-                                                 reservedIdentifiers: [])
+                                                 operatorRegex: nil,
+                                                 reservedIdentifiers: [],
+                                                 reservedOperators: [])
 
 }
 
@@ -301,7 +319,7 @@ extension LanguageConfiguration {
   public static let octalLit: Regex<Substring>    = /(?:[0-7]_*)+/
   public static let decimalLit: Regex<Substring>  = /(?:[0-9]_*)+/
   public static let hexalLit: Regex<Substring>    = /(?:[0-9A-Fa-f]_*)+/
-  public static let optNegation: Regex<Substring> = /(?:\\B-|\\b)/
+  public static let optNegation: Regex<Substring> = /(?:\B-|\b)/
   public static let exponentLit: Regex<Substring> = Regex {
     /[eE](?:[+-])?/
     decimalLit
@@ -311,10 +329,9 @@ extension LanguageConfiguration {
     decimalLit
   }
 
-  // Identifier components following the Swift 5.4 reference
-  public static let identifierHeadChar: Regex<Substring>
-  = Regex {
-    CharacterClass("a"..."z",
+  // Identifier components following the Swift 5.10 reference
+  public static let identifierHeadCharacters: CharacterClass
+  = CharacterClass("a"..."z",
                    "A"..."Z",
                    .anyOf("_"),
                    .anyOf("\u{A8}\u{AA}\u{AD}\u{AF}\u{B2}–\u{B5}\u{B7}–\u{BA}"),
@@ -331,13 +348,42 @@ extension LanguageConfiguration {
                    .anyOf("\u{50000}–\u{5FFFD}\u{60000}–\u{6FFFD}\u{70000}–\u{7FFFD}\u{80000}–\u{8FFFD}"),
                    .anyOf("\u{90000}–\u{9FFFD}\u{A0000}–\u{AFFFD}\u{B0000}–\u{BFFFD}\u{C0000}–\u{CFFFD}"),
                    .anyOf("\u{D0000}–\u{DFFFD}\u{E0000}–\u{EFFFD}"))
-  }
-  public static let identifierBodyChar
-  = Regex {
-    CharacterClass("0"..."9", .anyOf("\u{300}–\u{36F}\u{1DC0}–\u{1DFF}\u{20D0}–\u{20FF}\u{FE20}–\u{FE2F}"))
-  }
+  public static let identifierCharacters
+  = CharacterClass(identifierHeadCharacters,
+                   "0"..."9",
+                   .anyOf("\u{300}–\u{36F}\u{1DC0}–\u{1DFF}\u{20D0}–\u{20FF}\u{FE20}–\u{FE2F}"))
 
-  /// Wrap a regular expression into grouping brackets.
+  // Operator components following the Swift 5.10 reference
+  public static let operatorHeadCharacters: CharacterClass
+  = CharacterClass(.anyOf("/=-+!*%<>&|^~?"),
+                   .anyOf("\u{A1}–\u{A7}"),
+                   .anyOf("\u{A9}\u{AB}"),
+                   .anyOf("\u{AC}\u{AE}"),
+                   .anyOf("\u{B0}–\u{B1}"),
+                   .anyOf("\u{B6}\u{BB}\u{BF}\u{D7}\u{F7}"),
+                   .anyOf("\u{2016}–\u{2017}"),
+                   .anyOf("\u{2020}–\u{2027}"),
+                   .anyOf("\u{2030}–\u{203E}"),
+                   .anyOf("\u{2041}–\u{2053}"),
+                   .anyOf("\u{2055}–\u{205E}"),
+                   .anyOf("\u{2190}–\u{23FF}"),
+                   .anyOf("\u{2500}–\u{2775}"),
+                   .anyOf("\u{2794}–\u{2BFF}"),
+                   .anyOf("\u{2E00}–\u{2E7F}"),
+                   .anyOf("\u{3001}–\u{3003}"),
+                   .anyOf("\u{3008}–\u{3020}"),
+                   .anyOf("\u{3030}"))
+  public static let operatorCharacters: CharacterClass
+  = CharacterClass(operatorHeadCharacters,
+                   .anyOf("\u{0300}–\u{036F}"),
+                   .anyOf("\u{1DC0}–\u{1DFF}"),
+                   .anyOf("\u{20D0}–\u{20FF}"),
+                   .anyOf("\u{FE00}–\u{FE0F}"),
+                   .anyOf("\u{FE20}–\u{FE2F}"),
+                   .anyOf("\u{E0100}–\u{E01EF}"))
+
+
+    /// Wrap a regular expression into grouping brackets.
   ///
   @available(*, deprecated, message: "Use Regex builder")
   public static func group(_ regexp: String) -> String { "(?:" + regexp + ")" }
@@ -422,10 +468,16 @@ extension LanguageConfiguration {
                                          action: (token: .nestedCommentClose, transition: decNestedComment)))
     }
     if let regex = identifierRegex { codeTokens.append(TokenDescription(regex: regex, action: token(.identifier(nil)))) }
+    if let regex = operatorRegex { codeTokens.append(TokenDescription(regex: regex, action: token(.operator(nil)))) }
     for reserved in reservedIdentifiers {
       codeTokens.append(TokenDescription(regex: Regex{ Anchor.wordBoundary; reserved; Anchor.wordBoundary },
                                          singleLexeme: reserved,
                                          action: token(.keyword)))
+    }
+    for reserved in reservedOperators {
+      codeTokens.append(TokenDescription(regex: Regex{ Anchor.wordBoundary; reserved; Anchor.wordBoundary },
+                                         singleLexeme: reserved,
+                                         action: token(.symbol)))
     }
 
     // Populate the token dictionary for the comment state (tokenising within a nested comment)

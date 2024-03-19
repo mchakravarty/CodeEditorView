@@ -12,6 +12,8 @@ import RegexBuilder
 private let haskellReservedIds =
   ["case", "class", "data", "default", "deriving", "do", "else", "foreign", "if", "import", "in", "infix", "infixl",
    "infixr", "instance", "let", "module", "newtype", "of", "then", "type", "where"]
+private let haskellReservedOperators =
+  ["..", ":", "::", "=", "\\", "|", "<-", "->", "@", "~", "=>"]
 
 extension LanguageConfiguration {
 
@@ -31,23 +33,28 @@ extension LanguageConfiguration {
       }
     }
     let identifierRegex = Regex {
-      identifierHeadChar
+      identifierHeadCharacters
       ZeroOrMore {
-        ChoiceOf {
-          identifierHeadChar
-          identifierBodyChar
-          "'"
-        }
+        CharacterClass(identifierCharacters, .anyOf("'"))
       }
     }
+    let symbolCharacter = CharacterClass(.anyOf("!#$%&⋆+./<=>?@\\^|-~:"),
+                                         operatorHeadCharacters.subtracting(.anyOf("/=-+!*%<>&|^~?"))),
+                                         // This is for the Unicode symbols, but the Haskell spec actually specifies "any Unicode symbol or punctuation".
+        operatorRegex   = Regex {
+          symbolCharacter
+          ZeroOrMore { symbolCharacter }
+        }
     return LanguageConfiguration(name: "Haskell",
-                                 stringRegex: /\"(?:\\\\\"|[^\"])*+\"/,
-                                 characterRegex: /'(?:\\\\'|[^']|\\\\[^']*+)'/,
+                                 stringRegex: /\"(?:\\\"|[^\"])*+\"/,
+                                 characterRegex: /'(?:\\'|[^']|\\[^']*+)'/,
                                  numberRegex: numberRegex,
                                  singleLineComment: "--",
                                  nestedComment: (open: "{-", close: "-}"),
                                  identifierRegex: identifierRegex,
+                                 operatorRegex: operatorRegex,
                                  reservedIdentifiers: haskellReservedIds,
+                                 reservedOperators: haskellReservedOperators,
                                  languageService: languageService)
   }
 }

@@ -126,7 +126,9 @@ extension CodeStorage {
       case .character:  theme.characterColour
       case .number:     theme.numberColour
       case .identifier: theme.identifierColour
+      case .operator:   theme.operatorColour
       case .keyword:    theme.keywordColour
+      case .symbol:     theme.symbolColour
       default:          theme.textColour
       }
     }

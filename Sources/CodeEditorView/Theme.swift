@@ -50,9 +50,17 @@ public struct Theme: Identifiable, Equatable {
   ///
   public var identifierColour: OSColor
 
+  /// The colour for operators.
+  ///
+  public var operatorColour: OSColor
+
   /// The colour for keywords.
   ///
   public var keywordColour: OSColor
+
+  /// The colour for reserved symbols.
+  ///
+  public var symbolColour: OSColor
 
   /// The background colour.
   ///
@@ -83,7 +91,9 @@ public struct Theme: Identifiable, Equatable {
               characterColour: OSColor,
               numberColour: OSColor,
               identifierColour: OSColor,
+              operatorColour: OSColor,
               keywordColour: OSColor,
+              symbolColour: OSColor,
               backgroundColour: OSColor,
               currentLineColour: OSColor,
               selectionColour: OSColor,
@@ -99,7 +109,9 @@ public struct Theme: Identifiable, Equatable {
     self.characterColour = characterColour
     self.numberColour = numberColour
     self.identifierColour = identifierColour
+    self.operatorColour = operatorColour
     self.keywordColour = keywordColour
+    self.symbolColour = symbolColour
     self.backgroundColour = backgroundColour
     self.currentLineColour = currentLineColour
     self.selectionColour = selectionColour
@@ -122,9 +134,11 @@ extension Theme {
             commentColour: OSColor(red: 0.51, green: 0.55, blue: 0.59, alpha: 1.0),
             stringColour: OSColor(red: 0.94, green: 0.53, blue: 0.46, alpha: 1.0),
             characterColour: OSColor(red: 0.84, green: 0.79, blue: 0.53, alpha: 1.0),
-            numberColour: OSColor(red: 0.84, green: 0.79, blue: 0.53, alpha: 1.0),
-            identifierColour: OSColor(red: 0.89, green: 0.89, blue: 0.89, alpha: 1.0),
+            numberColour: OSColor(red: 0.81, green: 0.74, blue: 0.40, alpha: 1.0),
+            identifierColour: OSColor(red: 0.41, green: 0.72, blue: 0.64, alpha: 1.0),
+            operatorColour: OSColor(red: 0.62, green: 0.94, blue: 0.87, alpha: 1.0),
             keywordColour: OSColor(red: 0.94, green: 0.51, blue: 0.69, alpha: 1.0),
+            symbolColour: OSColor(red: 0.72, green: 0.72, blue: 0.73, alpha: 1.0),
             backgroundColour: OSColor(red: 0.16, green: 0.16, blue: 0.18, alpha: 1.0),
             currentLineColour: OSColor(red: 0.19, green: 0.20, blue: 0.22, alpha: 1.0),
             selectionColour: OSColor(red: 0.40, green: 0.44, blue: 0.51, alpha: 1.0),
@@ -139,9 +153,11 @@ extension Theme {
             commentColour: OSColor(red: 0.45, green: 0.50, blue: 0.55, alpha: 1.0),
             stringColour: OSColor(red: 0.76, green: 0.24, blue: 0.16, alpha: 1.0),
             characterColour: OSColor(red: 0.14, green: 0.19, blue: 0.81, alpha: 1.0),
-            numberColour: OSColor(red: 0.14, green: 0.19, blue: 0.81, alpha: 1.0),
-            identifierColour: OSColor(red: 0.15, green: 0.15, blue: 0.15, alpha: 1.0),
+            numberColour: OSColor(red: 0.0, green: 0.05, blue: 1.0, alpha: 1.0),
+            identifierColour: OSColor(red: 0.23, green: 0.50, blue: 0.54, alpha: 1.0),
+            operatorColour: OSColor(red: 0.18, green: 0.05, blue: 0.43, alpha: 1.0),
             keywordColour: OSColor(red: 0.63, green: 0.28, blue: 0.62, alpha: 1.0),
+            symbolColour: OSColor(red: 0.24, green: 0.13, blue: 0.48, alpha: 1.0),
             backgroundColour: OSColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0),
             currentLineColour: OSColor(red: 0.93, green: 0.96, blue: 1.0, alpha: 1.0),
             selectionColour: OSColor(red: 0.73, green: 0.84, blue: 0.99, alpha: 1.0),
