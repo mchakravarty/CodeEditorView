@@ -187,10 +187,17 @@ public struct Tokeniser<TokenType: Equatable, StateType: TokeniserState> {
       }
     }
 
+    func longestFirst(lhs: TokenDescription<TokenType, StateType>, rhs: TokenDescription<TokenType, StateType>) -> Bool
+    {
+      (lhs.singleLexeme ?? "").count >= (rhs.singleLexeme ?? "").count
+    }
+
     func tokeniser(for stateMap: [TokenDescription<TokenType, StateType>]) -> Tokeniser<TokenType, StateType>.State?
     {
 
-      let singleLexemeTokens      = stateMap.filter{ $0.singleLexeme != nil },
+      // NB: The list of single lexeme tokens need to be from longest to shortest, to ensure that the longer one is
+      //     chosen if the lexeme of one token is a prefix of another token's lexeme.
+      let singleLexemeTokens      = stateMap.filter{ $0.singleLexeme != nil }.sorted(by: longestFirst),
           multiLexemeTokens       = stateMap.filter{ $0.singleLexeme == nil },
           singleLexemeTokensRegex = combine(alternatives: singleLexemeTokens),
           multiLexemeTokensRegex  = combineWithCapture(alternatives: multiLexemeTokens)
