@@ -161,6 +161,14 @@ public struct LanguageConfiguration {
   /// The name of the language.
   ///
   public let name: String
+  
+  /// Whether square bracket characters act as brackets.
+  ///
+  public let supportsSquareBrackets: Bool
+
+  /// Whether curly bracket characters act as brackets.
+  ///
+  public let supportsCurlyBrackets: Bool
 
   /// Regular expression matching strings
   ///
@@ -205,6 +213,8 @@ public struct LanguageConfiguration {
   /// Defines a language configuration.
   ///
   public init(name: String,
+              supportsSquareBrackets: Bool,
+              supportsCurlyBrackets: Bool,
               stringRegex: Regex<Substring>?,
               characterRegex: Regex<Substring>?,
               numberRegex: Regex<Substring>?,
@@ -216,17 +226,19 @@ public struct LanguageConfiguration {
               reservedOperators: [String],
               languageService: LanguageServiceBuilder? = nil)
   {
-    self.name                = name
-    self.stringRegex         = stringRegex
-    self.characterRegex      = characterRegex
-    self.numberRegex         = numberRegex
-    self.singleLineComment   = singleLineComment
-    self.nestedComment       = nestedComment
-    self.identifierRegex     = identifierRegex
-    self.operatorRegex       = operatorRegex
-    self.reservedIdentifiers = reservedIdentifiers
-    self.reservedOperators   = reservedOperators
-    self.languageService     = languageService
+    self.name                   = name
+    self.supportsSquareBrackets = supportsSquareBrackets
+    self.supportsCurlyBrackets  = supportsCurlyBrackets
+    self.stringRegex            = stringRegex
+    self.characterRegex         = characterRegex
+    self.numberRegex            = numberRegex
+    self.singleLineComment      = singleLineComment
+    self.nestedComment          = nestedComment
+    self.identifierRegex        = identifierRegex
+    self.operatorRegex          = operatorRegex
+    self.reservedIdentifiers    = reservedIdentifiers
+    self.reservedOperators      = reservedOperators
+    self.languageService        = languageService
   }
 
   /// Defines a language configuration.
@@ -258,6 +270,8 @@ public struct LanguageConfiguration {
     }
 
     self = LanguageConfiguration(name: name,
+                                 supportsSquareBrackets: true,
+                                 supportsCurlyBrackets: true,
                                  stringRegex: makeRegex(from: stringRegexp),
                                  characterRegex: makeRegex(from: characterRegexp),
                                  numberRegex: makeRegex(from: numberRegexp),
@@ -300,6 +314,8 @@ extension LanguageConfiguration {
   /// Empty language configuration
   ///
   public static let none = LanguageConfiguration(name: "Text",
+                                                 supportsSquareBrackets: false,
+                                                 supportsCurlyBrackets: false,
                                                  stringRegex: nil,
                                                  characterRegex: nil,
                                                  numberRegex: nil,
@@ -446,11 +462,19 @@ extension LanguageConfiguration {
     //
     var codeTokens = [ TokenDescription(regex: /\(/, singleLexeme: "(", action: token(.roundBracketOpen))
                      , TokenDescription(regex: /\)/, singleLexeme: ")", action: token(.roundBracketClose))
-                     , TokenDescription(regex: /\[/, singleLexeme: "[", action: token(.squareBracketOpen))
-                     , TokenDescription(regex: /\]/, singleLexeme: "]", action: token(.squareBracketClose))
-                     , TokenDescription(regex: /{/, singleLexeme: "{", action: token(.curlyBracketOpen))
-                     , TokenDescription(regex: /}/, singleLexeme: "}", action: token(.squareBracketClose))
                      ]
+    if supportsSquareBrackets {
+      codeTokens.append(contentsOf: 
+                          [ TokenDescription(regex: /\[/, singleLexeme: "[", action: token(.squareBracketOpen))
+                          , TokenDescription(regex: /\]/, singleLexeme: "]", action: token(.squareBracketClose))
+                          ])
+    }
+    if supportsCurlyBrackets {
+      codeTokens.append(contentsOf:
+                          [ TokenDescription(regex: /{/, singleLexeme: "{", action: token(.curlyBracketOpen))
+                          , TokenDescription(regex: /}/, singleLexeme: "}", action: token(.squareBracketClose))
+                          ])
+    }
     if let regex = stringRegex { codeTokens.append(TokenDescription(regex: regex, action: token(.string))) }
     if let regex = characterRegex { codeTokens.append(TokenDescription(regex: regex, action: token(.character))) }
     if let regex = numberRegex { codeTokens.append(TokenDescription(regex: regex, action: token(.number))) }

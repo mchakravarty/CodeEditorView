@@ -10,12 +10,13 @@ import RegexBuilder
 
 
 private let swiftReservedIdentifiers =
-  ["actor", "associatedtype", "async", "await", "as", "break", "case", "catch", "class", "continue", "default", "defer",
-   "deinit", "do", "else", "enum", "extension", "fallthrough", "fileprivate", "for", "func", "guard", "if", "import",
-   "init", "inout", "internal", "in", "is", "let", "operator", "precedencegroup", "private", "protocol", "public",
-   "repeat", "rethrows", "return", "self", "static", "struct", "subscript", "super", "switch", "throws", "throw", "try",
-   "typealias", "var", "where", "while", "#available", "#colorLiteral", "#else", "#elseif", "#endif", "#fileLiteral",
-   "#if", "#imageLiteral", "#keyPath", "#selector", "#sourceLocation", "#unavailable"]
+  ["Any", "actor", "associatedtype", "async", "await", "as", "break", "case", "catch", "class", "continue", "default", 
+   "defer", "deinit", "do", "else", "enum", "extension", "fallthrough", "false", "fileprivate", "for", "func", "guard",
+   "if", "in", "is", "import", "init", "inout", "internal", "in", "is", "let", "nil", "open", "operator",
+   "precedencegroup", "private", "protocol", "public", "repeat", "rethrows", "return", "Self", "self", "static",
+   "struct", "subscript", "super", "switch", "throw", "throws", "true", "try", "typealias", "var", "where", "while",
+   "_", "#available", "#colorLiteral", "#else", "#elseif", "#endif", "#fileLiteral", "#if", "#imageLiteral", "#keyPath",
+   "#selector", "#sourceLocation", "#unavailable"]
 private let swiftReservedOperators =
   [".", ",", ":", ";", "=", "@", "#", "&", "->", "`", "?", "!"]
 
@@ -69,6 +70,8 @@ extension LanguageConfiguration {
       }
     }
     return LanguageConfiguration(name: "Swift",
+                                 supportsSquareBrackets: true,
+                                 supportsCurlyBrackets: true,
                                  stringRegex: /\"(?:\\\"|[^\"])*+\"/,
                                  characterRegex: nil,
                                  numberRegex: numberRegex,

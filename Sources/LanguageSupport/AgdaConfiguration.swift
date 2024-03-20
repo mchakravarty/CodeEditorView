@@ -12,11 +12,11 @@ import RegexBuilder
 
 
 private let agdaReservedIds =
-  ["abstract", "codata", "coinductive", "constructor", "data", "do", "eta-equality", "field", "forall", "import", "in",
+  ["abstract", "coinductive", "constructor", "data", "do", "eta-equality", "field", "forall", "hiding", "import", "in",
    "inductive", "infix", "infixl", "infixr", "instance", "interleaved", "let", "macro", "module", "mutual",
-   "no-eta-equality", "open", "overlap", "pattern", "postulate", "primitive", "private", "quote", "quoteTerm", "record",
-   "rewrite", "syntax", "tactic", "unquote", "unquoteDecl", "unquoteDef", "variable", "where", "with", "opaque",
-   "unfolding", "using", "hiding", "renaming", "public"]
+   "no-eta-equality", "opaque", "open", "overlap", "pattern", "postulate", "primitive", "private", "public", "quote",
+   "quoteTerm", "record", "renaming", "rewrite", "syntax", "tactic", "unfolding", "unquote", "unquoteDecl", "unquoteDef",
+   "using", "variable", "where", "with"]
 private let agdaReservedOperator =
   ["=", "|", "->", "→", ":", "?", "\\", "λ", "∀", "..", "..."]
 
@@ -40,10 +40,13 @@ extension LanguageConfiguration {
     let namePart        = Regex { agdaNamePartHeadChar; ZeroOrMore{ agdaNamePartBodyChar } },
         identifierRegex = Regex {
           Optionally { /_/ }
-          OneOrMore { Regex { namePart; /_/ } }
           namePart
+          ZeroOrMore { Regex { /_/; namePart } }
+          Optionally { /_/ }
         }
     return LanguageConfiguration(name: "Agda",
+                                 supportsSquareBrackets: false,
+                                 supportsCurlyBrackets: true,
                                  stringRegex: /\"(?:\\\"|[^\"])*+\"/,
                                  characterRegex: /'(?:\\'|[^']|\\[^']*+)'/,
                                  numberRegex: numberRegex,
