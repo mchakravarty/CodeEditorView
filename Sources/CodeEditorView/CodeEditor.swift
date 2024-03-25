@@ -5,6 +5,7 @@
 //
 //  SwiftUI 'CodeEditor' view
 
+import Combine
 import SwiftUI
 
 import Rearrange
@@ -78,7 +79,22 @@ public struct CodeEditor {
   /// Collects all currently available code actions.
   ///
   public struct Actions {
+
+    public struct Language {
+      
+      /// The name of the language.
+      ///
+      public let name: String
+
+      /// The extra actions currently available.
+      ///
+      public var extraActions: [ExtraAction] = []
+    }
     
+    /// Language-specific actions, if any.
+    ///
+    public var language: Language = Language(name: "Text")
+
     /// Display semantic information about the current selection.
     ///
     public var info: (() -> Void)?
@@ -147,7 +163,7 @@ public struct CodeEditor {
     ///
     fileprivate var lastMessages: Set<TextLocated<Message>> = Set()
 
-    /// The current set of code actions, which, on setting, are directly propagated to the context.
+    /// The current set of code actions, which, on setting, are immediately propagated to the context.
     ///
     fileprivate var actions: Actions = Actions() {
       didSet {
@@ -305,9 +321,18 @@ extension CodeEditor: NSViewRepresentable {
     DispatchQueue.main.async{ updateMessages(in: codeView, with: context) }
 
     // Set the initial actions
-    context.coordinator.actions = Actions(info: codeView.infoAction,
+    context.coordinator.actions = Actions(language: Actions.Language(name: language.name),
+                                          info: codeView.infoAction,
                                           completions: codeView.completionAction,
                                           capabilities: codeView.capabilitiesAction)
+
+    let coordinator = context.coordinator
+    context.coordinator.extraActionsCancellable = codeView.optLanguageService?.extraActions
+      .receive(on: DispatchQueue.main)
+      .sink{ [coordinator] actions in
+
+        coordinator.actions.language.extraActions = actions
+      }
 
     return scrollView
   }
@@ -337,6 +362,7 @@ extension CodeEditor: NSViewRepresentable {
 
   public final class Coordinator: _Coordinator {
     var boundsChangedNotificationObserver: NSObjectProtocol?
+    var extraActionsCancellable:           Cancellable?
 
     deinit {
       if let observer = boundsChangedNotificationObserver { NotificationCenter.default.removeObserver(observer) }

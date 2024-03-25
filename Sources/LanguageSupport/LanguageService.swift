@@ -153,6 +153,29 @@ extension Completions.Completion: Comparable {
   }
 }
 
+/// Extra action that is specific to a particular language (server).
+///
+public struct ExtraAction {
+
+  /// The name of the extra action, suitable for use in a menu.
+  ///
+  public let title: String
+
+  /// An optional key equivalent that may be used to trigger the extra action when used with the modififiers determined
+  /// by the hosting application.
+  ///
+  public let key: KeyEquivalent?
+
+  /// The actual action.
+  ///
+  public var action: (() -> Void)?
+
+  public init(title: String, key: KeyEquivalent? = nil, action: (() -> Void)? = nil) {
+    self.title  = title
+    self.key    = key
+    self.action = action
+  }
+}
 
 
 /// Determines the capabilities and endpoints for language-dependent external services, such as an LSP server.
@@ -233,6 +256,14 @@ public protocol LanguageService {
   ///   simply no extra information available for the given location, the function simply returns `nil`.
   ///
   func info(at location: Int) async throws -> (view: any View, anchor: NSRange?)?
+
+
+  // MARK: Extra actions
+  
+  /// The current set of extra actions provided by the language service. These actions are dependent on the language and
+  /// maybe also the particular language service. They can change in dependence on the state of the language service.
+  ///
+  var extraActions: CurrentValueSubject<[ExtraAction], Never> { get }
 
 
   // MARK: Developer support
