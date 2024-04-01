@@ -25,7 +25,7 @@ public protocol LocationService: LocationConverter {
   /// - Returns: The length (number of characters) of the given line, including any trainling newline character, or
   ///     `nil` if the line does not exist.
   ///
-  func length(of line: Int) -> Int?
+  func length(of zeroBasedLine: Int) -> Int?
 }
 
 /// Function that instantiates a language service from a location converter.
