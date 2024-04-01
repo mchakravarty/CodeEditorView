@@ -555,7 +555,10 @@ extension CodeStorageDelegate {
                                                  edited: .editedAttributes,
                                                  range: range,
                                                  changeInLength: 0,
-                                                 invalidatedRange: range)
+                                                 invalidatedRange: NSRange(location: 0, length: textStorage.string.count))
+                                                                   // ^^If we don't invalidate the whole text, we
+                                                                   // somehow lose highlighting for everything outside
+                                                                   // of the invalidated range.
             }
           }
 

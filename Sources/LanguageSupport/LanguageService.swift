@@ -177,6 +177,14 @@ public struct ExtraAction {
   }
 }
 
+/// Events that can be reported by a language service.
+///
+public enum LanguageServiceEvent {
+
+  /// New semantic token information is available for the given line range.
+  ///
+  case tokensAvailable(lineRange: Range<Int>)
+}
 
 /// Determines the capabilities and endpoints for language-dependent external services, such as an LSP server.
 ///
@@ -204,6 +212,14 @@ public protocol LanguageService {
   /// NB: After this call, no functions from the language service may be used anymore.
   ///
   func closeDocument() async throws
+
+
+  // MARK: Events
+
+  /// Serves ephemeral events notifying a consumer of the language service of state changes that may require display
+  /// refreshes, user-facing messages, and similar.
+  ///
+  var events: PassthroughSubject<LanguageServiceEvent, Never> { get }
 
 
   // MARK: Diagnostics

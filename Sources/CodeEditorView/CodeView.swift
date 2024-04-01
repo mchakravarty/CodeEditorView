@@ -393,6 +393,10 @@ final class CodeView: NSTextView {
   ///
   private var diagnosticsCancellable: Cancellable?
 
+  /// For the consumption of the events stream from the language service.
+  ///
+  private var eventsCancellable: Cancellable?
+
   /// Holds the info popover if there is one.
   ///
   var infoPopover: InfoPopover?
@@ -588,12 +592,20 @@ final class CodeView: NSTextView {
       // Report diagnostic messages as they come in.
       diagnosticsCancellable = languageService.diagnostics
         .receive(on: DispatchQueue.main)
-        .sink{ [self] messages in
+        .sink { [self] messages in
 
           retractMessages()
           messages.forEach{ report(message: $0) }
 
         }
+
+      eventsCancellable = languageService.events
+        .receive(on: DispatchQueue.main)
+        .sink { [self] event in
+
+          process(event: event)
+        }
+
     }
   }
 
@@ -1193,6 +1205,19 @@ extension CodeView {
   func collapseMessageViews() {
     for messageView in messageViews {
       messageView.value.view.unfolded = false
+    }
+  }
+
+  // MARK: Events
+
+
+  func process(event: LanguageServiceEvent) {
+    guard let codeStorage = optCodeStorage else { return }
+
+    switch event {
+
+    case .tokensAvailable(lineRange: let lineRange):
+      codeStorageDelegate.requestSemanticTokens(for: lineRange, in: codeStorage)
     }
   }
 }
