@@ -61,6 +61,18 @@ public struct Theme: Identifiable, Equatable {
   /// The colour for reserved symbols.
   ///
   public var symbolColour: OSColor
+  
+  /// The colour for type names (identifiers and operators).
+  ///
+  public var typeColour: OSColor
+
+  /// The colour for field names.
+  ///
+  public var fieldColour: OSColor
+
+  /// The colour for names of alternatives.
+  ///
+  public var caseColour: OSColor
 
   /// The background colour.
   ///
@@ -94,6 +106,9 @@ public struct Theme: Identifiable, Equatable {
               operatorColour: OSColor,
               keywordColour: OSColor,
               symbolColour: OSColor,
+              typeColour: OSColor,
+              fieldColour: OSColor,
+              caseColour: OSColor,
               backgroundColour: OSColor,
               currentLineColour: OSColor,
               selectionColour: OSColor,
@@ -112,6 +127,9 @@ public struct Theme: Identifiable, Equatable {
     self.operatorColour = operatorColour
     self.keywordColour = keywordColour
     self.symbolColour = symbolColour
+    self.typeColour = typeColour
+    self.fieldColour = fieldColour
+    self.caseColour = caseColour
     self.backgroundColour = backgroundColour
     self.currentLineColour = currentLineColour
     self.selectionColour = selectionColour
@@ -139,6 +157,9 @@ extension Theme {
             operatorColour: OSColor(red: 0.62, green: 0.94, blue: 0.87, alpha: 1.0),
             keywordColour: OSColor(red: 0.94, green: 0.51, blue: 0.69, alpha: 1.0),
             symbolColour: OSColor(red: 0.72, green: 0.72, blue: 0.73, alpha: 1.0),
+            typeColour: OSColor(red: 0.36, green: 0.85, blue: 1.0, alpha: 1.0),
+            fieldColour: OSColor(red: 0.63, green: 0.40, blue: 0.90, alpha: 1.0),
+            caseColour: OSColor(red: 0.82, green: 0.66, blue: 1.0, alpha: 1.0),
             backgroundColour: OSColor(red: 0.16, green: 0.16, blue: 0.18, alpha: 1.0),
             currentLineColour: OSColor(red: 0.19, green: 0.20, blue: 0.22, alpha: 1.0),
             selectionColour: OSColor(red: 0.40, green: 0.44, blue: 0.51, alpha: 1.0),
@@ -158,6 +179,9 @@ extension Theme {
             operatorColour: OSColor(red: 0.18, green: 0.05, blue: 0.43, alpha: 1.0),
             keywordColour: OSColor(red: 0.63, green: 0.28, blue: 0.62, alpha: 1.0),
             symbolColour: OSColor(red: 0.24, green: 0.13, blue: 0.48, alpha: 1.0),
+            typeColour: OSColor(red: 0.04, green: 0.29, blue: 0.46, alpha: 1.0),
+            fieldColour: OSColor(red: 0.36, green: 0.15, blue: 0.60, alpha: 1.0),
+            caseColour: OSColor(red: 0.18, green: 0.05, blue: 0.43, alpha: 1.0),
             backgroundColour: OSColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0),
             currentLineColour: OSColor(red: 0.93, green: 0.96, blue: 1.0, alpha: 1.0),
             selectionColour: OSColor(red: 0.73, green: 0.84, blue: 0.99, alpha: 1.0),

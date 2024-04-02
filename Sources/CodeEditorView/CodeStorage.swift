@@ -125,8 +125,20 @@ extension CodeStorage {
       case .string:     theme.stringColour
       case .character:  theme.characterColour
       case .number:     theme.numberColour
-      case .identifier: theme.identifierColour
-      case .operator:   theme.operatorColour
+      case .identifier(let flavour):
+        switch flavour {
+        case .type:     theme.typeColour
+        case .property: theme.fieldColour
+        case .enumCase: theme.caseColour
+        default:        theme.identifierColour
+        }
+      case .operator(let flavour):
+        switch flavour {
+        case .type:     theme.typeColour
+        case .property: theme.fieldColour
+        case .enumCase: theme.caseColour
+        default:        theme.operatorColour
+        }
       case .keyword:    theme.keywordColour
       case .symbol:     theme.symbolColour
       default:          theme.textColour
