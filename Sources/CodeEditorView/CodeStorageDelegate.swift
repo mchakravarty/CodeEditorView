@@ -576,7 +576,9 @@ extension CodeStorageDelegate {
   /// NB: Currently, we only enrich the information of tokens that are already present as syntactic tokens.
   ///
   private func merge(semanticTokens: [(token: LanguageConfiguration.Token, range: NSRange)], into line: Int) {
-    guard var info = lineMap.lookup(line: line)?.info else { return }
+    guard var info = lineMap.lookup(line: line)?.info,
+          !semanticTokens.isEmpty       // Short-cut if there are no semantic tokens
+    else { return }
 
     var remainingSemanticTokens = semanticTokens
     var tokens                  = info.tokens
