@@ -26,15 +26,15 @@ public struct CodeEditor {
 
   /// Specification of the editor layout.
   ///
-  public struct LayoutConfiguration: Equatable {
+  public struct LayoutConfiguration: Equatable, RawRepresentable {
 
-    /// Show the minimap if possible. (Currently only supported on macOS.)
+    /// Show the minimap.
     ///
-    public let showMinimap: Bool
+    public var showMinimap: Bool
 
     /// Determines whether line of text may extend beyond the width of the text area or are getting wrapped.
     ///
-    public let wrapText: Bool
+    public var wrapText: Bool
 
     /// Creates a layout configuration.
     ///
@@ -48,6 +48,18 @@ public struct CodeEditor {
     }
 
     public static let standard = LayoutConfiguration(showMinimap: true, wrapText: true)
+
+    // MARK: For 'RawRepresentable'
+
+    public var rawValue: String { "\(showMinimap ? "t" : "f")\(wrapText ? "t" : "f")" }
+
+    public init?(rawValue: String) {
+      guard rawValue.count == 2
+      else { return nil }
+
+      self.showMinimap = rawValue[rawValue.startIndex] == "t"
+      self.wrapText    = rawValue[rawValue.index(after: rawValue.startIndex)] == "t"
+    }
   }
 
   /// Specification of a text editing position; i.e., text selection and scroll position.
