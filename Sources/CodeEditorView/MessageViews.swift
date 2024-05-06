@@ -138,7 +138,7 @@ extension EnvironmentValues {
 private struct MessageBorder: ViewModifier {
   let cornerRadius: CGFloat
 
-  @Environment(\.colorScheme) var colourScheme: ColorScheme
+  @Environment(\.colorScheme) private var colourScheme: ColorScheme
 
   func body(content: Content) -> some View {
 
@@ -180,8 +180,8 @@ fileprivate struct MessagePopupCategoryView: View {
 
   let cornerRadius: CGFloat = 10
 
-  @Environment(\.colorScheme) var colourScheme: ColorScheme
-  @Environment(\.popupWidth)  var popupWidth:   CGFloat?
+  @Environment(\.colorScheme) private var colourScheme: ColorScheme
+  @Environment(\.popupWidth)  private var popupWidth:   CGFloat?
 
   var body: some View {
 
