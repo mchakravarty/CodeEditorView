@@ -122,9 +122,10 @@ public struct CodeEditor {
     public var capabilities: (() -> Void)?
   }
 
-  let language:   LanguageConfiguration
-  let layout  :   LayoutConfiguration
-  let setActions: ((Actions) -> Void)?
+  let language:            LanguageConfiguration
+  let layout:              LayoutConfiguration
+  let breakUndoCoalescing: PassthroughSubject<(), Never>?
+  let setActions:          ((Actions) -> Void)?
 
   @Binding private var text:     String
   @Binding private var position: Position
@@ -140,23 +141,27 @@ public struct CodeEditor {
   ///               simultaneous messages and they shouldn't change too frequently.
   ///   - language: Language configuration for highlighting and similar.
   ///   - layout: Layout configuration determining the visible elements of the editor view.
+  ///   - breakUndoCoalescing: Trigger indicating when to break undo coalescing to avoid coalescing undos across
+  ///       saves.
   ///   - setActions: Function that the code editor uses to update the context about the available code editing
   ///       actions. Some actions can be temporarily unavailable and the context can use that, e.g., to enable and
   ///       disable corresponding menu or toolbar options.
   ///
-  public init(text:       Binding<String>,
-              position:   Binding<Position>,
-              messages:   Binding<Set<TextLocated<Message>>>,
-              language:   LanguageConfiguration = .none,
-              layout:     LayoutConfiguration = .standard,
-              setActions: ((Actions) -> Void)? = nil)
+  public init(text:                Binding<String>,
+              position:            Binding<Position>,
+              messages:            Binding<Set<TextLocated<Message>>>,
+              language:            LanguageConfiguration = .none,
+              layout:              LayoutConfiguration = .standard,
+              breakUndoCoalescing: PassthroughSubject<(), Never>? = nil,
+              setActions:          ((Actions) -> Void)? = nil)
   {
-    self._text      = text
-    self._position  = position
-    self._messages  = messages
-    self.language   = language
-    self.layout     = layout
-    self.setActions = setActions
+    self._text               = text
+    self._position           = position
+    self._messages           = messages
+    self.language            = language
+    self.layout              = layout
+    self.breakUndoCoalescing = breakUndoCoalescing
+    self.setActions          = setActions
   }
 
   public class _Coordinator {
@@ -321,16 +326,21 @@ extension CodeEditor: NSViewRepresentable {
     // The minimap needs to be vertically positioned in dependence on the scroll position of the main code view by
     // observing the bounds of the content view.
     context.coordinator.boundsChangedNotificationObserver
-    = NotificationCenter.default.addObserver(forName: NSView.boundsDidChangeNotification,
-                                             object: scrollView.contentView,
-                                             queue: .main){ _ in
+      = NotificationCenter.default.addObserver(forName: NSView.boundsDidChangeNotification,
+                                               object: scrollView.contentView,
+                                               queue: .main){ _ in
 
-        // FIXME: we would like to get less fine-grained updates here, but `NSScrollView.didEndLiveScrollNotification` doesn't happen when moving the cursor around
-        context.coordinator.scrollPositionDidChange(scrollView)
-      }
+          // FIXME: we would like to get less fine-grained updates here, but `NSScrollView.didEndLiveScrollNotification` doesn't happen when moving the cursor around
+          context.coordinator.scrollPositionDidChange(scrollView)
+        }
 
     // Report the initial message set
     DispatchQueue.main.async{ updateMessages(in: codeView, with: context) }
+
+    // Break undo coalescing whenever we get a trigger over the corresponding subject.
+    context.coordinator.breakUndoCoalescingCancellable = breakUndoCoalescing?.sink { _ in
+      codeView.breakUndoCoalescing()
+    }
 
     // Set the initial actions
     context.coordinator.actions = Actions(language: Actions.Language(name: language.name),
@@ -352,7 +362,9 @@ extension CodeEditor: NSViewRepresentable {
   public func updateNSView(_ scrollView: NSScrollView, context: Context) {
     guard let codeView = scrollView.documentView as? CodeView else { return }
     context.coordinator.updatingView = true
-    
+
+    codeView.breakUndoCoalescing()
+
     let theme                      = context.environment.codeEditorTheme,
         selections                 = position.selections.map{ NSValue(range: $0) }
 
@@ -375,6 +387,7 @@ extension CodeEditor: NSViewRepresentable {
   public final class Coordinator: _Coordinator {
     var boundsChangedNotificationObserver: NSObjectProtocol?
     var extraActionsCancellable:           Cancellable?
+    var breakUndoCoalescingCancellable:    Cancellable?
 
     deinit {
       if let observer = boundsChangedNotificationObserver { NotificationCenter.default.removeObserver(observer) }
