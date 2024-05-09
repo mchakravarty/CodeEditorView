@@ -32,6 +32,10 @@ public struct Message: Identifiable, Hashable {
     ///
     case warning
 
+    /// A hole — indicating a gap in the code that still needs to be filled in.
+    ///
+    case hole
+
     /// A message without any direct impact on the validity of the program.
     ///
     case informational
