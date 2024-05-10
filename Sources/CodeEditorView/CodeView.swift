@@ -27,12 +27,14 @@ import LanguageSupport
 ///     container during line fragment computations.
 ///
 struct MessageInfo {
-  let view:              StatefulMessageView.HostingView
-  let backgroundView:    CodeBackgroundHighlightView
-  var characterIndex:    Int                            // The starting character index for the line hosting the message
-  var lineFragementRect: CGRect                         // The *full* line fragement rectangle (incl. message)
-  var geometry:          MessageView.Geometry?
-  var colour:            OSColor                        // The category colour of the most severe category
+  let view:                    StatefulMessageView.HostingView
+  let backgroundView:          CodeBackgroundHighlightView
+  var characterIndex:          Int                    // The starting character index for the line hosting the message
+  var telescope:               Int?                   // The number of telescope lines (i.e., beyond starting line)
+  var characterIndexTelescope: Int?                   // The last index of the last line of the telescope lines (if any)
+  var lineFragementRect:       CGRect                 // The *full* line fragement rectangle (incl. message)
+  var geometry:                MessageView.Geometry?
+  var colour:                  OSColor                // The category colour of the most severe category
 
   var topAnchorConstraint:   NSLayoutConstraint?
   var rightAnchorConstraint: NSLayoutConstraint?
@@ -808,12 +810,26 @@ extension CodeView {
 
     for messageView in messageViews {
 
-      if let textLocation  = optTextContentStorage?.textLocation(for: messageView.value.characterIndex),
-         let fragmentFrame = optTextLayoutManager?.textLayoutFragment(for: textLocation)?.layoutFragmentFrameWithoutExtraLineFragment,
-         let highlightRect = lineBackgroundRect(y: fragmentFrame.minY, height: fragmentFrame.height),
-         messageView.value.backgroundView.frame != highlightRect
-      {
-        messageView.value.backgroundView.frame = highlightRect
+      if let telescopeCharacterIndex = messageView.value.characterIndexTelescope {
+
+        if let startLocation  = optTextContentStorage?.textLocation(for: messageView.value.characterIndex),
+           let endLocation    = optTextContentStorage?.textLocation(for: telescopeCharacterIndex),
+           let textRange      = NSTextRange(location: startLocation, end: endLocation),
+           let extent         = optTextLayoutManager?.textLayoutFragmentExtent(for: textRange),
+           let highlightRect  = lineBackgroundRect(y: extent.y, height: extent.height)
+        {
+          messageView.value.backgroundView.frame = highlightRect
+        }
+
+      } else {
+
+        if let textLocation  = optTextContentStorage?.textLocation(for: messageView.value.characterIndex),
+           let fragmentFrame = optTextLayoutManager?.textLayoutFragment(for: textLocation)?.layoutFragmentFrameWithoutExtraLineFragment,
+           let highlightRect = lineBackgroundRect(y: fragmentFrame.minY, height: fragmentFrame.height),
+           messageView.value.backgroundView.frame != highlightRect
+        {
+          messageView.value.backgroundView.frame = highlightRect
+        }
       }
     }
   }
@@ -1138,11 +1154,14 @@ extension CodeView {
                                                       colourScheme: theme.colourScheme),
         principalCategory = messagesByCategory(messageBundle.messages)[0].key,
         colour            = messageTheme(principalCategory).colour,
-        backgroundView    = CodeBackgroundHighlightView(color: colour.withAlphaComponent(0.1))
+        backgroundView    = CodeBackgroundHighlightView(color: colour.withAlphaComponent(0.1)),
+        telescope: Int?   = if messageBundle.messages.count == 1 { messageBundle.messages[0].telescope } else { nil }
 
     messageViews[messageBundle.id] = MessageInfo(view: messageView,
                                                  backgroundView: backgroundView,
                                                  characterIndex: 0,
+                                                 telescope: telescope,
+                                                 characterIndexTelescope: telescope.map{ _ in 0 },
                                                  lineFragementRect: .zero,
                                                  geometry: nil,
                                                  colour: colour)
@@ -1251,7 +1270,7 @@ final class CodeContainer: NSTextContainer {
           let delegate    = codeStorage.delegate as? CodeStorageDelegate,
           let line        = delegate.lineMap.lineOf(index: characterIndex),
           let oneLine     = delegate.lineMap.lookup(line: line),
-          characterIndex == oneLine.range.location    // we are only interested in the first line fragment of a line
+          characterIndex == oneLine.range.location     // do the following only for the first line fragment of a line
     else { return calculatedRect }
 
     // On lines that contain messages, we reduce the width of the available line fragement rect such that there is
@@ -1263,6 +1282,14 @@ final class CodeContainer: NSTextContainer {
       codeView.messageViews[messageBundleId]?.characterIndex    = characterIndex
       codeView.messageViews[messageBundleId]?.lineFragementRect = calculatedRect
       codeView.messageViews[messageBundleId]?.geometry = nil                      // invalidate the geometry
+
+      // If the bundle has a telescope, determine the telescope character index.
+
+      if let lines   = codeView.messageViews[messageBundleId]?.telescope,
+         let oneLine = delegate.lineMap.lookup(line: line + lines)
+      {
+        codeView.messageViews[messageBundleId]?.characterIndexTelescope = oneLine.range.max
+      }
 
       // To fully determine the layout of the message view, typesetting needs to complete for this line; hence, we defer
       // configuring the view.

@@ -28,13 +28,13 @@ public struct Message: Identifiable, Hashable {
     ///
     case error
 
-    /// A warning — indicating a possible problem that doesn't prevent execution.
-    ///
-    case warning
-
     /// A hole — indicating a gap in the code that still needs to be filled in.
     ///
     case hole
+
+    /// A warning — indicating a possible problem that doesn't prevent execution.
+    ///
+    case warning
 
     /// A message without any direct impact on the validity of the program.
     ///
@@ -52,7 +52,7 @@ public struct Message: Identifiable, Hashable {
   /// The number of characters that the message is related to and which ought to be underlined.
   ///
   public let length: Int
-
+  
   /// Short version of the message (displayed inline and in the popup) — one line only.
   ///
   public let summary: String
@@ -61,11 +61,22 @@ public struct Message: Identifiable, Hashable {
   ///
   public let description: NSAttributedString?
 
-  public init(category: Message.Category, length: Int, summary: String, description: NSAttributedString?) {
+  /// The number of lines, beyond the line on which the message is located, that are to be highlighted (as they are
+  /// within the scope of the message).
+  ///
+  public let telescope: Int?
+
+  public init(category: Message.Category, 
+              length: Int,
+              summary: String,
+              description: NSAttributedString?,
+              telescope: Int? = nil)
+  {
     self.category    = category
     self.length      = length
     self.summary     = summary
     self.description = description
+    self.telescope   = telescope
   }
 }
 

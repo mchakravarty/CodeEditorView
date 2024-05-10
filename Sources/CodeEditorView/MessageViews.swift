@@ -28,10 +28,10 @@ extension Message {
       return (colour: OSColor.green, icon: Image(systemName: "line.horizontal.3"))
     case .error:
       return (colour: OSColor.red, icon: Image(systemName: "xmark.octagon.fill"))
-    case .warning:
-      return (colour: OSColor.yellow, icon: Image(systemName: "exclamationmark.triangle.fill"))
     case .hole:
       return (colour: OSColor.orange, icon: Image(systemName: "questionmark.circle.fill"))
+    case .warning:
+      return (colour: OSColor.yellow, icon: Image(systemName: "exclamationmark.triangle.fill"))
     case .informational:
       return (colour: OSColor.gray, icon: Image(systemName: "info.circle.fill"))
     }
