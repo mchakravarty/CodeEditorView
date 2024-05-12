@@ -33,7 +33,7 @@ extension Message {
     case .warning:
       return (colour: OSColor.yellow, icon: Image(systemName: "exclamationmark.triangle.fill"))
     case .informational:
-      return (colour: OSColor.gray, icon: Image(systemName: "info.circle.fill"))
+      return (colour: OSColor.cyan, icon: Image(systemName: "info.circle.fill"))
     }
   }
 }
@@ -48,9 +48,10 @@ extension Message {
 /// NB: The array of messages may not be empty.
 ///
 struct MessageInlineView: View {
-  let messages:   [Message]
-  let theme:      Message.Theme
-  let background: Color
+  let messages:    [Message]
+  let theme:       Message.Theme
+  let background:  Color
+  let invalidated: Bool
 
   var body: some View {
 
@@ -59,7 +60,7 @@ struct MessageInlineView: View {
     GeometryReader { geometryProxy in
 
       let height = geometryProxy.size.height
-      let colour = Color(theme(categories[0]).colour)
+      let colour = if invalidated { Color(OSColor.gray) } else { Color(theme(categories[0]).colour) }
 
       HStack {
 
@@ -176,9 +177,10 @@ extension View {
 /// NB: The array of messages may not be empty.
 ///
 fileprivate struct MessagePopupCategoryView: View {
-  let category: Message.Category
-  let messages: [Message]
-  let theme:    Message.Theme
+  let category:    Message.Category
+  let messages:    [Message]
+  let theme:       Message.Theme
+  let invalidated: Bool
 
   let cornerRadius: CGFloat = 10
 
@@ -188,7 +190,7 @@ fileprivate struct MessagePopupCategoryView: View {
   var body: some View {
 
     let backgroundColour = colourScheme == .dark ? Color.black : Color.white
-    let colour           = Color(theme(category).colour)
+    let colour           = if invalidated { Color(OSColor.gray) } else { Color(theme(category).colour) }
 
     let theActualView =
       HStack(spacing: 0) {
@@ -235,8 +237,9 @@ fileprivate struct MessagePopupCategoryView: View {
 }
 
 struct MessagePopupView: View {
-  let messages: [Message]
-  let theme:    Message.Theme
+  let messages:    [Message]
+  let theme:       Message.Theme
+  let invalidated: Bool
 
   /// The width of the text in the message category with the widest text.
   ///
@@ -248,7 +251,10 @@ struct MessagePopupView: View {
 
     VStack(spacing: 4) {
       ForEach(0..<categories.count, id: \.self) { i in
-        MessagePopupCategoryView(category: categories[i].0, messages: categories[i].1, theme: theme)
+        MessagePopupCategoryView(category: categories[i].0,
+                                 messages: categories[i].1,
+                                 theme: theme,
+                                 invalidated: invalidated)
       }
     }
     .background(Color.clear)
@@ -288,6 +294,7 @@ struct MessageView: View {
   let theme:       Message.Theme    // The message display theme to use
   let background:  Color
   let geometry:    Geometry
+  let invalidated: Bool
 
   @Binding var unfolded: Bool       // False => inline view; true => popup view
 
@@ -302,7 +309,7 @@ struct MessageView: View {
       VStack {
         Spacer(minLength: geometry.popupOffset)
         HStack {
-          MessagePopupView(messages: messages, theme: theme)
+          MessagePopupView(messages: messages, theme: theme, invalidated: invalidated)
             .frame(maxWidth: geometry.popupWidth)
             .onTapGesture { unfolded.toggle() }
           Spacer(minLength: MessageView.popupRightSideOffset)
@@ -310,7 +317,7 @@ struct MessageView: View {
       }
       .opacity(unfolded ? 1.0 : 0.0)
 
-      MessageInlineView(messages: messages, theme: theme, background: background)
+      MessageInlineView(messages: messages, theme: theme, background: background, invalidated: invalidated)
         .frame(minWidth: MessageView.minimumInlineWidth, maxWidth: geometry.lineWidth, maxHeight: geometry.lineHeight)
         .transition(.opacity)
         .onTapGesture { unfolded.toggle() }
@@ -344,6 +351,7 @@ struct StatefulMessageView: View {
   let background:   Color                  // The background colour
   let fontSize:     CGFloat                // Font size to use for messages
   let colourScheme: ColorScheme            // The colour scheme to use for SwiftUI elements
+  let invalidated:  Bool                   // Whether the messages are to be rendered invalidated
 
   @ObservedObject var unfolded: ObservableBool  // `true` iff the view shows the popup flavour
 
@@ -363,6 +371,7 @@ struct StatefulMessageView: View {
                 theme: theme, 
                 background: background,
                 geometry: geometry,
+                invalidated: invalidated,
                 unfolded: $unfolded.bool)
       .font(.system(size: fontSize))
       .environment(\.colorScheme, colourScheme)
@@ -377,7 +386,7 @@ extension StatefulMessageView {
 
     private let messages:     [Message]
     private let theme:        Message.Theme
-    private let background:   Color
+    private var background:   Color
     private let fontSize:     CGFloat
     private let colourScheme: ColorScheme
 
@@ -388,9 +397,14 @@ extension StatefulMessageView {
     var geometry: MessageView.Geometry {
       didSet { reconfigure() }
     }
+
     var unfolded: Bool {
       get { unfoldedState.bool }
       set { unfoldedState.bool = newValue }
+    }
+
+    var invalidated: Bool {
+      didSet { reconfigure() }
     }
 
     init(messages: [Message],
@@ -406,6 +420,7 @@ extension StatefulMessageView {
       self.geometry     = geometry
       self.fontSize     = fontSize
       self.colourScheme = colourScheme
+      self.invalidated  = false
       super.init(frame: .zero)
 
 #if os(iOS) || os(visionOS)
@@ -419,6 +434,7 @@ extension StatefulMessageView {
                                                                 background: background,
                                                                 fontSize: fontSize,
                                                                 colourScheme: colourScheme,
+                                                                invalidated: invalidated,
                                                                 unfolded: unfoldedState))
 #if os(iOS) || os(visionOS)
       hostingView?.isOpaque = false
@@ -449,6 +465,7 @@ extension StatefulMessageView {
                                                        background: background,
                                                        fontSize: fontSize,
                                                        colourScheme: colourScheme,
+                                                       invalidated: invalidated,
                                                        unfolded: unfoldedState)
     }
   }
@@ -478,7 +495,8 @@ struct MessageViewPreview: View {
     MessageView(messages: messages,
                 theme: theme, 
                 background: background,
-                geometry: geometry,
+                geometry: geometry, 
+                invalidated: false,
                 unfolded: $unfolded)
   }
 }
@@ -491,23 +509,24 @@ struct MessageViews_Previews: PreviewProvider {
 
     // Inline view
 
-    MessageInlineView(messages: [message1], theme: Message.defaultTheme, background: darkBackground)
+    MessageInlineView(messages: [message1], theme: Message.defaultTheme, background: darkBackground, invalidated: false)
       .frame(width: 80, height: 15, alignment: .center)
       .preferredColorScheme(.dark)
 
-    MessageInlineView(messages: [message1], theme: Message.defaultTheme, background: darkBackground)
+    MessageInlineView(messages: [message1], theme: Message.defaultTheme, background: darkBackground, invalidated: false)
       .frame(width: 80, height: 25, alignment: .center)
       .preferredColorScheme(.dark)
 
     VStack{
 
-      MessageInlineView(messages: [message1, message2], theme: Message.defaultTheme, background: darkBackground)
+      MessageInlineView(messages: [message1, message2], theme: Message.defaultTheme, background: darkBackground, invalidated: false)
         .frame(width: 180, height: 15, alignment: .center)
         .preferredColorScheme(.dark)
 
       MessageInlineView(messages: [message1, message2, message3],
                         theme: Message.defaultTheme,
-                        background: darkBackground)
+                        background: darkBackground,
+                        invalidated: false)
         .frame(width: 180, height: 15, alignment: .center)
         .preferredColorScheme(.dark)
 
@@ -515,30 +534,35 @@ struct MessageViews_Previews: PreviewProvider {
 
     MessageInlineView(messages: [message1, message2, message3],
                       theme: Message.defaultTheme,
-                      background: lightBackground)
+                      background: lightBackground,
+                      invalidated: false)
       .frame(width: 180, height: 15, alignment: .center)
       .preferredColorScheme(.light)
 
     // Popup view
 
-    MessagePopupView(messages: [message1], theme: Message.defaultTheme)
+    MessagePopupView(messages: [message1], theme: Message.defaultTheme, invalidated: false)
       .font(.system(size: 32))
       .frame(maxWidth: 320, minHeight: 15)
       .preferredColorScheme(.dark)
 
-    MessagePopupView(messages: [message1, message4], theme: Message.defaultTheme)
+    MessagePopupView(messages: [message1, message4], theme: Message.defaultTheme, invalidated: false)
       .frame(maxWidth: 320, minHeight: 15)
       .preferredColorScheme(.dark)
 
-    MessagePopupView(messages: [message1, message2, message3], theme: Message.defaultTheme)
+    MessagePopupView(messages: [message1, message2, message3], theme: Message.defaultTheme, invalidated: false)
       .frame(maxWidth: 320, minHeight: 15)
       .preferredColorScheme(.dark)
 
-    MessagePopupView(messages: [message1, message5, message2, message4, message3], theme: Message.defaultTheme)
+    MessagePopupView(messages: [message1, message5, message2, message4, message3],
+                     theme: Message.defaultTheme,
+                     invalidated: false)
       .frame(maxWidth: 320, minHeight: 15)
       .preferredColorScheme(.dark)
 
-    MessagePopupView(messages: [message1, message5, message2, message4, message3], theme: Message.defaultTheme)
+    MessagePopupView(messages: [message1, message5, message2, message4, message3],
+                     theme: Message.defaultTheme,
+                     invalidated: false)
       .frame(maxWidth: 320, minHeight: 15)
       .preferredColorScheme(.light)
 
@@ -559,6 +583,7 @@ struct MessageViews_Previews: PreviewProvider {
                           background: darkBackground,
                           fontSize: 15,
                           colourScheme: .dark,
+                          invalidated: false,
                           unfolded: StatefulMessageView.ObservableBool(bool: false))
         .offset(y: 18)
     }

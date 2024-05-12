@@ -35,6 +35,7 @@ struct MessageInfo {
   var lineFragementRect:       CGRect                 // The *full* line fragement rectangle (incl. message)
   var geometry:                MessageView.Geometry?
   var colour:                  OSColor                // The category colour of the most severe category
+  var invalidated:             Bool                   // Greyed out and doesn't display a telescope
 
   var topAnchorConstraint:   NSLayoutConstraint?
   var rightAnchorConstraint: NSLayoutConstraint?
@@ -231,7 +232,7 @@ final class CodeView: UITextView {
                                                object: self,
                                                queue: .main){ [weak self, minimapView, codeStorageDelegate] _ in
 
-        self?.removeMessageViews(withIDs: self!.codeStorageDelegate.lastEvictedMessageIDs)
+        self?.invalidateMessageViews(withIDs: self!.codeStorageDelegate.lastInvalidatedMessageIDs)
         self?.gutterView?.invalidateGutter()
         self?.minimapGutterView?.invalidateGutter()
 
@@ -585,7 +586,7 @@ final class CodeView: NSTextView {
       = NotificationCenter.default.addObserver(forName: NSText.didChangeNotification, object: self, queue: .main){ [weak self] _ in
 
         self?.considerCompletionFor(range: self!.rangeForUserCompletion)
-        self?.removeMessageViews(withIDs: self!.codeStorageDelegate.lastEvictedMessageIDs)
+        self?.invalidateMessageViews(withIDs: self!.codeStorageDelegate.lastInvalidatedMessageIDs)
       }
 
     // Try to initialise a language service.
@@ -810,7 +811,9 @@ extension CodeView {
 
     for messageView in messageViews {
 
-      if let telescopeCharacterIndex = messageView.value.characterIndexTelescope {
+      if let telescopeCharacterIndex = messageView.value.characterIndexTelescope,
+         !messageView.value.invalidated     // No telesopes for invalidates messages
+      {
 
         if let startLocation  = optTextContentStorage?.textLocation(for: messageView.value.characterIndex),
            let endLocation    = optTextContentStorage?.textLocation(for: telescopeCharacterIndex),
@@ -1129,6 +1132,8 @@ extension CodeView {
   private func updateMessageView(for messageBundle: LineInfo.MessageBundle, at line: Int) {
     guard let charRange = codeStorageDelegate.lineMap.lookup(line: line)?.range else { return }
 
+    // NB: If the message info with that id has been invalidated, it just gets removed here, and hence, we don't have to
+    //      worry about a mix of invalidated and new messages.
     removeMessageViews(withIDs: [messageBundle.id])
 
     // If we removed the last message of this view, we don't need to create a new version
@@ -1164,7 +1169,8 @@ extension CodeView {
                                                  characterIndexTelescope: telescope.map{ _ in 0 },
                                                  lineFragementRect: .zero,
                                                  geometry: nil,
-                                                 colour: colour)
+                                                 colour: colour,
+                                                 invalidated: false)
 
     // We invalidate the layout of the line where the message belongs as their may be less space for the text now and
     // because the layout process for the text fills the `lineFragmentRect` property of the above `MessageInfo`.
@@ -1200,11 +1206,30 @@ extension CodeView {
     if lines == nil { removeMessageViews() } else { removeMessageViews(withIDs: messageIds) }
   }
 
+  /// Invalidate the message views with the given ids.
+  ///
+  /// - Parameter ids: The IDs of the message bundles that ought to be invalidated. If `nil`, invalidate all.
+  ///
+  /// IDs that do not have an associated message view cause no harm.
+  ///
+  fileprivate func invalidateMessageViews(withIDs ids: [LineInfo.MessageBundle.ID]? = nil) {
+
+    for id in ids ?? Array<LineInfo.MessageBundle.ID>(messageViews.keys) {
+      messageViews[id]?.invalidated = true
+      if let info = messageViews[id] {
+
+        info.backgroundView.color = OSColor.gray.withAlphaComponent(0.1)
+        info.view.invalidated     = true
+
+      }
+    }
+  }
+
   /// Remove the message views with the given ids.
   ///
   /// - Parameter ids: The IDs of the message bundles that ought to be removed. If `nil`, remove all.
   ///
-  /// IDs that do not have no associated message view cause no harm.
+  /// IDs that do not have an associated message view cause no harm.
   ///
   fileprivate func removeMessageViews(withIDs ids: [LineInfo.MessageBundle.ID]? = nil) {
 

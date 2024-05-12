@@ -114,7 +114,7 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
   /// The message bundle IDs that got invalidated by the last editing operation because the lines to which they were
   /// attached got changed.
   ///
-  private(set) var lastEvictedMessageIDs: [LineInfo.MessageBundle.ID] = []
+  private(set) var lastInvalidatedMessageIDs: [LineInfo.MessageBundle.ID] = []
 
   /// If the last text change was a one-character addition, which completed a token, then that token is remembered here
   /// together with its range until the next text change.
@@ -194,7 +194,7 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
 
     // Determine the ids of message bundles that are removed by this edit.
     let lines = lineMap.linesAffected(by: editedRange, changeInLength: delta)
-    lastEvictedMessageIDs = lines.compactMap{ lineMap.lookup(line: $0)?.info?.messages?.id  }
+    lastInvalidatedMessageIDs = lines.compactMap{ lineMap.lookup(line: $0)?.info?.messages?.id  }
 
     let endColumn = if let beforeLine     = lines.last,
                        let beforeLineInfo = lineMap.lookup(line: beforeLine)
