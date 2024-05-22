@@ -98,16 +98,30 @@ final class CodeView: UITextView {
   @Invalidating(.layout)
   var viewLayout: CodeEditor.LayoutConfiguration = .standard
 
+  /// Hook to propagate message sets upwards in the view hierarchy.
+  ///
+  let setMessages: (Set<TextLocated<Message>>) -> Void
+
+  /// This is the last reported set of `messages`. New message sets can come from the context or from a language server.
+  ///
+  var lastMessages: Set<TextLocated<Message>> = Set()
+
   /// Keeps track of the set of message views.
   ///
   var messageViews: MessageViews = [:]
 
   /// Designated initializer for code views with a gutter.
   ///
-  init(frame: CGRect, with language: LanguageConfiguration, viewLayout: CodeEditor.LayoutConfiguration, theme: Theme) {
+  init(frame: CGRect, 
+       with language: LanguageConfiguration,
+       viewLayout: CodeEditor.LayoutConfiguration,
+       theme: Theme,
+       setMessages: @escaping (Set<TextLocated<Message>>) -> Void)
+  {
 
-    self.theme      = theme
-    self.viewLayout = viewLayout
+    self.theme       = theme
+    self.viewLayout  = viewLayout
+    self.setMessages = setMessages
 
     // Use custom components that are gutter-aware and support code-specific editing actions and highlighting.
     let textLayoutManager  = NSTextLayoutManager(),
@@ -387,6 +401,14 @@ final class CodeView: NSTextView {
   ///
   @Invalidating(.layout)
   var viewLayout: CodeEditor.LayoutConfiguration = .standard
+  
+  /// Hook to propagate message sets upwards in the view hierarchy.
+  ///
+  let setMessages: (Set<TextLocated<Message>>) -> Void
+
+  /// This is the last reported set of `messages`. New message sets can come from the context or from a language server.
+  ///
+  var lastMessages: Set<TextLocated<Message>> = Set()
 
   /// Keeps track of the set of message views.
   ///
@@ -418,10 +440,16 @@ final class CodeView: NSTextView {
 
   /// Designated initialiser for code views with a gutter.
   ///
-  init(frame: CGRect, with language: LanguageConfiguration, viewLayout: CodeEditor.LayoutConfiguration, theme: Theme) {
+  init(frame: CGRect, 
+       with language: LanguageConfiguration,
+       viewLayout: CodeEditor.LayoutConfiguration,
+       theme: Theme,
+       setMessages: @escaping (Set<TextLocated<Message>>) -> Void)
+  {
 
     self.theme      = theme
     self.viewLayout = viewLayout
+    self.setMessages = setMessages
 
     // Use custom components that are gutter-aware and support code-specific editing actions and highlighting.
     let textLayoutManager  = NSTextLayoutManager(),
@@ -597,9 +625,8 @@ final class CodeView: NSTextView {
         .receive(on: DispatchQueue.main)
         .sink { [self] messages in
 
-          retractMessages()
-          messages.forEach{ report(message: $0) }
-
+          setMessages(messages)
+          update(messages: messages)
         }
 
       eventsCancellable = languageService.events
@@ -1107,6 +1134,19 @@ extension CodeView {
       }
     }
   }
+  
+  /// Update the whole set of current messages to a new set.
+  ///
+  /// - Parameter messages: The new set of messages.
+  ///
+  func update(messages: Set<TextLocated<Message>>) {
+
+    // FIXME: Retracting all and then adding them again my be bad with animation of we re-add many of the same.
+    retractMessages()
+    for message in messages { report(message: message) }
+
+    lastMessages = messages
+  }
 
   /// Adds a new message to the set of messages for this code view.
   ///
@@ -1191,7 +1231,7 @@ extension CodeView {
     var messageIds: [LineInfo.MessageBundle.ID] = []
 
     // Remove all message bundles in the line map and collect their ids for subsequent view removal.
-    for line in lines ?? 1..<codeStorageDelegate.lineMap.lines.count {
+    for line in lines ?? codeStorageDelegate.lineMap.lines.indices {
 
       if let messageBundle = codeStorageDelegate.messages(at: line) {
 

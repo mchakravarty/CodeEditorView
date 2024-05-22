@@ -192,7 +192,7 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
       textStorage.removeAttribute(.underlineStyle, range: wholeTextRange)
     }
 
-    // Determine the ids of message bundles that are removed by this edit.
+    // Determine the ids of message bundles that are invalidated by this edit.
     let lines = lineMap.linesAffected(by: editedRange, changeInLength: delta)
     lastInvalidatedMessageIDs = lines.compactMap{ lineMap.lookup(line: $0)?.info?.messages?.id  }
 

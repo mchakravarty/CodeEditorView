@@ -176,10 +176,6 @@ public struct CodeEditor {
     ///
     fileprivate var updatingView = false
 
-    /// This is the last observed value of `messages`, to enable us to compute the difference in the next update.
-    ///
-    fileprivate var lastMessages: Set<TextLocated<Message>> = Set()
-
     /// The current set of code actions, which, on setting, are immediately propagated to the context.
     ///
     fileprivate var actions: Actions = Actions() {
@@ -207,7 +203,8 @@ extension CodeEditor: UIViewRepresentable {
     let codeView = CodeView(frame: CGRect(x: 0, y: 0, width: 100, height: 40),
                             with: language,
                             viewLayout: layout,
-                            theme: context.environment.codeEditorTheme)
+                            theme: context.environment.codeEditorTheme,
+                            setMessages: { messages = $0 })
 
     codeView.text = text
     if let delegate = codeView.delegate as? CodeViewDelegate {
@@ -225,7 +222,7 @@ extension CodeEditor: UIViewRepresentable {
     codeView.verticalScrollPosition = position.verticalScrollPosition
 
     // Report the initial message set
-    DispatchQueue.main.async { updateMessages(in: codeView, with: context) }
+    DispatchQueue.main.async { codeView.update(messages: messages) }
 
     // Set the initial actions
     context.coordinator.actions = Actions(info: codeView.infoAction)
@@ -240,7 +237,7 @@ extension CodeEditor: UIViewRepresentable {
     let theme     = context.environment.codeEditorTheme,
         selection = position.selections.first ?? .zero
 
-    updateMessages(in: codeView, with: context)
+    codeView.update(messages: messages)
     if text != textView.text { textView.text = text }  // Hoping for the string comparison fast path...
     if selection != codeView.selectedRange { codeView.selectedRange = selection }
     if abs(position.verticalScrollPosition - textView.verticalScrollPosition) > 0.0001 {
@@ -301,7 +298,8 @@ extension CodeEditor: NSViewRepresentable {
     let codeView = CodeView(frame: CGRect(x: 0, y: 0, width: 100, height: 40),
                             with: language,
                             viewLayout: layout,
-                            theme: context.environment.codeEditorTheme)
+                            theme: context.environment.codeEditorTheme,
+                            setMessages: { messages = $0 })
     codeView.isVerticallyResizable   = true
     codeView.isHorizontallyResizable = false
     codeView.autoresizingMask        = .width
@@ -335,7 +333,7 @@ extension CodeEditor: NSViewRepresentable {
         }
 
     // Report the initial message set
-    DispatchQueue.main.async{ updateMessages(in: codeView, with: context) }
+    DispatchQueue.main.async{ codeView.update(messages: messages) }
 
     // Break undo coalescing whenever we get a trigger over the corresponding subject.
     context.coordinator.breakUndoCoalescingCancellable = breakUndoCoalescing?.sink { _ in
@@ -368,7 +366,7 @@ extension CodeEditor: NSViewRepresentable {
     let theme                      = context.environment.codeEditorTheme,
         selections                 = position.selections.map{ NSValue(range: $0) }
 
-    updateMessages(in: codeView, with: context)
+    codeView.update(messages: messages)
     if text != codeView.string { codeView.string = text }  // Hoping for the string comparison fast path...
     if selections != codeView.selectedRanges { codeView.selectedRanges = selections }
     if abs(position.verticalScrollPosition - scrollView.verticalScrollPosition) > 0.0001 {
@@ -421,32 +419,6 @@ extension CodeEditor: NSViewRepresentable {
 
 // MARK: -
 // MARK: Shared code
-
-extension CodeEditor {
-
-  // MARK: Messages
-
-  /// Update messages for a code view in the given context.
-  ///
-  private func updateMessages(in codeView: CodeView, with context: Context) {
-    update(oldMessages: context.coordinator.lastMessages, to: messages, in: codeView)
-    context.coordinator.lastMessages = messages
-  }
-
-  /// Update the message set of the given code view.
-  ///
-  private func update(oldMessages: Set<TextLocated<Message>>,
-                      to updatedMessages: Set<TextLocated<Message>>,
-                      in codeView: CodeView)
-  {
-    let messagesToAdd    = updatedMessages.subtracting(oldMessages),
-        messagesToRemove = oldMessages.subtracting(updatedMessages)
-
-    for message in messagesToRemove { codeView.retract(message: message.entity) }
-    for message in messagesToAdd    { codeView.report(message: message) }
-  }
-}
-
 
 // MARK: Themes
 
