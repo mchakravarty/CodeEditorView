@@ -116,6 +116,7 @@ final class CodeView: UITextView {
        with language: LanguageConfiguration,
        viewLayout: CodeEditor.LayoutConfiguration,
        theme: Theme,
+       setText: @escaping (String) -> Void,
        setMessages: @escaping (Set<TextLocated<Message>>) -> Void)
   {
 
@@ -133,7 +134,7 @@ final class CodeView: UITextView {
     textContentStorage.primaryTextLayoutManager = textLayoutManager
     textContentStorage.textStorage              = codeStorage
 
-    codeStorageDelegate = CodeStorageDelegate(with: language)
+    codeStorageDelegate = CodeStorageDelegate(with: language, setText: setText)
 
     super.init(frame: frame, textContainer: codeContainer)
     codeContainer.textView = self
@@ -444,11 +445,12 @@ final class CodeView: NSTextView {
        with language: LanguageConfiguration,
        viewLayout: CodeEditor.LayoutConfiguration,
        theme: Theme,
+       setText: @escaping (String) -> Void,
        setMessages: @escaping (Set<TextLocated<Message>>) -> Void)
   {
 
-    self.theme      = theme
-    self.viewLayout = viewLayout
+    self.theme       = theme
+    self.viewLayout  = viewLayout
     self.setMessages = setMessages
 
     // Use custom components that are gutter-aware and support code-specific editing actions and highlighting.
@@ -461,7 +463,7 @@ final class CodeView: NSTextView {
     textContentStorage.primaryTextLayoutManager = textLayoutManager
     textContentStorage.textStorage              = codeStorage
 
-    codeStorageDelegate = CodeStorageDelegate(with: language)
+    codeStorageDelegate = CodeStorageDelegate(with: language, setText: setText)
 
     super.init(frame: frame, textContainer: codeContainer)
 

@@ -108,7 +108,11 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
   let              language:        LanguageConfiguration
   private      let tokeniser:       LanguageConfiguration.Tokeniser?  // cache the tokeniser
   private(set) var languageService: LanguageService?  // instantiated language service if available
-  
+
+  /// Hook to propagate changes to the text store upwards in the view hierarchy.
+  ///
+  let setText: (String) -> Void
+
   private(set) var lineMap = LineMap<LineInfo>(string: "")
 
   /// The message bundle IDs that got invalidated by the last editing operation because the lines to which they were
@@ -136,9 +140,10 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
 
   // MARK: Initialisers
 
-  init(with language: LanguageConfiguration) {
+  init(with language: LanguageConfiguration, setText: @escaping (String) -> Void) {
     self.language  = language
     self.tokeniser = Tokeniser(for: language.tokenDictionary)
+    self.setText   = setText
     super.init()
   }
   
@@ -237,6 +242,23 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
     if visualDebugging {
       textStorage.addAttribute(.backgroundColor, value: visualDebuggingEditedColour, range: editedRange)
     }
+
+    // MARK: [Note Propagating text changes into SwiftUI]
+    // We need to trigger the propagation of text changes via the binding passed to the `CodeEditor` view here and *not*
+    // in the `NSTextViewDelegate` or `UITextViewDelegate`. The reason for this is the composition of characters with
+    // diacritics using muliple key strokes. Until the composition is complete, the already entered composing characters
+    // are indicated by marked text and do *not* lead to the signaling of text changes by `NSTextViewDelegate` or
+    // `UITextViewDelegate`, although they *do* alter the text storage. However, the methods of `NSTextStorageDelegate`
+    // are invoked at each step of the composition process, faithfully representing the state changes of the text
+    // storage.
+    //
+    // Why is this important? Because `CodeEditor.updateNSView(_:context:)` and `CodeEditor.updateUIView(_:context:)`
+    // compare the current contents of the text binding with the current contents of the text storage to determine
+    // whether the latter needs to be updated. If the text storage changes without propagating the change to the
+    // binding, this check inside `CodeEditor.updateNSView(_:context:)` and `CodeEditor.updateUIView(_:context:)` will
+    // suggest that the text storage needs to be overwritten by the contents of the binding, incorrectly removing any
+    // entered composing characters (i.e., the marked text).
+    setText(textStorage.string)
 
     // Notify language service (if attached)
     let text         = (textStorage.string as NSString).substring(with: editedRange),

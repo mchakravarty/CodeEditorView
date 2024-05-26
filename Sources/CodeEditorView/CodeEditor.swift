@@ -200,10 +200,20 @@ public struct CodeEditor {
 extension CodeEditor: UIViewRepresentable {
 
   public func makeUIView(context: Context) -> UITextView {
+
+    // We pass this function down into `CodeStorageDelegate` to facilitate updates to the `text` binding. For details,
+    // see [Note Propagating text changes into SwiftUI].
+    func setText(_ text: String) {
+      guard !context.coordinator.updatingView else { return }
+
+      if self.text != text { self.text = text }
+    }
+
     let codeView = CodeView(frame: CGRect(x: 0, y: 0, width: 100, height: 40),
                             with: language,
                             viewLayout: layout,
                             theme: context.environment.codeEditorTheme,
+                            setText: setText(_:),
                             setMessages: { messages = $0 })
 
     codeView.text = text
@@ -255,11 +265,8 @@ extension CodeEditor: UIViewRepresentable {
 
   public final class Coordinator: _Coordinator {
 
-    func textDidChange(_ textView: UITextView) {
-      guard !updatingView else { return }
-
-      if self.text != textView.text { self.text = textView.text }
-    }
+    // Update of `self.text` happens in `CodeStorageDelegate` — see [Note Propagating text changes into SwiftUI].
+    func textDidChange(_ textView: UITextView) { }
 
     func selectionDidChange(_ textView: UITextView) {
       guard !updatingView else { return }
@@ -287,6 +294,14 @@ extension CodeEditor: NSViewRepresentable {
 
   public func makeNSView(context: Context) -> NSScrollView {
 
+    // We pass this function down into `CodeStorageDelegate` to facilitate updates to the `text` binding. For details,
+    // see [Note Propagating text changes into SwiftUI].
+    func setText(_ text: String) {
+      guard !context.coordinator.updatingView else { return }
+
+      if self.text != text { self.text = text }
+    }
+
     // Set up scroll view
     let scrollView = NSScrollView(frame: CGRect(x: 0, y: 0, width: 100, height: 40))
     scrollView.borderType          = .noBorder
@@ -299,6 +314,7 @@ extension CodeEditor: NSViewRepresentable {
                             with: language,
                             viewLayout: layout,
                             theme: context.environment.codeEditorTheme,
+                            setText: setText(_:),
                             setMessages: { messages = $0 })
     codeView.isVerticallyResizable   = true
     codeView.isHorizontallyResizable = false
@@ -391,11 +407,8 @@ extension CodeEditor: NSViewRepresentable {
       if let observer = boundsChangedNotificationObserver { NotificationCenter.default.removeObserver(observer) }
     }
 
-    func textDidChange(_ textView: NSTextView) {
-      guard !updatingView else { return }
-
-      if self.text != textView.string { self.text = textView.string }
-    }
+    // Update of `self.text` happens in `CodeStorageDelegate` — see [Note Propagating text changes into SwiftUI].
+    func textDidChange(_ textView: NSTextView) { }
 
     func selectionDidChange(_ textView: NSTextView) {
       guard !updatingView else { return }
