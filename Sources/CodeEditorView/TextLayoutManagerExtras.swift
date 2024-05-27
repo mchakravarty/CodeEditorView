@@ -8,6 +8,9 @@
 import SwiftUI
 
 
+// MARK: -
+// MARK: 'NSTextLayoutFragment' extras
+
 extension NSTextLayoutFragment {
 
   /// Yield the layout fragment's frame, but without the height of an extra line fragment if present.
@@ -66,6 +69,10 @@ extension NSTextLayoutFragment {
     }
   }
 }
+
+
+// MARK: -
+// MARK: 'NSTextLayoutManager' extras
 
 extension NSTextLayoutManager {
   
@@ -214,7 +221,7 @@ extension NSTextLayoutManager {
     }
   }
 
-  /// A set of string attributes together with a text range to which theu apply.
+  /// A set of string attributes together with a text range to which they apply.
   ///
   typealias AttributeRun = (attributes: [NSAttributedString.Key : Any], textRange: NSTextRange)
 
@@ -228,5 +235,68 @@ extension NSTextLayoutManager {
     var attributes: [(attributes: [NSAttributedString.Key : Any], textRange: NSTextRange)] = []
     enumerateRenderingAttributes(in: textRange, reverse: false) { attributes.append((attributes: $1, textRange: $2)) }
     return attributes
+  }
+}
+
+
+// MARK: -
+// MARK: 'NSTextLayoutManager' workaround
+
+// There appears to be a bug in the implementation of 'NSTextLayoutManager' on at least macOS 14. Specifically, during
+// processing of an edit operation, a closure stored in `renderingAttributesValidator` gets called before the layout
+// manager has updated its data structures to text locations *after* the edit. As a result, calls to
+// `setRenderingAttributes(_:for:)` (and related methods) will set rendering attributes in the vicinity of the edit
+// location for shifted character ranges (if the edit operation changes the length of the text).
+//
+// It turns out that we can work around this issue by delaying the calls to `setRenderingAttributes(_:for:)` until after
+// `NSTextContentManager.hasEditingTransaction` is `false`. We achieve this by using KVO to observe
+// `hasEditingTransaction`, in order to trigger attribute setting after the editing transaction has completed.
+
+extension NSTextLayoutManager {
+
+  private final class PendingTextLayoutFragments {
+    var fragments: [NSTextLayoutFragment] = []
+  }
+  
+  /// Set the rendering attribute validator in a way that it avoids the timing bug with updating internal layout
+  /// manager structures on (at least) macOS 14.
+  ///
+  /// - Parameter renderingAttributesValidator: The validator to set.
+  /// - Returns: A KVO object that needs to be retained until this validator is no longer needed.
+  ///
+  func setSafeRenderingAttributesValidator(_ renderingAttributesValidator:
+                                           @escaping (NSTextLayoutManager, NSTextLayoutFragment) -> Void)
+  -> NSKeyValueObservation?
+  {
+    guard let textContentManager else {
+
+      self.renderingAttributesValidator = renderingAttributesValidator
+      return nil
+
+    }
+
+    let pendingFragments = PendingTextLayoutFragments()
+
+    self.renderingAttributesValidator = { textLayoutManager, textLayoutFragment in
+
+      // If we are within an editing transaction, delay setting attributes.
+      if let textContentManager = textLayoutManager.textContentManager,
+         textContentManager.hasEditingTransaction
+      {
+        pendingFragments.fragments.append(textLayoutFragment)
+      } else {
+        renderingAttributesValidator(textLayoutManager, textLayoutFragment)
+      }
+    }
+
+    return textContentManager.observe(\.hasEditingTransaction) {
+      [self, renderingAttributesValidator, pendingFragments] textContentManager, change in
+
+      guard !textContentManager.hasEditingTransaction else { return }
+
+      let fragments = pendingFragments.fragments
+      pendingFragments.fragments = []
+      fragments.forEach { renderingAttributesValidator(self, $0) }
+    }
   }
 }

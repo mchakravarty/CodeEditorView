@@ -148,13 +148,6 @@ extension CodeStorage {
 
   func setHighlightingAttributes(for range: NSRange, in layoutManager: NSTextLayoutManager)
   {
-    // We cannot inline the body of the task, because `setRenderingAttributes` will not correctly interpret the text
-    // ranges in the case that we are in an edit operation. It is also undesirable to dispatch this block to the main
-    // queue as this will introduce a visible delay in the rendering of the highlighting.
-    //
-    // The "non-sendable type" warnings are rather unfortunate, but I don't have a better solution right now.
-    // Suggestions are welcome!
-    Task {
       guard let contentStorage = layoutManager.textContentManager as? NSTextContentStorage
       else { return }
 
@@ -171,7 +164,6 @@ extension CodeStorage {
           layoutManager.setRenderingAttributes([.foregroundColor: colour], for: textRange)
         }
       }
-    }
   }
 }
 
@@ -497,7 +489,8 @@ class CodeContentStorage: NSTextContentStorage {
       for textLayoutManager in textLayoutManagers {
 
         // Invalidate the rendering attributes for syntax highlighting in the entire invalidated token range.
-        textLayoutManager.invalidateRenderingAttributes(for: invalidationTextRange)
+        print("invalidating range = \(invalidationTextRange)")
+//        textLayoutManager.invalidateRenderingAttributes(for: invalidationTextRange)
         if delta > 1,
            let textLayoutManagerDelegate = textLayoutManager.delegate,
            textLayoutManagerDelegate.isKind(of: MinimapTextLayoutManagerDelegate.self)

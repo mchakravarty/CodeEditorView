@@ -110,6 +110,10 @@ final class CodeView: UITextView {
   ///
   var messageViews: MessageViews = [:]
 
+  /// KVO observations that need to be retained.
+  ///
+  var observations: [NSKeyValueObservation] = []
+
   /// Designated initializer for code views with a gutter.
   ///
   init(frame: CGRect, 
@@ -139,11 +143,11 @@ final class CodeView: UITextView {
     super.init(frame: frame, textContainer: codeContainer)
     codeContainer.textView = self
 
-    textLayoutManager.renderingAttributesValidator = { (textLayoutManager, layoutFragment) in
+    textLayoutManager.setSafeRenderingAttributesValidator { (textLayoutManager, layoutFragment) in
       guard let textContentStorage = textLayoutManager.textContentManager as? NSTextContentStorage else { return }
       codeStorage.setHighlightingAttributes(for: textContentStorage.range(for: layoutFragment.rangeInElement),
                                             in: textLayoutManager)
-    }
+    }.flatMap { observations.append($0) }
 
     // We can't do this — see [Note NSTextViewportLayoutControllerDelegate].
     //
@@ -213,11 +217,11 @@ final class CodeView: UITextView {
     // content storage, so that code view and minimap use the same content.
     minimapView.textLayoutManager?.replace(textContentStorage)
     textContentStorage.primaryTextLayoutManager = textLayoutManager
-    minimapView.textLayoutManager?.renderingAttributesValidator = { (minimapLayoutManager, layoutFragment) in
+    minimapView.textLayoutManager?.setSafeRenderingAttributesValidator { (minimapLayoutManager, layoutFragment) in
       guard let textContentStorage = minimapLayoutManager.textContentManager as? NSTextContentStorage else { return }
       codeStorage.setHighlightingAttributes(for: textContentStorage.range(for: layoutFragment.rangeInElement),
                                             in: minimapLayoutManager)
-    }
+    }.flatMap { observations.append($0) }
     minimapView.textLayoutManager?.delegate = minimapTextLayoutManagerDelegate
 
     minimapView.isScrollEnabled                    = false
@@ -355,7 +359,7 @@ final class CodeBackgroundHighlightView: UIView {
 // MARK: AppKit version
 
 /// `NSTextView` with a gutter
-///
+///  
 final class CodeView: NSTextView {
 
   // Delegates
@@ -439,6 +443,10 @@ final class CodeView: NSTextView {
   ///
   var capabilitiesWindow: CapabilitiesWindow?
 
+  /// KVO observations that need to be retained.
+  ///
+  var observations: [NSKeyValueObservation] = []
+
   /// Designated initialiser for code views with a gutter.
   ///
   init(frame: CGRect, 
@@ -467,11 +475,12 @@ final class CodeView: NSTextView {
 
     super.init(frame: frame, textContainer: codeContainer)
 
-    textLayoutManager.renderingAttributesValidator = { (textLayoutManager, layoutFragment) in
+    textLayoutManager.setSafeRenderingAttributesValidator { (textLayoutManager, layoutFragment) in
       guard let textContentStorage = textLayoutManager.textContentManager as? NSTextContentStorage else { return }
+
       codeStorage.setHighlightingAttributes(for: textContentStorage.range(for: layoutFragment.rangeInElement),
                                             in: textLayoutManager)
-    }
+    }.flatMap { observations.append($0) }
 
     // We can't do this — see [Note NSTextViewportLayoutControllerDelegate].
     //
@@ -557,11 +566,11 @@ final class CodeView: NSTextView {
     // content storage, so that code view and minimap use the same content.
     minimapView.textLayoutManager?.replace(textContentStorage)
     textContentStorage.primaryTextLayoutManager = textLayoutManager
-    minimapView.textLayoutManager?.renderingAttributesValidator = { (minimapLayoutManager, layoutFragment) in
+    minimapView.textLayoutManager?.setSafeRenderingAttributesValidator { (minimapLayoutManager, layoutFragment) in
       guard let textContentStorage = minimapLayoutManager.textContentManager as? NSTextContentStorage else { return }
       codeStorage.setHighlightingAttributes(for: textContentStorage.range(for: layoutFragment.rangeInElement),
                                             in: minimapLayoutManager)
-    }
+    }.flatMap { observations.append($0) }
     minimapView.textLayoutManager?.delegate = minimapTextLayoutManagerDelegate
 
     let font = theme.font
