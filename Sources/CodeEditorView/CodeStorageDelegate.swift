@@ -124,6 +124,10 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
   /// together with its range until the next text change.
   ///
   private var lastTypedToken: LanguageConfiguration.Tokeniser.Token?
+  
+  /// Indicates whether the current editing round is for a wholesale replacement of the text.
+  /// 
+  private(set) var processingStringReplacement: Bool = false
 
   /// Indicates whether the current editing round is for a one-character addition to the text.
   ///
@@ -209,6 +213,8 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
 
     lineMap.updateAfterEditing(string: textStorage.string, range: editedRange, changeInLength: delta)
     var highlightingRange = tokenise(range: editedRange, in: textStorage)
+
+    processingStringReplacement = editedRange == NSRange(location: 0, length: textStorage.length)
 
     // If a single character was added, process token-level completion steps (and remember that we are processing a
     // one character addition).
@@ -737,7 +743,7 @@ extension CodeStorageDelegate {
         codeStorage.replaceCharacters(in: NSRange(location: index + 1, length: 0), with: string)
 
       }
-      return completingString?.count ?? 0
+      return completingString?.utf16.count ?? 0
 
     } else { return 0 }
   }

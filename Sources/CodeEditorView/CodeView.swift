@@ -110,10 +110,6 @@ final class CodeView: UITextView {
   ///
   var messageViews: MessageViews = [:]
 
-  /// KVO observations that need to be retained.
-  ///
-  var observations: [NSKeyValueObservation] = []
-
   /// Designated initializer for code views with a gutter.
   ///
   init(frame: CGRect, 
@@ -143,11 +139,11 @@ final class CodeView: UITextView {
     super.init(frame: frame, textContainer: codeContainer)
     codeContainer.textView = self
 
-    textLayoutManager.setSafeRenderingAttributesValidator { (textLayoutManager, layoutFragment) in
+    textLayoutManager.renderingAttributesValidator = { (textLayoutManager, layoutFragment) in
       guard let textContentStorage = textLayoutManager.textContentManager as? NSTextContentStorage else { return }
       codeStorage.setHighlightingAttributes(for: textContentStorage.range(for: layoutFragment.rangeInElement),
                                             in: textLayoutManager)
-    }.flatMap { observations.append($0) }
+    }
 
     // We can't do this — see [Note NSTextViewportLayoutControllerDelegate].
     //
@@ -217,11 +213,11 @@ final class CodeView: UITextView {
     // content storage, so that code view and minimap use the same content.
     minimapView.textLayoutManager?.replace(textContentStorage)
     textContentStorage.primaryTextLayoutManager = textLayoutManager
-    minimapView.textLayoutManager?.setSafeRenderingAttributesValidator { (minimapLayoutManager, layoutFragment) in
+    minimapView.textLayoutManager?.renderingAttributesValidator = { (minimapLayoutManager, layoutFragment) in
       guard let textContentStorage = minimapLayoutManager.textContentManager as? NSTextContentStorage else { return }
       codeStorage.setHighlightingAttributes(for: textContentStorage.range(for: layoutFragment.rangeInElement),
                                             in: minimapLayoutManager)
-    }.flatMap { observations.append($0) }
+    }
     minimapView.textLayoutManager?.delegate = minimapTextLayoutManagerDelegate
 
     minimapView.isScrollEnabled                    = false
@@ -366,6 +362,7 @@ final class CodeView: NSTextView {
   fileprivate let codeViewDelegate =                 CodeViewDelegate()
   fileprivate var codeStorageDelegate:               CodeStorageDelegate
   fileprivate let minimapTextLayoutManagerDelegate = MinimapTextLayoutManagerDelegate()
+  fileprivate let minimapCodeViewDelegate =          CodeViewDelegate()
 
   // Subviews
   var gutterView:               GutterView?
@@ -475,7 +472,7 @@ final class CodeView: NSTextView {
 
     super.init(frame: frame, textContainer: codeContainer)
 
-    textLayoutManager.setSafeRenderingAttributesValidator { (textLayoutManager, layoutFragment) in
+    textLayoutManager.setSafeRenderingAttributesValidator(with: codeViewDelegate) { (textLayoutManager, layoutFragment) in
       guard let textContentStorage = textLayoutManager.textContentManager as? NSTextContentStorage else { return }
 
       codeStorage.setHighlightingAttributes(for: textContentStorage.range(for: layoutFragment.rangeInElement),
@@ -566,7 +563,10 @@ final class CodeView: NSTextView {
     // content storage, so that code view and minimap use the same content.
     minimapView.textLayoutManager?.replace(textContentStorage)
     textContentStorage.primaryTextLayoutManager = textLayoutManager
-    minimapView.textLayoutManager?.setSafeRenderingAttributesValidator { (minimapLayoutManager, layoutFragment) in
+    minimapView.delegate = minimapCodeViewDelegate
+    minimapView.textLayoutManager?.setSafeRenderingAttributesValidator(with: 
+                                                                        minimapCodeViewDelegate) { (minimapLayoutManager,
+                                                                                                    layoutFragment) in
       guard let textContentStorage = minimapLayoutManager.textContentManager as? NSTextContentStorage else { return }
       codeStorage.setHighlightingAttributes(for: textContentStorage.range(for: layoutFragment.rangeInElement),
                                             in: minimapLayoutManager)

@@ -323,10 +323,17 @@ extension CodeEditor: NSViewRepresentable {
     // Embed text view in scroll view
     scrollView.documentView = codeView
 
-    codeView.string = text
+    // NB: We are not setting `codeView.text` here. That will happen via `updateNSView(:)`.
+
     if let delegate = codeView.delegate as? CodeViewDelegate {
 
-      delegate.textDidChange      = context.coordinator.textDidChange
+      // The property `delegate.textDidChange` is expected to alreayd have been set during initialisation of the
+      // `CodeView`. Hence, we add to it; instead of just overwriting it.
+      let currentTextDidChange = delegate.textDidChange
+      delegate.textDidChange = { [currentTextDidChange] textView in
+        context.coordinator.textDidChange(textView)
+        currentTextDidChange?(textView)
+      }
       delegate.selectionDidChange = { textView in
         selectionDidChange(textView)
         context.coordinator.selectionDidChange(textView)

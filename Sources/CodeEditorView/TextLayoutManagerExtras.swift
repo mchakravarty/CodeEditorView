@@ -251,6 +251,10 @@ extension NSTextLayoutManager {
 // It turns out that we can work around this issue by delaying the calls to `setRenderingAttributes(_:for:)` until after
 // `NSTextContentManager.hasEditingTransaction` is `false`. We achieve this by using KVO to observe
 // `hasEditingTransaction`, in order to trigger attribute setting after the editing transaction has completed.
+//
+// Unfortunately, the fix involving `NSTextContentManager.hasEditingTransaction`, on its own, is not sufficient, as
+// `hasEditingTransaction` is not being used in case of a a paste command or in case of an undo/redo. In these cases,
+// we wait until the `CodeViewDelegate` receives a `textDidChange` notification to trigger setting the attributes.
 
 extension NSTextLayoutManager {
 
@@ -261,11 +265,14 @@ extension NSTextLayoutManager {
   /// Set the rendering attribute validator in a way that it avoids the timing bug with updating internal layout
   /// manager structures on (at least) macOS 14.
   ///
-  /// - Parameter renderingAttributesValidator: The validator to set.
+  /// - Parameters:
+  ///   - codeViewDelegate: The code view delegate whose `textDidChange` hook ought to be used for setting attributes.
+  ///   - renderingAttributesValidator: The validator to set.
   /// - Returns: A KVO object that needs to be retained until this validator is no longer needed.
   ///
-  func setSafeRenderingAttributesValidator(_ renderingAttributesValidator:
-                                           @escaping (NSTextLayoutManager, NSTextLayoutFragment) -> Void)
+  func setSafeRenderingAttributesValidator(with codeViewDelegate: CodeViewDelegate,
+                                           _ renderingAttributesValidator:
+                                             @escaping (NSTextLayoutManager, NSTextLayoutFragment) -> Void)
   -> NSKeyValueObservation?
   {
     guard let textContentManager else {
@@ -279,24 +286,39 @@ extension NSTextLayoutManager {
 
     self.renderingAttributesValidator = { textLayoutManager, textLayoutFragment in
 
-      // If we are within an editing transaction, delay setting attributes.
-      if let textContentManager = textLayoutManager.textContentManager,
-         textContentManager.hasEditingTransaction
+      // We delay setting attributes, except if the entire text has been replaced by a new one. In that case, it is
+      // fine to set the attributes right away.
+      if let textContentStorage  = textLayoutManager.textContentManager as? NSTextContentStorage,
+         let codeStorageDelegate = textContentStorage.textStorage?.delegate as? CodeStorageDelegate,
+         codeStorageDelegate.processingStringReplacement
       {
-        pendingFragments.fragments.append(textLayoutFragment)
-      } else {
         renderingAttributesValidator(textLayoutManager, textLayoutFragment)
+      } else {
+        pendingFragments.fragments.append(textLayoutFragment)
       }
     }
 
-    return textContentManager.observe(\.hasEditingTransaction) {
-      [self, renderingAttributesValidator, pendingFragments] textContentManager, change in
-
-      guard !textContentManager.hasEditingTransaction else { return }
-
+    func processFragements() {
       let fragments = pendingFragments.fragments
       pendingFragments.fragments = []
-      fragments.forEach { renderingAttributesValidator(self, $0) }
+      fragments.forEach {
+        renderingAttributesValidator(self, $0) }
+    }
+
+    // After a text change is reported to the view's delegate, always process all pending fragments.
+    let currentTextDidChange = codeViewDelegate.textDidChange
+    codeViewDelegate.textDidChange = { textView in
+      currentTextDidChange?(textView)
+      processFragements()
+    }
+
+    return textContentManager.observe(\.hasEditingTransaction) {
+      [processFragements] textContentManager, change in
+
+      // Process fragments if an editing transaction just ended.
+      guard !textContentManager.hasEditingTransaction else { return }
+      processFragements()
+
     }
   }
 }

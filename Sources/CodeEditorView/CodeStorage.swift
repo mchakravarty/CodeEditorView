@@ -77,7 +77,7 @@ class CodeStorage: NSTextStorage {
        let deletedToken = token(at: range.location).token,
        let language     = (delegate as? CodeStorageDelegate)?.language,
        deletedToken.token.isOpenBracket
-        && range.location + 1 < string.utf16.count
+        && range.location + 1 < length
         && language.lexeme(of: deletedToken.token)?.count == 1
         && token(at: range.location + 1).token?.token == deletedToken.token.matchingBracket
     {
@@ -489,8 +489,7 @@ class CodeContentStorage: NSTextContentStorage {
       for textLayoutManager in textLayoutManagers {
 
         // Invalidate the rendering attributes for syntax highlighting in the entire invalidated token range.
-        print("invalidating range = \(invalidationTextRange)")
-//        textLayoutManager.invalidateRenderingAttributes(for: invalidationTextRange)
+        textLayoutManager.invalidateRenderingAttributes(for: invalidationTextRange)
         if delta > 1,
            let textLayoutManagerDelegate = textLayoutManager.delegate,
            textLayoutManagerDelegate.isKind(of: MinimapTextLayoutManagerDelegate.self)

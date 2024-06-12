@@ -244,8 +244,8 @@ struct LineMap<LineInfo> {
     // edited range ends on a newline, this may insert a new line break, which means, we also need to update the line
     // *after* the new line break.
     //
-    let newStringRange      = NSRange(location: 0, length: string.count),
-        nsString            = string as NSString,
+    let nsString            = string as NSString,
+        newStringRange      = NSRange(location: 0, length: nsString.length),
         oldLinesRange       = linesAffected(by: editedRange, changeInLength: delta),  // NB: `linesAffected` extends itself
         extendedEditedRange = extend(range: editedRange, clippingTo: newStringRange),
         newLinesRange       = nsString.lineRange(for: extendedEditedRange),
