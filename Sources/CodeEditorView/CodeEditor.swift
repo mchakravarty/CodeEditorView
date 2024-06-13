@@ -389,7 +389,7 @@ extension CodeEditor: NSViewRepresentable {
     let theme                      = context.environment.codeEditorTheme,
         selections                 = position.selections.map{ NSValue(range: $0) }
 
-    codeView.update(messages: messages)
+    if codeView.lastMessages != messages { codeView.update(messages: messages) }
     if text != codeView.string { codeView.string = text }  // Hoping for the string comparison fast path...
     if selections != codeView.selectedRanges { codeView.selectedRanges = selections }
     if abs(position.verticalScrollPosition - scrollView.verticalScrollPosition) > 0.0001 {
