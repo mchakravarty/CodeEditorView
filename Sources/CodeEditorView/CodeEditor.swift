@@ -247,7 +247,7 @@ extension CodeEditor: UIViewRepresentable {
     let theme     = context.environment.codeEditorTheme,
         selection = position.selections.first ?? .zero
 
-    codeView.update(messages: messages)
+    if codeView.lastMessages != messages { codeView.update(messages: messages) }
     if text != textView.text { textView.text = text }  // Hoping for the string comparison fast path...
     if selection != codeView.selectedRange { codeView.selectedRange = selection }
     if abs(position.verticalScrollPosition - textView.verticalScrollPosition) > 0.0001 {
