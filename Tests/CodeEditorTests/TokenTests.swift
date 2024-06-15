@@ -25,7 +25,7 @@ final class TokenTests: XCTestCase {
 // 15 "abc"
 let str = "xyz"
 """
-    let codeStorageDelegate = CodeStorageDelegate(with: .swift()),
+    let codeStorageDelegate = CodeStorageDelegate(with: .swift(), setText: { _ in }),
         codeStorage         = CodeStorage(theme: .defaultLight)
     codeStorage.delegate = codeStorageDelegate
 
@@ -44,7 +44,8 @@ let str = "xyz"
     // Line 2
     XCTAssertEqual(lineMap.lookup(line: 1)?.info?.tokens,
                    [ Tokeniser.Token(token: .keyword, range: NSRange(location: 0, length: 3))
-                     , Tokeniser.Token(token: .identifier(.none), range: NSRange(location: 4, length: 3))
+                   , Tokeniser.Token(token: .identifier(.none), range: NSRange(location: 4, length: 3))
+                   , Tokeniser.Token(token: .symbol, range: NSRange(location: 8, length: 1))
                    , Tokeniser.Token(token: .string, range: NSRange(location: 10, length: 5))])
     XCTAssertEqual(lineMap.lookup(line: 1)?.info?.commentRanges, [])
   }
@@ -55,7 +56,7 @@ let str = "xyz"
 //
 // A Test
 """
-    let codeStorageDelegate = CodeStorageDelegate(with: .swift()),
+    let codeStorageDelegate = CodeStorageDelegate(with: .swift(), setText: { _ in }),
         codeStorage         = CodeStorage(theme: .defaultLight)
     codeStorage.delegate = codeStorageDelegate
 
@@ -72,8 +73,8 @@ let str = "xyz"
     // Line 2
     XCTAssertEqual(lineMap.lookup(line: 1)?.info?.tokens,
                    [ Tokeniser.Token(token: .singleLineComment, range: NSRange(location: 0, length: 2))
-                     , Tokeniser.Token(token: .identifier(.none), range: NSRange(location: 3, length: 1))
-                     , Tokeniser.Token(token: .identifier(.none), range: NSRange(location: 5, length: 4))])
+                   , Tokeniser.Token(token: .identifier(.none), range: NSRange(location: 3, length: 1))
+                   , Tokeniser.Token(token: .identifier(.none), range: NSRange(location: 5, length: 4))])
     XCTAssertEqual(lineMap.lookup(line: 1)?.info?.commentRanges, [NSRange(location: 0, length: 9)])
   }
 
@@ -83,7 +84,7 @@ let str = "xyz"
 // 15 "abc"
 let str = "xyz"\n
 """
-    let codeStorageDelegate = CodeStorageDelegate(with: .swift()),
+    let codeStorageDelegate = CodeStorageDelegate(with: .swift(), setText: { _ in }),
         codeStorage         = CodeStorage(theme: .defaultLight)
     codeStorage.delegate = codeStorageDelegate
 
@@ -103,7 +104,7 @@ let str = "xyz"\n
 let str = "xyz" // 15 "abc"
 test
 """
-    let codeStorageDelegate = CodeStorageDelegate(with: .swift()),
+    let codeStorageDelegate = CodeStorageDelegate(with: .swift(), setText: { _ in }),
         codeStorage         = CodeStorage(theme: .defaultLight)
     codeStorage.delegate = codeStorageDelegate
 
@@ -115,7 +116,8 @@ test
     // Line 1
     XCTAssertEqual(lineMap.lookup(line: 0)?.info?.tokens,
                    [ Tokeniser.Token(token: .keyword, range: NSRange(location: 0, length: 3))
-                     , Tokeniser.Token(token: .identifier(.none), range: NSRange(location: 4, length: 3))
+                   , Tokeniser.Token(token: .identifier(.none), range: NSRange(location: 4, length: 3))
+                   , Tokeniser.Token(token: .symbol, range: NSRange(location: 8, length: 1))
                    , Tokeniser.Token(token: .string, range: NSRange(location: 10, length: 5))
                    , Tokeniser.Token(token: .singleLineComment, range: NSRange(location: 16, length: 2))
                    , Tokeniser.Token(token: .number, range: NSRange(location: 19, length: 2))
@@ -130,7 +132,7 @@ let str = "xyz"
   let x = 15 // 15 "abc"
 test
 """
-    let codeStorageDelegate = CodeStorageDelegate(with: .swift()),
+    let codeStorageDelegate = CodeStorageDelegate(with: .swift(), setText: { _ in }),
         codeStorage         = CodeStorage(theme: .defaultLight)
     codeStorage.delegate = codeStorageDelegate
 
@@ -142,12 +144,14 @@ test
     // Line 1
     XCTAssertEqual(lineMap.lookup(line: 0)?.info?.tokens,
                    [ Tokeniser.Token(token: .keyword, range: NSRange(location: 0, length: 3))
-                     , Tokeniser.Token(token: .identifier(.none), range: NSRange(location: 4, length: 3))
+                   , Tokeniser.Token(token: .identifier(.none), range: NSRange(location: 4, length: 3))
+                   , Tokeniser.Token(token: .symbol, range: NSRange(location: 8, length: 1))
                    , Tokeniser.Token(token: .string, range: NSRange(location: 10, length: 5))])
     // Line 2
     XCTAssertEqual(lineMap.lookup(line: 1)?.info?.tokens,
                    [ Tokeniser.Token(token: .keyword, range: NSRange(location: 2, length: 3))
-                     , Tokeniser.Token(token: .identifier(.none), range: NSRange(location: 6, length: 1))
+                   , Tokeniser.Token(token: .identifier(.none), range: NSRange(location: 6, length: 1))
+                   , Tokeniser.Token(token: .symbol, range: NSRange(location: 8, length: 1))
                    , Tokeniser.Token(token: .number, range: NSRange(location: 10, length: 2))
                    , Tokeniser.Token(token: .singleLineComment, range: NSRange(location: 13, length: 2))
                    , Tokeniser.Token(token: .number, range: NSRange(location: 16, length: 2))
