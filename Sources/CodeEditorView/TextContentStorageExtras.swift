@@ -41,9 +41,13 @@ extension NSTextContentStorage {
   /// Convert a character range to a text range within this text content storage.
   ///
   /// - Parameter range: The character range to convert.
-  /// - Returns: The corresponding text range in the underlying text storage.
+  /// - Returns: The corresponding text range in the underlying text storage if there exists a corresponding valid text
+  ///     range.
   ///
   func textRange(for range: NSRange) -> NSTextRange? {
+    // NB: `NSTextRange(location:end:)` crashes if `end` is before `start` (instead of returning `nil`).
+    guard range.length >= 0 else { return nil }
+
     if let start = location(documentRange.location, offsetBy: range.location),
        let end   = location(start, offsetBy: range.length)
     {

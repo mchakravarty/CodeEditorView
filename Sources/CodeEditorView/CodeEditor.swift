@@ -386,8 +386,8 @@ extension CodeEditor: NSViewRepresentable {
 
     codeView.breakUndoCoalescing()
 
-    let theme                      = context.environment.codeEditorTheme,
-        selections                 = position.selections.map{ NSValue(range: $0) }
+    let theme      = context.environment.codeEditorTheme,
+        selections = position.selections.map{ NSValue(range: $0) }
 
     if codeView.lastMessages != messages { codeView.update(messages: messages) }
     if text != codeView.string { codeView.string = text }  // Hoping for the string comparison fast path...

@@ -122,6 +122,8 @@ test
                    , Tokeniser.Token(token: .singleLineComment, range: NSRange(location: 16, length: 2))
                    , Tokeniser.Token(token: .number, range: NSRange(location: 19, length: 2))
                    , Tokeniser.Token(token: .string, range: NSRange(location: 22, length: 5))])
+
+    // Comment ranges
     XCTAssertEqual(lineMap.lookup(line: 0)?.info?.commentRanges, [NSRange(location: 16, length: 12)])
   }
 
@@ -163,11 +165,72 @@ test
     XCTAssertEqual(lineMap.lookup(line: 2)?.info?.commentRanges, [])
   }
 
+  func testTokeniseNestedComment() throws {
+    let code =
+"""
+let str = "xyz" /* 15 "abc"*/
+test
+"""
+    let codeStorageDelegate = CodeStorageDelegate(with: .swift(), setText: { _ in }),
+        codeStorage         = CodeStorage(theme: .defaultLight)
+    codeStorage.delegate = codeStorageDelegate
+
+    codeStorage.setAttributedString(NSAttributedString(string: code))  // this triggers tokenisation
+
+    let lineMap = codeStorageDelegate.lineMap
+    XCTAssertEqual(lineMap.lines.count, 2)    // code starts at line 1
+
+    // Line 1
+    XCTAssertEqual(lineMap.lookup(line: 0)?.info?.tokens,
+                   [ Tokeniser.Token(token: .keyword, range: NSRange(location: 0, length: 3))
+                   , Tokeniser.Token(token: .identifier(.none), range: NSRange(location: 4, length: 3))
+                   , Tokeniser.Token(token: .symbol, range: NSRange(location: 8, length: 1))
+                   , Tokeniser.Token(token: .string, range: NSRange(location: 10, length: 5))
+                   , Tokeniser.Token(token: .nestedCommentOpen, range: NSRange(location: 16, length: 2))
+                   , Tokeniser.Token(token: .nestedCommentClose, range: NSRange(location: 27, length: 2))])
+
+    // Comment ranges
+    XCTAssertEqual(lineMap.lookup(line: 0)?.info?.commentRanges, [NSRange(location: 16, length: 13)])
+    XCTAssertEqual(lineMap.lookup(line: 1)?.info?.commentRanges, [])
+  }
+
+  func testTokeniseMultiLineNestedComment() throws {
+    let code =
+"""
+let str = "xyz" /* 15 "abc"
+test */
+"""
+    let codeStorageDelegate = CodeStorageDelegate(with: .swift(), setText: { _ in }),
+        codeStorage         = CodeStorage(theme: .defaultLight)
+    codeStorage.delegate = codeStorageDelegate
+
+    codeStorage.setAttributedString(NSAttributedString(string: code))  // this triggers tokenisation
+
+    let lineMap = codeStorageDelegate.lineMap
+    XCTAssertEqual(lineMap.lines.count, 2)    // code starts at line 1
+
+    // Line 1
+    XCTAssertEqual(lineMap.lookup(line: 0)?.info?.tokens,
+                   [ Tokeniser.Token(token: .keyword, range: NSRange(location: 0, length: 3))
+                   , Tokeniser.Token(token: .identifier(.none), range: NSRange(location: 4, length: 3))
+                   , Tokeniser.Token(token: .symbol, range: NSRange(location: 8, length: 1))
+                   , Tokeniser.Token(token: .string, range: NSRange(location: 10, length: 5))
+                   , Tokeniser.Token(token: .nestedCommentOpen, range: NSRange(location: 16, length: 2))])
+    XCTAssertEqual(lineMap.lookup(line: 1)?.info?.tokens,
+                   [ Tokeniser.Token(token: .nestedCommentClose, range: NSRange(location: 5, length: 2))])
+
+    // Comment ranges
+    XCTAssertEqual(lineMap.lookup(line: 0)?.info?.commentRanges, [NSRange(location: 16, length: 12)])
+    XCTAssertEqual(lineMap.lookup(line: 1)?.info?.commentRanges, [NSRange(location: 0, length: 7)])
+  }
+
   static var allTests = [
     ("testSimpleTokenise", testSimpleTokenise),
     ("testTokeniseAllComment", testTokeniseAllComment),
     ("testTokeniseWithNewline", testTokeniseWithNewline),
     ("testTokeniseCommentAtEnd", testTokeniseCommentAtEnd),
     ("testTokeniseCommentAtEndMulti", testTokeniseCommentAtEndMulti),
+    ("testTokeniseNestedComment", testTokeniseNestedComment),
+    ("testTokeniseMultiLineNestedComment", testTokeniseMultiLineNestedComment),
   ]
 }
