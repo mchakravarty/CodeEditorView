@@ -145,7 +145,18 @@ extension CodeStorage {
       }
     }
   }
-
+  
+  // FIXME: We might want to change the interface here to set attributes per line. This will also make token enumeration simpler.
+  /// Set rendering attributes to implement token-based highlighting,
+  ///
+  /// - Parameters:
+  ///   - range: The text range for which renderring attributes ought to be set.
+  ///   - layoutManager: The layout manager on which the rendering attributes need to be set.
+  ///
+  ///   NB: The `range` shouldn't be to large as this is a fairly expensive operation. The text system has a bias
+  ///       towards performing the setting of attributes on a line by line bases (or rather a text layout fragment per
+  ///       text layout fragment basis).
+  ///
   func setHighlightingAttributes(for range: NSRange, in layoutManager: NSTextLayoutManager)
   {
       guard let contentStorage = layoutManager.textContentManager as? NSTextContentStorage
@@ -474,49 +485,42 @@ class CodeContentStorage: NSTextContentStorage {
                                changeInLength delta: Int,
                                invalidatedRange invalidatedCharRange: NSRange)
   {
+    // NB: It might seem that we can deal with the extended token invalidation range, given by
+    //     `codeStorageDelegate.tokenInvalidationRange`, by extending `invalidatedCharRange` appropriately. While
+    //      this triggers the appropriate redrawing on iOS, it is harmful for performance, as it invalidates the layout,
+    //      while we only want to redraw *the same layout* with different rendering attributes. Moreover, the extended
+    //      range seems to have no effect on macOS.
     super.processEditing(for: textStorage,
                          edited: editMask,
                          range: newCharRange,
                          changeInLength: delta,
                          invalidatedRange: invalidatedCharRange)
 
+    // If only attributes change, there is no need to adjust rendering attributes. (In fact, we may get here due to
+    // forcing redrawing of changed rendering attributes and then we would run into a loop if we don't bail out at this
+    // point!)
+    guard editMask.contains(.editedCharacters) else { return }
+
     // NB: We need to wait until after the content storage has processed the edit before text locations (and ranges)
-    //     match characters counts in the backing store again.
+    //     match characters counts in the backing store again. Hence, the placement after the super call.
     if let codeStorageDelegate   = textStorage.delegate as? CodeStorageDelegate,
        let invalidationRange     = codeStorageDelegate.tokenInvalidationRange,
-       let invalidationTextRange = textRange(for: invalidationRange)
+       let invalidationLines     = codeStorageDelegate.tokenInvalidationLines
     {
-      for textLayoutManager in textLayoutManagers {
+      let additionalInvalidationRange = if invalidatedCharRange.location == invalidationRange.location {
+          NSRange(location: invalidatedCharRange.max, length: invalidationRange.length - invalidatedCharRange.length)
+        } else { invalidationRange }
 
-        // Invalidate the rendering attributes for syntax highlighting in the entire invalidated token range.
-        textLayoutManager.invalidateRenderingAttributes(for: invalidationTextRange)
-        if delta > 1,
-           let textLayoutManagerDelegate = textLayoutManager.delegate,
-           textLayoutManagerDelegate.isKind(of: MinimapTextLayoutManagerDelegate.self)
-        {
+      if additionalInvalidationRange.length > 0 && invalidationLines > 1,
+         let additionalInvalidationTextRange = textRange(for: additionalInvalidationRange)
+      {
+        for textLayoutManager in textLayoutManagers {
+          
+          // NB: We do not want to call `NSTextLayoutManager.invalidateRenderingAttributes(for:)` as that removes all
+          //     rendering attributes *without* calling the rendnering attribute validator to set the new attributes.
 
-          // MARK: [Note Minimap Redraw Voodoo]
-          // Getting the minimap to redraw properly in case of changes affecting a larger area has proven difficult
-          // and OS-specific. It depends on timing and concurrency issues in the text system and I haven't been able to
-          // find a reliable way of tackling this problem.
-          //
-          // Below is a partial fix for macOS and iOS, but visionOS also requires invalidation code in the
-          // `textDidChangeNotification` observer configured in during initialisation of the `UITextView`-flavour of
-          // `CodeView`.
-          //
-          // If larger amounts of text are added, we need to invalidate the layout of the minimap (i.e., secondary)
-          // layout manager explicitly. We cannot do that inline, though, if we don't want to risk a deadlock (as
-          // experience shows). Hence, we delay that action by enqueueing this operation. This does, unfortunately, lead
-          // to a visible delay on macOS, which I don't know how to avoid at the moment.
-          Task { @MainActor in
-            if let invalidationTextRange = textRange(for: invalidationRange) {
-#if os(iOS) || os(visionOS)
-              // For some reason, for the voodoo to work, we need to ensure layour first on iOS...
-              textLayoutManager.ensureLayout(for: invalidationTextRange)
-#endif
-              textLayoutManager.invalidateLayout(for: invalidationTextRange)  // warning is bogus as this will run on the main thread
-            }
-          }
+          print("redisplay range = \(additionalInvalidationRange)")
+          textLayoutManager.redisplayRenderingAttributes(for: additionalInvalidationTextRange)
         }
       }
     }
