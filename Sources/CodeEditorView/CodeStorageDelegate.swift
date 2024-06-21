@@ -63,12 +63,32 @@ struct LineInfo {
   ///     increase and decrease the line number of a given bundle. We need a stable identifier.
   ///
   struct MessageBundle: Identifiable {
-    let id:       UUID
+    let id: UUID
+
+    private(set)
     var messages: [Message]
 
     init(messages: [Message]) {
       self.id       = UUID()
       self.messages = messages
+    }
+    
+    /// Add a message, such that it overrides its previous version if the message is already present.
+    ///
+    /// - Parameter message: The message to add.
+    ///
+    mutating func add(message: Message) {
+      if let idx = messages.firstIndex(of: message) {
+        messages[idx] = message
+      } else {
+        messages.append(message)
+      }
+    }
+
+    mutating func remove(message: Message) {
+      if let idx = messages.firstIndex(of: message) {
+        messages.remove(at: idx)
+      }
     }
   }
 
@@ -781,7 +801,7 @@ extension CodeStorageDelegate {
     if info.messages != nil {
 
       // Add a message to an existing message bundle for this line
-      info.messages?.messages.append(message.entity)
+      info.messages?.add(message: message.entity)
 
     } else {
 
@@ -805,15 +825,12 @@ extension CodeStorageDelegate {
   func remove(message: Message) -> (LineInfo.MessageBundle, Int)? {
 
     for line in lineMap.lines.indices {
-
       if var info = lineMap.lines[line].info {
-        if let idx = info.messages?.messages.firstIndex(of: message) {
 
-          info.messages?.messages.remove(at: idx)
-          lineMap.setInfoOf(line: line, to: info)
-          if let messages = info.messages { return (messages, line) } else { return nil }
+        info.messages?.remove(message: message)
+        lineMap.setInfoOf(line: line, to: info)
+        if let messages = info.messages { return (messages, line) } else { return nil }
 
-        }
       }
     }
     return nil

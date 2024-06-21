@@ -13,7 +13,7 @@ import Foundation
 
 /// A message that can be displayed in a code view.
 ///
-public struct Message: Identifiable, Hashable {
+public struct Message {
 
   /// The various category that a message can be in. The earlier in the enumeration, the higher priority in the sense
   /// that in the one-line view, the colour of the highest priority message will be used.
@@ -59,7 +59,7 @@ public struct Message: Identifiable, Hashable {
 
   /// Optional long message (only displayed in the popup, but may extend over multiple lines).
   ///
-  public let description: NSAttributedString?
+  public var description: NSAttributedString?
 
   /// The number of lines, beyond the line on which the message is located, that are to be highlighted (as they are
   /// within the scope of the message).
@@ -77,6 +77,16 @@ public struct Message: Identifiable, Hashable {
     self.summary     = summary
     self.description = description
     self.telescope   = telescope
+  }
+}
+
+extension Message: Equatable {
+  public static func ==(lhs: Message, rhs: Message) -> Bool { lhs.id == rhs.id }
+}
+
+extension Message: Hashable {
+  public func hash(into hasher: inout Hasher) {
+    id.hash(into: &hasher)
   }
 }
 

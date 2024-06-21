@@ -68,7 +68,7 @@ public protocol LocationConverter {
 ///
 public struct TextLocated<Entity> {
   public let location: TextLocation
-  public let entity:   Entity
+  public var entity:   Entity
 
   /// Attribute the given entity with the given location.
   ///
