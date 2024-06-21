@@ -59,7 +59,7 @@ public struct Message {
 
   /// Optional long message (only displayed in the popup, but may extend over multiple lines).
   ///
-  public var description: NSAttributedString?
+  public var description: AttributedString?
 
   /// The number of lines, beyond the line on which the message is located, that are to be highlighted (as they are
   /// within the scope of the message).
@@ -69,7 +69,7 @@ public struct Message {
   public init(category: Message.Category, 
               length: Int,
               summary: String,
-              description: NSAttributedString?,
+              description: AttributedString?,
               telescope: Int? = nil)
   {
     self.category    = category

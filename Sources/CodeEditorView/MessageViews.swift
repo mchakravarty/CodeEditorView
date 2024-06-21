@@ -209,7 +209,7 @@ fileprivate struct MessagePopupCategoryView: View {
         VStack(alignment: .leading, spacing: 6) {
           ForEach(0..<messages.count, id: \.self) { i in
             Text(messages[i].summary)
-            if let description = messages[i].description { Text(description.string) }
+            if let description = messages[i].description { Text(description) }
           }
         }
         .padding([.leading, .trailing], 5)
@@ -478,7 +478,7 @@ extension StatefulMessageView {
 let message1 = Message(category: .error, length: 1, summary: "It's wrong!", description: nil),
     message2 = Message(category: .error, length: 1, summary: "Need to fix this.", description: nil),
     message3 = Message(category: .warning, length: 1, summary: "Looks dodgy.",
-                       description: NSAttributedString(string: "This doesn't seem right and also totally unclear " +
+                       description: AttributedString("This doesn't seem right and also totally unclear " +
                                                         "what it is supposed to do.")),
     message4 = Message(category: .live, length: 1, summary: "Thread 1", description: nil),
     message5 = Message(category: .informational, length: 1, summary: "Cool stuff!", description: nil)
