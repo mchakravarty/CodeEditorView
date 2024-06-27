@@ -216,7 +216,13 @@ extension CodeEditor: UIViewRepresentable {
                             setText: setText(_:),
                             setMessages: { messages = $0 })
 
-    codeView.text = text
+    // NB: We are not setting `codeView.text` here. That will happen via `updateUIView(:)`.
+    // This implies that we must take care to not report that initial updates as a change to any connected language
+    // service.
+    if let codeStorageDelegate = codeView.optCodeStorage?.delegate as? CodeStorageDelegate {
+      codeStorageDelegate.skipNextChangeNotificationToLanguageService = true
+    }
+
     if let delegate = codeView.delegate as? CodeViewDelegate {
 
       delegate.textDidChange      = context.coordinator.textDidChange
@@ -324,6 +330,11 @@ extension CodeEditor: NSViewRepresentable {
     scrollView.documentView = codeView
 
     // NB: We are not setting `codeView.text` here. That will happen via `updateNSView(:)`.
+    // This implies that we must take care to not report that initial updates as a change to any connected language
+    // service.
+    if let codeStorageDelegate = codeView.optCodeStorage?.delegate as? CodeStorageDelegate {
+      codeStorageDelegate.skipNextChangeNotificationToLanguageService = true
+    }
 
     if let delegate = codeView.delegate as? CodeViewDelegate {
 

@@ -145,6 +145,11 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
   ///
   private var lastTypedToken: LanguageConfiguration.Tokeniser.Token?
   
+  /// Indicates that the language service is not to be notified of the next text change. (This is useful during
+  /// initialisation.)
+  ///
+  var skipNextChangeNotificationToLanguageService: Bool = false
+
   /// Indicates whether the current editing round is for a wholesale replacement of the text.
   /// 
   private(set) var processingStringReplacement: Bool = false
@@ -293,23 +298,26 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
     // entered composing characters (i.e., the marked text).
     setText(textStorage.string)
 
-    // Notify language service (if attached)
-    let text         = (textStorage.string as NSString).substring(with: editedRange),
-        afterLine    = lineMap.lineOf(index: editedRange.max),
-        lineChange   = if let afterLine,
-                          let beforeLine = lines.last { afterLine - beforeLine } else { 0 },
-        columnChange = if let afterLine,
-                          let info = lineMap.lookup(line: afterLine)
-                       {
-                         editedRange.max - info.range.location - endColumn
-                       } else { 0 }
-    Task { [editedRange, delta] in
-      try await languageService?.documentDidChange(position: editedRange.location,
-                                                   changeInLength: delta,
-                                                   lineChange: lineChange,
-                                                   columnChange: columnChange,
-                                                   newText: text)
-    }
+    if !skipNextChangeNotificationToLanguageService {
+
+      // Notify language service (if attached)
+      let text         = (textStorage.string as NSString).substring(with: editedRange),
+          afterLine    = lineMap.lineOf(index: editedRange.max),
+          lineChange   = if let afterLine,
+          let beforeLine = lines.last { afterLine - beforeLine } else { 0 },
+          columnChange = if let afterLine,
+          let info = lineMap.lookup(line: afterLine)
+      {
+        editedRange.max - info.range.location - endColumn
+      } else { 0 }
+      Task { [editedRange, delta] in
+        try await languageService?.documentDidChange(position: editedRange.location,
+                                                     changeInLength: delta,
+                                                     lineChange: lineChange,
+                                                     columnChange: columnChange,
+                                                     newText: text)
+      }
+    } else { skipNextChangeNotificationToLanguageService = false }
   }
 }
 
