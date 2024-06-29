@@ -209,6 +209,11 @@ extension CodeEditor: UIViewRepresentable {
       if self.text != text { self.text = text }
     }
 
+    context.coordinator.updatingView = true
+    defer {
+      context.coordinator.updatingView = false
+    }
+
     let codeView = CodeView(frame: CGRect(x: 0, y: 0, width: 100, height: 40),
                             with: language,
                             viewLayout: layout,
@@ -249,6 +254,9 @@ extension CodeEditor: UIViewRepresentable {
   public func updateUIView(_ textView: UITextView, context: Context) {
     guard let codeView = textView as? CodeView else { return }
     context.coordinator.updatingView = true
+    defer {
+      context.coordinator.updatingView = false
+    }
 
     let theme     = context.environment.codeEditorTheme,
         selection = position.selections.first ?? .zero
@@ -261,8 +269,6 @@ extension CodeEditor: UIViewRepresentable {
     }
     if theme.id != codeView.theme.id { codeView.theme = theme }
     if layout != codeView.viewLayout { codeView.viewLayout = layout }
-
-    context.coordinator.updatingView = false
   }
 
   public func makeCoordinator() -> Coordinator {
@@ -306,6 +312,11 @@ extension CodeEditor: NSViewRepresentable {
       guard !context.coordinator.updatingView else { return }
 
       if self.text != text { self.text = text }
+    }
+
+    context.coordinator.updatingView = true
+    defer {
+      context.coordinator.updatingView = false
     }
 
     // Set up scroll view
@@ -394,6 +405,9 @@ extension CodeEditor: NSViewRepresentable {
   public func updateNSView(_ scrollView: NSScrollView, context: Context) {
     guard let codeView = scrollView.documentView as? CodeView else { return }
     context.coordinator.updatingView = true
+    defer {
+      context.coordinator.updatingView = false
+    }
 
     codeView.breakUndoCoalescing()
 
@@ -408,8 +422,6 @@ extension CodeEditor: NSViewRepresentable {
     }
     if theme.id != codeView.theme.id { codeView.theme = theme }
     if layout != codeView.viewLayout { codeView.viewLayout = layout }
-
-    context.coordinator.updatingView = false
   }
 
   public func makeCoordinator() -> Coordinator {
