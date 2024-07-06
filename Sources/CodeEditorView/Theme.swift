@@ -11,7 +11,7 @@ import SwiftUI
 
 /// A code highlighting theme. Different syntactic elements are purely distinguished by colour.
 ///
-public struct Theme: Identifiable, Equatable {
+public struct Theme: Identifiable {
   public let id = UUID()
 
   /// The colour scheme of the theme.
@@ -136,6 +136,11 @@ public struct Theme: Identifiable, Equatable {
     self.cursorColour = cursorColour
     self.invisiblesColour = invisiblesColour
   }
+}
+
+extension Theme: Equatable {
+
+  public static func ==(lhs: Theme, rhs: Theme) -> Bool { lhs.id == rhs.id }
 }
 
 /// A theme catalog indexing themes by name

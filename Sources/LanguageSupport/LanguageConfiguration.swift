@@ -28,7 +28,7 @@ private let logger = Logger(subsystem: "org.justtesting.CodeEditorView", categor
 
 /// Specifies the language-dependent aspects of a code editor.
 ///
-public struct LanguageConfiguration {
+public struct LanguageConfiguration: Identifiable {
 
   /// The various categories of types.
   ///
@@ -157,6 +157,10 @@ public struct LanguageConfiguration {
   /// Lexeme pair for a bracketing construct
   ///
   public typealias BracketPair = (open: String, close: String)
+  
+  /// Identifier for a particular language configuration.
+  /// 
+  public let id: UUID
 
   /// The name of the language.
   ///
@@ -226,6 +230,7 @@ public struct LanguageConfiguration {
               reservedOperators: [String],
               languageService: LanguageServiceBuilder? = nil)
   {
+    self.id                     = UUID()
     self.name                   = name
     self.supportsSquareBrackets = supportsSquareBrackets
     self.supportsCurlyBrackets  = supportsCurlyBrackets
@@ -307,6 +312,10 @@ public struct LanguageConfiguration {
     case .regexp:             return nil
     }
   }
+}
+
+extension LanguageConfiguration: Equatable {
+  public static func ==(lhs: LanguageConfiguration, rhs: LanguageConfiguration) -> Bool { lhs.id == rhs.id }
 }
 
 extension LanguageConfiguration {

@@ -140,6 +140,7 @@ class MinimapLineFragment: NSTextLineFragment {
     super.init(attributedString: attributedString, range: range)
   }
 
+  @available(*, unavailable)
   required init?(coder aDecoder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
   override var glyphOrigin: CGPoint { CGPoint(x: textLineFragment.glyphOrigin.x / minimapRatio,
@@ -295,6 +296,7 @@ class MinimapLayoutFragment: NSTextLayoutFragment {
     }
   }
 
+  @available(*, unavailable)
   required init?(coder: NSCoder) {
     fatalError("init(coder:) has not been implemented")
   }

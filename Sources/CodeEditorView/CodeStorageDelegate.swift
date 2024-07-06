@@ -125,8 +125,8 @@ struct LineInfo {
 
 class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
 
-  let              language:        LanguageConfiguration
-  private      let tokeniser:       LanguageConfiguration.Tokeniser?  // cache the tokeniser
+  private(set) var language:        LanguageConfiguration
+  private      var tokeniser:       LanguageConfiguration.Tokeniser?  // cache the tokeniser
   private(set) var languageService: LanguageService?  // instantiated language service if available
 
   /// Hook to propagate changes to the text store upwards in the view hierarchy.
@@ -205,9 +205,26 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
 
   deinit {
     Task { [languageService] in
-      try await languageService?.closeDocument()
+      try await languageService?.stop()
     }
   }
+
+
+  // MARK: Updates
+
+  /// Reinitialise the code storage delegate with a new language.
+  ///
+  /// - Parameter language: The new language.
+  ///
+  /// This implies stopping any already running language service first.
+  /// 
+  func change(language: LanguageConfiguration, for codeStorage: CodeStorage) async throws {
+    try await languageService?.stop()
+    self.language  = language
+    self.tokeniser = Tokeniser(for: language.tokenDictionary)
+    let _ = tokenise(range: NSRange(location: 0, length: codeStorage.length), in: codeStorage)
+  }
+  
 
   // MARK: Delegate methods
 

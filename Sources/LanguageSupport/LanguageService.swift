@@ -293,3 +293,14 @@ public protocol LanguageService {
   ///
   func capabilities() async throws -> (any View)?
 }
+
+extension LanguageService {
+  
+  /// Close the document and retract all diagnostics.
+  ///
+  public func stop() async throws {
+
+    try await closeDocument()
+    diagnostics.send(Set())
+  }
+}

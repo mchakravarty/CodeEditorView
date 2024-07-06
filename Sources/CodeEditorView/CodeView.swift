@@ -93,6 +93,26 @@ final class CodeView: UITextView {
     }
   }
 
+  /// The current language configuration.
+  ///
+  /// We keep track of it here to enable us to spot changes during processing of view updates.
+  ///
+  @Invalidating(.layout, .display)
+  var language: LanguageConfiguration = .none {
+    didSet {
+      if let codeStorage = optCodeStorage {
+        Task { @MainActor in
+          try await codeStorageDelegate.change(language: language, for: codeStorage)
+          // FIXME: This is an awful kludge to get the code view to redraw with the new highlighting. Emitting
+          //        `codeStorage.edited(:range:changeInLength)` doesn't seem to work reliably.
+          Task { @MainActor in
+            font = theme.font
+          }
+      }
+      }
+    }
+  }
+
   /// The current view layout.
   ///
   @Invalidating(.layout)
@@ -253,6 +273,7 @@ final class CodeView: UITextView {
       }
   }
 
+  @available(*, unavailable)
   required init?(coder: NSCoder) {
     fatalError("init(coder:) has not been implemented")
   }
@@ -385,6 +406,29 @@ final class CodeView: NSTextView {
     }
   }
 
+  /// The current language configuration.
+  ///
+  /// We keep track of it here to enable us to spot changes during processing of view updates.
+  ///
+  @Invalidating(.layout, .display)
+  var language: LanguageConfiguration = .none {
+    didSet {
+      if let codeStorage = optCodeStorage,
+         oldValue.id != language.id
+      {
+        Task { @MainActor in
+          try await codeStorageDelegate.change(language: language, for: codeStorage)
+          try await startLanguageService()
+          // FIXME: This is an awful kludge to get the code view to redraw with the new highlighting. Emitting
+          //        `codeStorage.edited(:range:changeInLength)` doesn't seem to work reliably.
+          Task { @MainActor in
+            font = theme.font
+          }
+        }
+      }
+    }
+  }
+
   /// The current view layout.
   ///
   @Invalidating(.layout)
@@ -441,6 +485,7 @@ final class CodeView: NSTextView {
   {
 
     self.theme       = theme
+    self.language    = language
     self.viewLayout  = viewLayout
     self.setMessages = setMessages
 
@@ -614,6 +659,18 @@ final class CodeView: NSTextView {
         self?.invalidateMessageViews(withIDs: self!.codeStorageDelegate.lastInvalidatedMessageIDs)
       }
 
+    Task {
+      try await startLanguageService()
+    }
+  }
+  
+  /// Try to launch a language service for the currently configured language.
+  ///
+  func startLanguageService() async throws {
+
+    diagnosticsCancellable = nil
+    eventsCancellable      = nil
+
     // Try to initialise a language service.
     if let languageService = codeStorageDelegate.languageServiceInit() {
 
@@ -632,10 +689,10 @@ final class CodeView: NSTextView {
 
           process(event: event)
         }
-
     }
   }
 
+  @available(*, unavailable)
   required init?(coder: NSCoder) {
     fatalError("init(coder:) has not been implemented")
   }
@@ -644,6 +701,9 @@ final class CodeView: NSTextView {
     if let observer = frameChangedNotificationObserver { NotificationCenter.default.removeObserver(observer) }
     if let observer = didChangeNotificationObserver { NotificationCenter.default.removeObserver(observer) }
   }
+
+
+  // MARK: Overrides
 
   override func setSelectedRanges(_ ranges: [NSValue],
                                   affinity: NSSelectionAffinity,
@@ -667,7 +727,7 @@ final class CodeView: NSTextView {
     tile()
     adjustScrollPositionOfMinimap()
     super.layout()
-    gutterView?.needsDisplay = true
+    gutterView?.needsDisplay        = true
     minimapGutterView?.needsDisplay = true
   }
 }
