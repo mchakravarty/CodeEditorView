@@ -11,88 +11,132 @@ import SwiftUI
 
 /// A code highlighting theme. Different syntactic elements are purely distinguished by colour.
 ///
+/// NB: Themes are `Identifiable`. To ensure that a theme's identity changes when any of its properties is being changed
+///     the `id` is updated on setting any property. This makes mutating properties fairly expensive, but it should also
+///     not be a particularily frequent operation.
+///
 public struct Theme: Identifiable {
-  public let id = UUID()
+  public private(set) var id = UUID()
 
   /// The colour scheme of the theme.
   ///
-  public var colourScheme: ColorScheme
+  public var colourScheme: ColorScheme {
+    didSet { id = UUID() }
+  }
 
   /// The name of the font to use.
   ///
-  public var fontName: String
+  public var fontName: String {
+    didSet { id = UUID() }
+  }
 
   /// The point size of the font to use.
   ///
-  public var fontSize: CGFloat
+  public var fontSize: CGFloat {
+    didSet { id = UUID() }
+  }
 
   /// The default foreground text colour.
   ///
-  public var textColour: OSColor
+  public var textColour: OSColor {
+    didSet { id = UUID() }
+  }
 
   /// The colour for (all kinds of) comments.
   ///
-  public var commentColour: OSColor
+  public var commentColour: OSColor {
+    didSet { id = UUID() }
+  }
 
   /// The colour for string literals.
   ///
-  public var stringColour: OSColor
+  public var stringColour: OSColor {
+    didSet { id = UUID() }
+  }
 
   /// The colour for character literals.
   ///
-  public var characterColour: OSColor
+  public var characterColour: OSColor {
+    didSet { id = UUID() }
+  }
 
   /// The colour for number literals.
   ///
-  public var numberColour: OSColor
+  public var numberColour: OSColor {
+    didSet { id = UUID() }
+  }
 
   /// The colour for identifiers.
   ///
-  public var identifierColour: OSColor
+  public var identifierColour: OSColor {
+    didSet { id = UUID() }
+  }
 
   /// The colour for operators.
   ///
-  public var operatorColour: OSColor
+  public var operatorColour: OSColor {
+    didSet { id = UUID() }
+  }
 
   /// The colour for keywords.
   ///
-  public var keywordColour: OSColor
+  public var keywordColour: OSColor {
+    didSet { id = UUID() }
+  }
 
   /// The colour for reserved symbols.
   ///
-  public var symbolColour: OSColor
-  
+  public var symbolColour: OSColor {
+    didSet { id = UUID() }
+  }
+
   /// The colour for type names (identifiers and operators).
   ///
-  public var typeColour: OSColor
+  public var typeColour: OSColor {
+    didSet { id = UUID() }
+  }
 
   /// The colour for field names.
   ///
-  public var fieldColour: OSColor
+  public var fieldColour: OSColor {
+    didSet { id = UUID() }
+  }
 
   /// The colour for names of alternatives.
   ///
-  public var caseColour: OSColor
+  public var caseColour: OSColor {
+    didSet { id = UUID() }
+  }
 
   /// The background colour.
   ///
-  public var backgroundColour: OSColor
+  public var backgroundColour: OSColor {
+    didSet { id = UUID() }
+  }
 
   /// The colour of the current line highlight.
   ///
-  public var currentLineColour: OSColor
+  public var currentLineColour: OSColor {
+    didSet { id = UUID() }
+  }
 
   /// The colour to use for the selection highlight.
   ///
-  public var selectionColour: OSColor
+  public var selectionColour: OSColor {
+    didSet { id = UUID() }
+  }
 
   /// The cursor colour.
   ///
-  public var cursorColour: OSColor
+  public var cursorColour: OSColor {
+    didSet { id = UUID() }
+  }
 
   /// The colour to use if invisibles are drawn.
   ///
-  public var invisiblesColour: OSColor
+  public var invisiblesColour: OSColor {
+    didSet { id = UUID() }
+  }
 
   public init(colourScheme: ColorScheme,
               fontName: String,
