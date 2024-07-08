@@ -28,7 +28,7 @@ private let logger = Logger(subsystem: "org.justtesting.CodeEditorView", categor
 
 /// Specifies the language-dependent aspects of a code editor.
 ///
-public struct LanguageConfiguration: Identifiable {
+public struct LanguageConfiguration {
 
   /// The various categories of types.
   ///
@@ -158,11 +158,11 @@ public struct LanguageConfiguration: Identifiable {
   ///
   public typealias BracketPair = (open: String, close: String)
   
-  /// Identifier for a particular language configuration.
-  /// 
-  public let id: UUID
-
   /// The name of the language.
+  ///
+  /// NB: We require this to be a unique name, independent of the `languageService`. In other words, if we use two
+  ///     language configurations which are different in any property, other than `languageService`, they must also have
+  ///     different `name`s.
   ///
   public let name: String
   
@@ -230,7 +230,6 @@ public struct LanguageConfiguration: Identifiable {
               reservedOperators: [String],
               languageService: LanguageServiceBuilder? = nil)
   {
-    self.id                     = UUID()
     self.name                   = name
     self.supportsSquareBrackets = supportsSquareBrackets
     self.supportsCurlyBrackets  = supportsCurlyBrackets
@@ -315,7 +314,7 @@ public struct LanguageConfiguration: Identifiable {
 }
 
 extension LanguageConfiguration: Equatable {
-  public static func ==(lhs: LanguageConfiguration, rhs: LanguageConfiguration) -> Bool { lhs.id == rhs.id }
+  public static func ==(lhs: LanguageConfiguration, rhs: LanguageConfiguration) -> Bool { lhs.name == rhs.name }
 }
 
 extension LanguageConfiguration {

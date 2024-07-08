@@ -269,7 +269,7 @@ extension CodeEditor: UIViewRepresentable {
     }
     if theme.id != codeView.theme.id { codeView.theme = theme }
     if layout != codeView.viewLayout { codeView.viewLayout = layout }
-    if language.id != codeView.language.id { codeView.language = language }
+    if language.name != codeView.language.name { codeView.language = language }
   }
 
   public func makeCoordinator() -> Coordinator {
@@ -423,7 +423,7 @@ extension CodeEditor: NSViewRepresentable {
     }
     if theme.id != codeView.theme.id { codeView.theme = theme }
     if layout != codeView.viewLayout { codeView.viewLayout = layout }
-    if language.id != codeView.language.id { codeView.language = language }
+    if language.name != codeView.language.name { codeView.language = language }
   }
 
   public func makeCoordinator() -> Coordinator {

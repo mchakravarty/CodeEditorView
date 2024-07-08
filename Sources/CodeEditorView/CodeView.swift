@@ -414,7 +414,7 @@ final class CodeView: NSTextView {
   var language: LanguageConfiguration = .none {
     didSet {
       if let codeStorage = optCodeStorage,
-         oldValue.id != language.id
+         oldValue.name != language.name
       {
         Task { @MainActor in
           try await codeStorageDelegate.change(language: language, for: codeStorage)
