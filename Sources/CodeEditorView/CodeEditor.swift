@@ -269,7 +269,13 @@ extension CodeEditor: UIViewRepresentable {
     }
     if theme.id != codeView.theme.id { codeView.theme = theme }
     if layout != codeView.viewLayout { codeView.viewLayout = layout }
-    if language.name != codeView.language.name { codeView.language = language }
+    // We regard two language configurations to be equal if the configurations got the same time and they both do or
+    // do not provide a language service builder.
+    let configGotService = language.languageService != nil,
+        viewGotService   = codeView.language.languageService != nil
+    if language.name != codeView.language.name || configGotService != viewGotService {
+      codeView.language = language
+    }
   }
 
   public func makeCoordinator() -> Coordinator {
@@ -423,7 +429,13 @@ extension CodeEditor: NSViewRepresentable {
     }
     if theme.id != codeView.theme.id { codeView.theme = theme }
     if layout != codeView.viewLayout { codeView.viewLayout = layout }
-    if language.name != codeView.language.name { codeView.language = language }
+    // We regard two language configurations to be equal if the configurations got the same time and they both do or
+    // do not provide a language service builder.
+    let configGotService = language.languageService != nil,
+        viewGotService   = codeView.language.languageService != nil
+    if language.name != codeView.language.name || configGotService != viewGotService {
+      codeView.language = language
+    }
   }
 
   public func makeCoordinator() -> Coordinator {

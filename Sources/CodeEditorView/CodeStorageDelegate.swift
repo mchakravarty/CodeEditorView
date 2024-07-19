@@ -191,7 +191,7 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
   ///     initialised already.
   ///
   func languageServiceInit() -> LanguageService? {
-    logger.trace("Attempting to instantiate language service for one document")
+    logger.trace("Attempting to instantiate language service for one \(self.language.name) document")
 
     if let languageServiceBuilder = language.languageService {
       languageService = languageServiceBuilder(lineMapLocationConverter)

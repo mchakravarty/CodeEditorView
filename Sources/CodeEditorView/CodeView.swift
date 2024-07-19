@@ -100,7 +100,9 @@ final class CodeView: UITextView {
   @Invalidating(.layout, .display)
   var language: LanguageConfiguration = .none {
     didSet {
-      if let codeStorage = optCodeStorage {
+      if let codeStorage = optCodeStorage,
+         oldValue.name != language.name || (oldValue.languageService != nil) != (language.languageService != nil)
+      {
         Task { @MainActor in
           try await codeStorageDelegate.change(language: language, for: codeStorage)
           // FIXME: This is an awful kludge to get the code view to redraw with the new highlighting. Emitting
@@ -108,7 +110,7 @@ final class CodeView: UITextView {
           Task { @MainActor in
             font = theme.font
           }
-      }
+        }
       }
     }
   }
@@ -414,7 +416,7 @@ final class CodeView: NSTextView {
   var language: LanguageConfiguration = .none {
     didSet {
       if let codeStorage = optCodeStorage,
-         oldValue.name != language.name
+         oldValue.name != language.name || (oldValue.languageService != nil) != (language.languageService != nil)
       {
         Task { @MainActor in
           try await codeStorageDelegate.change(language: language, for: codeStorage)
