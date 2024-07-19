@@ -519,7 +519,6 @@ class CodeContentStorage: NSTextContentStorage {
           // NB: We do not want to call `NSTextLayoutManager.invalidateRenderingAttributes(for:)` as that removes all
           //     rendering attributes *without* calling the rendnering attribute validator to set the new attributes.
 
-          print("redisplay range = \(additionalInvalidationRange)")
           textLayoutManager.redisplayRenderingAttributes(for: additionalInvalidationTextRange)
         }
       }
