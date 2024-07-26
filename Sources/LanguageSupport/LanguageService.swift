@@ -28,10 +28,6 @@ public protocol LocationService: LocationConverter {
   func length(of zeroBasedLine: Int) -> Int?
 }
 
-/// Function that instantiates a language service from a location converter.
-///
-public typealias LanguageServiceBuilder = (LocationService) -> LanguageService
-
 /// Indicates the reason for querying code completions.
 ///  
 public enum CompletionTriggerReason {
@@ -188,12 +184,26 @@ public enum LanguageServiceEvent {
 
 /// Determines the capabilities and endpoints for language-dependent external services, such as an LSP server.
 ///
-public protocol LanguageService {
+public protocol LanguageService: AnyObject {
 
   // MARK: Document synchronisation
   
+  /// Determine whether the document is open.
+  ///
+  var isOpen: Bool { get }
+
+  /// Notify the language service of the document that it controls.
+  ///
+  /// - Parameters:
+  ///   - text: The contents of the document.
+  ///   - locationService: A location service for the document.
+  ///
+  ///   NB: This must be the first call to the language service.
+  ///
+  func openDocument(with text: String, locationService: LocationService) async throws
+
   /// Notify the language service of a document change.
-  /// 
+  ///
   /// - Parameters:
   ///   - changeLocation: The location at which the change originates.
   ///   - delta: The change of the document length.
@@ -207,9 +217,10 @@ public protocol LanguageService {
                          columnChange deltaColumn: Int,
                          newText text: String) async throws
 
-  /// Notify the language service that the document gets closed and the language service is no longer needed.
+  /// Notify the language service that the document gets closed and the language service is no longer active.
   ///
-  /// NB: After this call, no functions from the language service may be used anymore.
+  /// NB: After this call, no functions from the language service may be used anymore, except to open the document
+  ///     again.
   ///
   func closeDocument() async throws
 

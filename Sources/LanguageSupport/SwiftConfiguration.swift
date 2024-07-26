@@ -24,7 +24,7 @@ extension LanguageConfiguration {
 
   /// Language configuration for Swift
   ///
-  public static func swift(_ languageService: LanguageServiceBuilder? = nil) -> LanguageConfiguration {
+  public static func swift(_ languageService: LanguageService? = nil) -> LanguageConfiguration {
     let numberRegex: Regex<Substring> = Regex {
       optNegation
       ChoiceOf {

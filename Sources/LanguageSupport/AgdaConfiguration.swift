@@ -24,7 +24,7 @@ extension LanguageConfiguration {
 
   /// Language configuration for Agda
   ///
-  public static func agda(_ languageService: LanguageServiceBuilder? = nil) -> LanguageConfiguration {
+  public static func agda(_ languageService: LanguageService? = nil) -> LanguageConfiguration {
     let nameSeparator = CharacterClass(.anyOf(".;{}()@\""), .whitespace)
     let numberRegex = Regex {
       optNegation

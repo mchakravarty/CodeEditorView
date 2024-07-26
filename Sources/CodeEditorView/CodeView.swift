@@ -7,12 +7,16 @@
 //  This file contains both the macOS and iOS versions of the subclass for `NSTextView` and `UITextView`, respectively,
 //  which forms the heart of the code editor.
 
+import os
 import Combine
 import SwiftUI
 
 import Rearrange
 
 import LanguageSupport
+
+
+private let logger = Logger(subsystem: "org.justtesting.CodeEditorView", category: "CodeView")
 
 
 // MARK: -
@@ -205,7 +209,7 @@ final class CodeView: UITextView {
                                  textView: self, 
                                  codeStorage: codeStorage,
                                  theme: theme,
-                                 getMessageViews: { self.messageViews },
+                                 getMessageViews: { [weak self] in self?.messageViews ?? [:] },
                                  isMinimapGutter: false)
     gutterView.autoresizingMask  = []
     self.gutterView              = gutterView
@@ -222,7 +226,7 @@ final class CodeView: UITextView {
                                         textView: minimapView,
                                         codeStorage: codeStorage,
                                         theme: theme,
-                                        getMessageViews: { self.messageViews },
+                                        getMessageViews: { [weak self] in self?.messageViews ?? [:] },
                                         isMinimapGutter: true),
         minimapDividerView = UIView()
     minimapView.codeView = self
@@ -416,11 +420,18 @@ final class CodeView: NSTextView {
   var language: LanguageConfiguration = .none {
     didSet {
       if let codeStorage = optCodeStorage,
-         oldValue.name != language.name || (oldValue.languageService != nil) != (language.languageService != nil)
+          oldValue != language
       {
         Task { @MainActor in
-          try await codeStorageDelegate.change(language: language, for: codeStorage)
-          try await startLanguageService()
+          do {
+
+            try await codeStorageDelegate.change(language: language, for: codeStorage)
+            try await startLanguageService()
+
+          } catch let error {
+            logger.trace("Failed to change language from \(oldValue.name) to \(self.language.name): \(error.localizedDescription)")
+          }
+
           // FIXME: This is an awful kludge to get the code view to redraw with the new highlighting. Emitting
           //        `codeStorage.edited(:range:changeInLength)` doesn't seem to work reliably.
           Task { @MainActor in
@@ -564,7 +575,7 @@ final class CodeView: NSTextView {
                                 textView: self,
                                 codeStorage: codeStorage,
                                 theme: theme,
-                                getMessageViews: { self.messageViews },
+                                getMessageViews: { [weak self] in self?.messageViews ?? [:] },
                                 isMinimapGutter: false)
     gutterView.autoresizingMask  = .none
     self.gutterView              = gutterView
@@ -581,7 +592,7 @@ final class CodeView: NSTextView {
                                         textView: minimapView,
                                         codeStorage: codeStorage,
                                         theme: theme,
-                                        getMessageViews: { self.messageViews },
+                                        getMessageViews: { [weak self] in self?.messageViews ?? [:] },
                                         isMinimapGutter: true),
         minimapDividerView = NSBox()
     minimapView.codeView = self
@@ -644,12 +655,12 @@ final class CodeView: NSTextView {
     frameChangedNotificationObserver
       = NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification,
                                                object: enclosingScrollView,
-                                               queue: .main){ _ in
+                                               queue: .main){ [weak self] _ in
 
         // NB: When resizing the window, where the text container doesn't completely fill the text view (i.e., the text
         //     is short), we need to explicitly redraw the gutter, as line wrapping may have changed, which affects
         //     line numbering.
-        gutterView.needsDisplay = true
+        self?.gutterView?.needsDisplay = true
       }
 
     // We need to check whether we need to look up completions or cancel a running completion process after every text
@@ -662,34 +673,41 @@ final class CodeView: NSTextView {
       }
 
     Task {
-      try await startLanguageService()
+      do {
+        try await startLanguageService()
+      } catch let error {
+        logger.trace("Failed to start language service for \(language.name): \(error.localizedDescription)")
+      }
     }
   }
   
-  /// Try to launch a language service for the currently configured language.
+  /// Try to activate the language service for the currently configured language.
   ///
   func startLanguageService() async throws {
+    guard let textStorage else { return }
 
     diagnosticsCancellable = nil
     eventsCancellable      = nil
 
-    // Try to initialise a language service.
-    if let languageService = codeStorageDelegate.languageServiceInit() {
+    if let languageService = codeStorageDelegate.languageService {
+
+      try await languageService.openDocument(with: textStorage.string,
+                                             locationService: codeStorageDelegate.lineMapLocationConverter)
 
       // Report diagnostic messages as they come in.
       diagnosticsCancellable = languageService.diagnostics
         .receive(on: DispatchQueue.main)
-        .sink { [self] messages in
+        .sink { [weak self] messages in
 
-          setMessages(messages)
-          update(messages: messages)
+          self?.setMessages(messages)
+          self?.update(messages: messages)
         }
 
       eventsCancellable = languageService.events
         .receive(on: DispatchQueue.main)
-        .sink { [self] event in
+        .sink { [weak self] event in
 
-          process(event: event)
+          self?.process(event: event)
         }
     }
   }

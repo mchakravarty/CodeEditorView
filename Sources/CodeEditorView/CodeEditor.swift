@@ -246,7 +246,9 @@ extension CodeEditor: UIViewRepresentable {
     DispatchQueue.main.async { codeView.update(messages: messages) }
 
     // Set the initial actions
-    context.coordinator.actions = Actions(info: codeView.infoAction)
+    //
+    // NB: It is important that the actions don't capture the code view strongly.
+    context.coordinator.actions = Actions(info: { [weak codeView] in codeView?.infoAction() })
 
     return codeView
   }
@@ -269,13 +271,8 @@ extension CodeEditor: UIViewRepresentable {
     }
     if theme.id != codeView.theme.id { codeView.theme = theme }
     if layout != codeView.viewLayout { codeView.viewLayout = layout }
-    // We regard two language configurations to be equal if the configurations got the same time and they both do or
-    // do not provide a language service builder.
-    let configGotService = language.languageService != nil,
-        viewGotService   = codeView.language.languageService != nil
-    if language.name != codeView.language.name || configGotService != viewGotService {
-      codeView.language = language
-    }
+    // Equality on language configurations implies the same name and the same language service.
+    if language != codeView.language { codeView.language = language }
   }
 
   public func makeCoordinator() -> Coordinator {
@@ -378,30 +375,34 @@ extension CodeEditor: NSViewRepresentable {
     context.coordinator.boundsChangedNotificationObserver
       = NotificationCenter.default.addObserver(forName: NSView.boundsDidChangeNotification,
                                                object: scrollView.contentView,
-                                               queue: .main){ _ in
+                                               queue: .main){ [weak scrollView] _ in
 
           // FIXME: we would like to get less fine-grained updates here, but `NSScrollView.didEndLiveScrollNotification` doesn't happen when moving the cursor around
-          context.coordinator.scrollPositionDidChange(scrollView)
+          if let scrollView {
+            context.coordinator.scrollPositionDidChange(scrollView)
+          }
         }
 
     // Report the initial message set
     DispatchQueue.main.async{ codeView.update(messages: messages) }
 
     // Break undo coalescing whenever we get a trigger over the corresponding subject.
-    context.coordinator.breakUndoCoalescingCancellable = breakUndoCoalescing?.sink { _ in
-      codeView.breakUndoCoalescing()
+    context.coordinator.breakUndoCoalescingCancellable = breakUndoCoalescing?.sink { [weak codeView] _ in
+      codeView?.breakUndoCoalescing()
     }
 
     // Set the initial actions
+    //
+    // NB: It is important that the actions don't capture the code view strongly.
     context.coordinator.actions = Actions(language: Actions.Language(name: language.name),
-                                          info: codeView.infoAction,
-                                          completions: codeView.completionAction,
-                                          capabilities: codeView.capabilitiesAction)
+                                          info: { [weak codeView] in codeView?.infoAction() },
+                                          completions: { [weak codeView] in codeView?.completionAction() },
+                                          capabilities: { [weak codeView] in codeView?.capabilitiesAction() })
 
     let coordinator = context.coordinator
     context.coordinator.extraActionsCancellable = codeView.optLanguageService?.extraActions
       .receive(on: DispatchQueue.main)
-      .sink{ [coordinator] actions in
+      .sink { [coordinator] actions in
 
         coordinator.actions.language.extraActions = actions
       }
@@ -429,13 +430,8 @@ extension CodeEditor: NSViewRepresentable {
     }
     if theme.id != codeView.theme.id { codeView.theme = theme }
     if layout != codeView.viewLayout { codeView.viewLayout = layout }
-    // We regard two language configurations to be equal if the configurations got the same time and they both do or
-    // do not provide a language service builder.
-    let configGotService = language.languageService != nil,
-        viewGotService   = codeView.language.languageService != nil
-    if language.name != codeView.language.name || configGotService != viewGotService {
-      codeView.language = language
-    }
+    // Equality on language configurations implies the same name and the same language service.
+    if language != codeView.language { codeView.language = language }
   }
 
   public func makeCoordinator() -> Coordinator {

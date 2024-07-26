@@ -212,7 +212,7 @@ public struct LanguageConfiguration {
 
   /// Dynamic language service that provides advanced syntactic as well as semantic information.
   ///
-  public let languageService: LanguageServiceBuilder?
+  public let languageService: LanguageService?
 
   /// Defines a language configuration.
   ///
@@ -228,7 +228,7 @@ public struct LanguageConfiguration {
               operatorRegex: Regex<Substring>?,
               reservedIdentifiers: [String],
               reservedOperators: [String],
-              languageService: LanguageServiceBuilder? = nil)
+              languageService: LanguageService? = nil)
   {
     self.name                   = name
     self.supportsSquareBrackets = supportsSquareBrackets
@@ -258,7 +258,7 @@ public struct LanguageConfiguration {
               nestedComment: LanguageConfiguration.BracketPair?,
               identifierRegexp: String?,
               reservedIdentifiers: [String],
-              languageService: LanguageServiceBuilder? = nil)
+              languageService: LanguageService? = nil)
   {
     func makeRegex(from pattern: String?) -> Regex<Substring>? {
       if let pattern {
@@ -314,7 +314,9 @@ public struct LanguageConfiguration {
 }
 
 extension LanguageConfiguration: Equatable {
-  public static func ==(lhs: LanguageConfiguration, rhs: LanguageConfiguration) -> Bool { lhs.name == rhs.name }
+  public static func ==(lhs: LanguageConfiguration, rhs: LanguageConfiguration) -> Bool {
+    lhs.name == rhs.name && lhs.languageService === rhs.languageService
+  }
 }
 
 extension LanguageConfiguration {

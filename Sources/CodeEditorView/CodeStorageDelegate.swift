@@ -125,9 +125,12 @@ struct LineInfo {
 
 class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
 
-  private(set) var language:        LanguageConfiguration
-  private      var tokeniser:       LanguageConfiguration.Tokeniser?  // cache the tokeniser
-  private(set) var languageService: LanguageService?  // instantiated language service if available
+  private(set) var language:  LanguageConfiguration
+  private      var tokeniser: LanguageConfiguration.Tokeniser?  // cache the tokeniser
+  
+  /// Language service for this document if available.
+  /// 
+  var languageService: LanguageService? { language.languageService }
 
   /// Hook to propagate changes to the text store upwards in the view hierarchy.
   ///
@@ -180,29 +183,6 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
     super.init()
   }
   
-  /// Initialise the language service.
-  ///
-  /// - Returns: The initialised language service if successful.
-  ///
-  /// Initialising the language service in the `init` is too early. We want the whole code view-related set of classes
-  /// to be already set up, as the laguage service may immediately start sending notifications.
-  ///
-  /// NB: This is about initialising the service for one document. The project-wide service will often have been
-  ///     initialised already.
-  ///
-  func languageServiceInit() -> LanguageService? {
-    logger.trace("Attempting to instantiate language service for one \(self.language.name) document")
-
-    if let languageServiceBuilder = language.languageService {
-      languageService = languageServiceBuilder(lineMapLocationConverter)
-      logger.trace("Instantiation of language service was successful")
-    } else {
-      logger.trace("Instantiation of language service was NOT successful: missing language service builder")
-    }
-
-    return languageService
-  }
-
   deinit {
     Task { [languageService] in
       try await languageService?.stop()
@@ -321,12 +301,12 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
       let text         = (textStorage.string as NSString).substring(with: editedRange),
           afterLine    = lineMap.lineOf(index: editedRange.max),
           lineChange   = if let afterLine,
-          let beforeLine = lines.last { afterLine - beforeLine } else { 0 },
+                            let beforeLine = lines.last { afterLine - beforeLine } else { 0 },
           columnChange = if let afterLine,
-          let info = lineMap.lookup(line: afterLine)
-      {
-        editedRange.max - info.range.location - endColumn
-      } else { 0 }
+                            let info = lineMap.lookup(line: afterLine)
+                         {
+                           editedRange.max - info.range.location - endColumn
+                         } else { 0 }
       Task { [editedRange, delta] in
         try await languageService?.documentDidChange(position: editedRange.location,
                                                      changeInLength: delta,
