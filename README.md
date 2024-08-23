@@ -27,6 +27,11 @@ The following is the default light theme on iOS.
 Typical usage of the view is as follows.
 
 ```swift
+
+import SwiftUI
+import CodeEditor
+import LanguageSupport
+
 struct ContentView: View {
   @State private var text:     String                    = "My awesome code..."
   @State private var position: CodeEditor.Position       = CodeEditor.Position()
