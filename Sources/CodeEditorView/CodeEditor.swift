@@ -114,18 +114,78 @@ public struct CodeEditor {
     /// Display completions for the partial word in front of the selection.
     ///
     public var completions: (() -> Void)?
-
-    // Dev support
-
-    /// Diagnostic information about the capabilities of the attached language service if any.
+  }
+  
+  /// User-level info about the editor state.
+  /// 
+  public struct Info {
+    
+    /// Summarises the current selection state.
     ///
-    public var capabilities: (() -> Void)?
+    public enum SelectionSummary {
+
+      /// The selection is an insertion point at the given line and columnn (1-based).
+      ///
+      case insertionPoint(Int, Int)
+
+      /// Selection of one or more characters on a single line.
+      ///
+      case characters(Int)
+
+      /// Continous selection spanning the given number of lines (one or more).
+      ///
+      case lines(Int)
+
+      /// Selection coverering two or more separate ranges.
+      ///
+      case ranges(Int)
+
+      // NB: Internal as `LineMap` is internal.
+      init(selections: [NSRange], with lineMap: LineMap<LineInfo>) {
+        if let range = selections.first,
+           selections.count == 1,
+           let line    = lineMap.lineOf(index: range.location),
+           let oneLine = lineMap.lookup(line: line)
+        {
+          if range.length == 0 {
+            self = .insertionPoint(line + 1, range.location - oneLine.range.location + 1)
+          } else {
+
+            let lastLine = lineMap.lineOf(index: range.upperBound) ?? lineMap.lines.count
+            if line == lastLine {
+              self = .characters(range.length)
+            } else {
+              self = .lines(lastLine - line + 1)
+            }
+
+          }
+        } else if selections.count > 1 {
+          self = .ranges(selections.count)
+        } else {
+          self = .insertionPoint(1, 1)
+        }
+      }
+    }
+
+    /// Name of the configured language.
+    ///
+    public var language: String
+
+    /// A summary of the current selection.
+    ///
+    public var selectionSummary: SelectionSummary
+
+    public init(language: String = "Text", selectionSummary: SelectionSummary = .insertionPoint(1, 1)) {
+      self.language         = language
+      self.selectionSummary = selectionSummary
+    }
   }
 
   let language:            LanguageConfiguration
   let layout:              LayoutConfiguration
   let breakUndoCoalescing: PassthroughSubject<(), Never>?
   let setActions:          ((Actions) -> Void)?
+  let setInfo:             ((Info) -> Void)?
 
   @Binding private var text:     String
   @Binding private var position: Position
@@ -143,9 +203,12 @@ public struct CodeEditor {
   ///   - layout: Layout configuration determining the visible elements of the editor view.
   ///   - breakUndoCoalescing: Trigger indicating when to break undo coalescing to avoid coalescing undos across
   ///       saves.
-  ///   - setActions: Function that the code editor uses to update the context about the available code editing
-  ///       actions. Some actions can be temporarily unavailable and the context can use that, e.g., to enable and
-  ///       disable corresponding menu or toolbar options.
+  ///   - setActions: Callback that lets the code editor update the context about the available code editing actions.
+  ///       Some actions can be temporarily unavailable and the context can use that, e.g., to enable and disable
+  ///       corresponding menu or toolbar options.
+  ///   - setInfo: Callback that lets the code editor update the context about informational aspects of the current
+  ///       editor state, such as the current line and column position of the insertion point. In contrast to
+  ///       `position`, this is summarised information suitable for consumption by the user.
   ///
   public init(text:                Binding<String>,
               position:            Binding<Position>,
@@ -153,7 +216,8 @@ public struct CodeEditor {
               language:            LanguageConfiguration = .none,
               layout:              LayoutConfiguration = .standard,
               breakUndoCoalescing: PassthroughSubject<(), Never>? = nil,
-              setActions:          ((Actions) -> Void)? = nil)
+              setActions:          ((Actions) -> Void)? = nil,
+              setInfo:             ((Info) -> Void)? = nil)
   {
     self._text               = text
     self._position           = position
@@ -162,6 +226,7 @@ public struct CodeEditor {
     self.layout              = layout
     self.breakUndoCoalescing = breakUndoCoalescing
     self.setActions          = setActions
+    self.setInfo             = setInfo
   }
 
   public class _Coordinator {
@@ -169,6 +234,7 @@ public struct CodeEditor {
     @Binding fileprivate var position: Position
 
     fileprivate let setActions: ((Actions) -> Void)?
+    fileprivate let setInfo:    ((Info) -> Void)?
 
     /// In order to avoid update cycles, where view code tries to update SwiftUI state variables (such as the view's
     /// bindings) during a SwiftUI view update, we use `updatingView` as a flag that indicates whether the view is
@@ -184,10 +250,23 @@ public struct CodeEditor {
       }
     }
 
-    init(text: Binding<String>, position: Binding<Position>, setAction: ((Actions) -> Void)?) {
+    /// The current editor info, which, on setting, is immediately propagated to the context.
+    ///
+    fileprivate var info: Info = Info() {
+      didSet {
+        setInfo?(info)
+      }
+    }
+
+    init(text: Binding<String>,
+         position: Binding<Position>,
+         setAction: ((Actions) -> Void)?,
+         setInfo: ((Info) -> Void)?)
+    {
       self._text      = text
       self._position  = position
       self.setActions = setAction
+      self.setInfo    = setInfo
     }
   }
 }
@@ -341,6 +420,8 @@ extension CodeEditor: NSViewRepresentable {
     codeView.isHorizontallyResizable = false
     codeView.autoresizingMask        = .width
 
+    context.coordinator.info.language = language.name
+
     // Embed text view in scroll view
     scrollView.documentView = codeView
 
@@ -367,6 +448,12 @@ extension CodeEditor: NSViewRepresentable {
 
     }
     codeView.selectedRanges = position.selections.map{ NSValue(range: $0) }
+    if let codeStorageDelegate = codeView.optCodeStorage?.delegate as? CodeStorageDelegate
+    {
+      context.coordinator.info.selectionSummary = Info.SelectionSummary(selections: position.selections,
+                                                                        with: codeStorageDelegate.lineMap)
+    }
+
 
     scrollView.verticalScrollPosition = position.verticalScrollPosition
 
@@ -396,8 +483,7 @@ extension CodeEditor: NSViewRepresentable {
     // NB: It is important that the actions don't capture the code view strongly.
     context.coordinator.actions = Actions(language: Actions.Language(name: language.name),
                                           info: { [weak codeView] in codeView?.infoAction() },
-                                          completions: { [weak codeView] in codeView?.completionAction() },
-                                          capabilities: { [weak codeView] in codeView?.capabilitiesAction() })
+                                          completions: { [weak codeView] in codeView?.completionAction() })
 
     let coordinator = context.coordinator
     context.coordinator.extraActionsCancellable = codeView.optLanguageService?.extraActions
@@ -424,18 +510,28 @@ extension CodeEditor: NSViewRepresentable {
 
     if codeView.lastMessages != messages { codeView.update(messages: messages) }
     if text != codeView.string { codeView.string = text }  // Hoping for the string comparison fast path...
-    if selections != codeView.selectedRanges { codeView.selectedRanges = selections }
+    if selections != codeView.selectedRanges {
+      codeView.selectedRanges = selections
+      if let codeStorageDelegate = codeView.optCodeStorage?.delegate as? CodeStorageDelegate
+      {
+        context.coordinator.info.selectionSummary = Info.SelectionSummary(selections: position.selections,
+                                                                          with: codeStorageDelegate.lineMap)
+      }
+    }
     if abs(position.verticalScrollPosition - scrollView.verticalScrollPosition) > 0.0001 {
       scrollView.verticalScrollPosition = position.verticalScrollPosition
     }
     if theme.id != codeView.theme.id { codeView.theme = theme }
     if layout != codeView.viewLayout { codeView.viewLayout = layout }
     // Equality on language configurations implies the same name and the same language service.
-    if language != codeView.language { codeView.language = language }
+    if language != codeView.language {
+      codeView.language                 = language
+      context.coordinator.info.language = language.name
+    }
   }
 
   public func makeCoordinator() -> Coordinator {
-    return Coordinator(text: $text, position: $position, setAction: setActions)
+    return Coordinator(text: $text, position: $position, setAction: setActions, setInfo: setInfo)
   }
 
   public final class Coordinator: _Coordinator {
@@ -454,7 +550,16 @@ extension CodeEditor: NSViewRepresentable {
       guard !updatingView else { return }
 
       let newValue = textView.selectedRanges.map{ $0.rangeValue }
-      if self.position.selections != newValue { self.position.selections = newValue }
+      if self.position.selections != newValue {
+
+        self.position.selections  = newValue
+        if let codeStorageDelegate = ((textView as? CodeView)?.optCodeStorage as? CodeStorage)?.delegate
+                                       as? CodeStorageDelegate
+        {
+          self.info.selectionSummary = Info.SelectionSummary(selections: newValue, with: codeStorageDelegate.lineMap)
+        }
+
+      }
     }
 
     func scrollPositionDidChange(_ scrollView: NSScrollView) {

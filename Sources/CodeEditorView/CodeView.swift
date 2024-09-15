@@ -479,10 +479,6 @@ final class CodeView: NSTextView {
   ///
   var completionTask: Task<(), Error>?
 
-  /// Holds the capabilities window if there is one.
-  ///
-  var capabilitiesWindow: CapabilitiesWindow?
-
   /// KVO observations that need to be retained.
   ///
   var observations: [NSKeyValueObservation] = []
