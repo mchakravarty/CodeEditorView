@@ -353,7 +353,7 @@ final class CompletionPanel: NSPanel {
 
 
 #Preview {
-  @StateObject var selection = CompletionPanel.ObservableSelection()
+  @Previewable @StateObject var selection = CompletionPanel.ObservableSelection()
   let completions = Completions(isIncomplete: false,
                                 items: [
                                   Completions.Completion(id: 1,
