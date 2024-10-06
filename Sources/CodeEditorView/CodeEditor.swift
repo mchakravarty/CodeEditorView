@@ -233,8 +233,8 @@ public struct CodeEditor {
     @Binding fileprivate var text:     String
     @Binding fileprivate var position: Position
 
-    fileprivate let setActions: ((Actions) -> Void)?
-    fileprivate let setInfo:    ((Info) -> Void)?
+    fileprivate var setActions: ((Actions) -> Void)?
+    fileprivate var setInfo:    ((Info) -> Void)?
 
     /// In order to avoid update cycles, where view code tries to update SwiftUI state variables (such as the view's
     /// bindings) during a SwiftUI view update, we use `updatingView` as a flag that indicates whether the view is
@@ -268,6 +268,20 @@ public struct CodeEditor {
       self.setActions = setAction
       self.setInfo    = setInfo
     }
+    
+    /// Update the bindings and callbacks that parameterise the editor view to be able to update them during a view
+    /// update.
+    ///
+    func updateBindings(text: Binding<String>,
+                        position: Binding<Position>,
+                        setAction: ((Actions) -> Void)?,
+                        setInfo: ((Info) -> Void)?)
+    {
+      self._text      = text
+      self._position  = position
+      self.setActions = setAction
+      self.setInfo    = setInfo
+    }
   }
 }
 
@@ -285,8 +299,9 @@ extension CodeEditor: UIViewRepresentable {
     func setText(_ text: String) {
       guard !context.coordinator.updatingView else { return }
 
-      if self.text != text { self.text = text }
-    }
+      // NB: Don't use `self.text` here as the closure will capture it without an option to update it when the view
+      //     gets updated with a new 'text' bdining.
+      if context.coordinator.text != text { context.coordinator.text = text }    }
 
     context.coordinator.updatingView = true
     defer {
@@ -342,6 +357,7 @@ extension CodeEditor: UIViewRepresentable {
     let theme     = context.environment.codeEditorTheme,
         selection = position.selections.first ?? .zero
 
+    context.coordinator.updateBindings(text: $text, position: $position, setAction: setActions, setInfo: setInfo)
     if codeView.lastMessages != messages { codeView.update(messages: messages) }
     if text != textView.text { textView.text = text }  // Hoping for the string comparison fast path...
     if selection != codeView.selectedRange { codeView.selectedRange = selection }
@@ -394,7 +410,9 @@ extension CodeEditor: NSViewRepresentable {
     func setText(_ text: String) {
       guard !context.coordinator.updatingView else { return }
 
-      if self.text != text { self.text = text }
+      // NB: Don't use `self.text` here as the closure will capture it without an option to update it when the view
+      //     gets updated with a new 'text' bdining.
+      if context.coordinator.text != text { context.coordinator.text = text }
     }
 
     context.coordinator.updatingView = true
@@ -508,6 +526,7 @@ extension CodeEditor: NSViewRepresentable {
     let theme      = context.environment.codeEditorTheme,
         selections = position.selections.map{ NSValue(range: $0) }
 
+    context.coordinator.updateBindings(text: $text, position: $position, setAction: setActions, setInfo: setInfo)
     if codeView.lastMessages != messages { codeView.update(messages: messages) }
     if text != codeView.string { codeView.string = text }  // Hoping for the string comparison fast path...
     if selections != codeView.selectedRanges {
