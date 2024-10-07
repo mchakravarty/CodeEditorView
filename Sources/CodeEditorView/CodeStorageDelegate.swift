@@ -149,7 +149,7 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
   private var lastTypedToken: LanguageConfiguration.Tokeniser.Token?
   
   /// Indicates that the language service is not to be notified of the next text change. (This is useful during
-  /// initialisation.)
+  /// (re)initialisation.)
   ///
   var skipNextChangeNotificationToLanguageService: Bool = false
 
@@ -196,13 +196,23 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
   ///
   /// - Parameter language: The new language.
   ///
-  /// This implies stopping any already running language service first.
-  /// 
+  /// This implies stopping any already running language service first. We don't do anything if target language
+  /// configuration equals the current one.
+  ///
   func change(language: LanguageConfiguration, for codeStorage: CodeStorage) async throws {
+    let currentLanguage = self.language
+    guard language != currentLanguage else { return }
+
     try await languageService?.stop()
-    self.language  = language
-    self.tokeniser = Tokeniser(for: language.tokenDictionary)
-    let _ = tokenise(range: NSRange(location: 0, length: codeStorage.length), in: codeStorage)
+    self.language = language
+
+    // If the actual language changes and not just the language service, re-tokenise the code storage.
+    if currentLanguage.name != language.name {
+
+      self.tokeniser = Tokeniser(for: language.tokenDictionary)
+      let _ = tokenise(range: NSRange(location: 0, length: codeStorage.length), in: codeStorage)
+
+    }
   }
   
 

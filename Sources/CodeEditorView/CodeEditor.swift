@@ -359,15 +359,39 @@ extension CodeEditor: UIViewRepresentable {
 
     context.coordinator.updateBindings(text: $text, position: $position, setAction: setActions, setInfo: setInfo)
     if codeView.lastMessages != messages { codeView.update(messages: messages) }
-    if text != textView.text { textView.text = text }  // Hoping for the string comparison fast path...
-    if selection != codeView.selectedRange { codeView.selectedRange = selection }
+    if text != codeView.string {  // Hoping for the string comparison fast path...
+
+      if language.languageService !== codeView.language.languageService {
+        (codeView.optCodeStorage?.delegate as? CodeStorageDelegate)?.skipNextChangeNotificationToLanguageService = true
+      }
+      codeView.string = text
+//      // FIXME: Stupid hack to force redrawing when the language doesn't change. (A language change already forces
+//      // FIXME: redrawing.)
+//      if language == codeView.language {
+//        Task { @MainActor in
+//          codeView.font = theme.font
+//        }
+//      }
+
+    }
+    if selection != codeView.selectedRange {
+      codeView.selectedRange = selection
+      if let codeStorageDelegate = codeView.optCodeStorage?.delegate as? CodeStorageDelegate
+      {
+        context.coordinator.info.selectionSummary = Info.SelectionSummary(selections: position.selections,
+                                                                          with: codeStorageDelegate.lineMap)
+      }
+    }
     if abs(position.verticalScrollPosition - textView.verticalScrollPosition) > 0.0001 {
       textView.verticalScrollPosition = position.verticalScrollPosition
     }
     if theme.id != codeView.theme.id { codeView.theme = theme }
     if layout != codeView.viewLayout { codeView.viewLayout = layout }
     // Equality on language configurations implies the same name and the same language service.
-    if language != codeView.language { codeView.language = language }
+    if language != codeView.language {
+      codeView.language                 = language
+      context.coordinator.info.language = language.name
+    }
   }
 
   public func makeCoordinator() -> Coordinator {
@@ -528,7 +552,21 @@ extension CodeEditor: NSViewRepresentable {
 
     context.coordinator.updateBindings(text: $text, position: $position, setAction: setActions, setInfo: setInfo)
     if codeView.lastMessages != messages { codeView.update(messages: messages) }
-    if text != codeView.string { codeView.string = text }  // Hoping for the string comparison fast path...
+    if text != codeView.string {  // Hoping for the string comparison fast path...
+
+      if language.languageService !== codeView.language.languageService {
+        (codeView.optCodeStorage?.delegate as? CodeStorageDelegate)?.skipNextChangeNotificationToLanguageService = true
+      }
+      codeView.string = text
+      // FIXME: Stupid hack to force redrawing when the language doesn't change. (A language change already forces
+      // FIXME: redrawing.)
+      if language == codeView.language {
+        Task { @MainActor in
+          codeView.font = theme.font
+        }
+      }
+
+    }
     if selections != codeView.selectedRanges {
       codeView.selectedRanges = selections
       if let codeStorageDelegate = codeView.optCodeStorage?.delegate as? CodeStorageDelegate

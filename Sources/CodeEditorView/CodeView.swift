@@ -419,9 +419,10 @@ final class CodeView: NSTextView {
   @Invalidating(.layout, .display)
   var language: LanguageConfiguration = .none {
     didSet {
-      if let codeStorage = optCodeStorage,
-          oldValue != language
-      {
+      guard let codeStorage = optCodeStorage else { return }
+
+      if oldValue != language {
+
         Task { @MainActor in
           do {
 
@@ -438,6 +439,7 @@ final class CodeView: NSTextView {
             font = theme.font
           }
         }
+
       }
     }
   }
