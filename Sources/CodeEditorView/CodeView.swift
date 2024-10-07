@@ -733,7 +733,13 @@ final class CodeView: NSTextView {
     // Updates only if there is an actual selection change.
     if oldSelectedRanges != selectedRanges {
 
-      minimapView?.selectedRanges = selectedRanges    // minimap mirrors the selection of the main code view
+      // FIXME: The following does not succeed for anything, but setting an insertion point. From macOS 15, selecting
+      // FIXME: across more than one line, leads to a crash.
+//      minimapView?.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelectingFlag)
+      // FIXME: Hence, we only set insertion points for now. (They lead to a line highlight.)
+      if let insertionPoint {
+        minimapView?.setSelectedRange(NSRange(location: insertionPoint, length: 0))
+      }
 
       updateBackgroundFor(oldSelection: combinedRanges(ranges: oldSelectedRanges),
                           newSelection: combinedRanges(ranges: ranges))

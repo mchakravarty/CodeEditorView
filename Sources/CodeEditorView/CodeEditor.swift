@@ -359,12 +359,12 @@ extension CodeEditor: UIViewRepresentable {
 
     context.coordinator.updateBindings(text: $text, position: $position, setAction: setActions, setInfo: setInfo)
     if codeView.lastMessages != messages { codeView.update(messages: messages) }
-    if text != codeView.string {  // Hoping for the string comparison fast path...
+    if text != codeView.text {  // Hoping for the string comparison fast path...
 
       if language.languageService !== codeView.language.languageService {
         (codeView.optCodeStorage?.delegate as? CodeStorageDelegate)?.skipNextChangeNotificationToLanguageService = true
       }
-      codeView.string = text
+      codeView.text = text
 //      // FIXME: Stupid hack to force redrawing when the language doesn't change. (A language change already forces
 //      // FIXME: redrawing.)
 //      if language == codeView.language {
@@ -395,7 +395,7 @@ extension CodeEditor: UIViewRepresentable {
   }
 
   public func makeCoordinator() -> Coordinator {
-    return Coordinator(text: $text, position: $position, setAction: setActions)
+    return Coordinator(text: $text, position: $position, setAction: setActions, setInfo: setInfo)
   }
 
   public final class Coordinator: _Coordinator {
