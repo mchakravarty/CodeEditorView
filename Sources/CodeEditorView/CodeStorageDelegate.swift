@@ -161,10 +161,6 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
   ///
   private(set) var processingOneCharacterAddition: Bool = false
   
-  /// Indicates the number of characters added by token completion in the current editing round.
-  /// 
-  private(set) var tokenCompletionCharacters: Int = 0
-  
   /// Contains the range of characters whose token information was invalidated by the last editing operation.
   ///
   private(set) var tokenInvalidationRange: NSRange? = nil
@@ -172,6 +168,12 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
   /// Contains the number of lines affected by `tokenInvalidationRange`.
   ///
   private(set) var tokenInvalidationLines: Int? = nil
+
+  /// Indicates the number of characters added by token completion to the right of the insertion point by the
+  /// `CodeStorageDelegate`, so that the `CodeViewDelegate` can restrict the advance of the insertion point. This is
+  /// only necessary on macOS and seems like a kludge.
+  ///
+  var tokenCompletionCharacters: Int = 0
 
 
   // MARK: Initialisers

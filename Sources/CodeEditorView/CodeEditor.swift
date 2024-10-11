@@ -64,7 +64,7 @@ public struct CodeEditor {
 
   /// Specification of a text editing position; i.e., text selection and scroll position.
   ///
-  public struct Position {
+  public struct Position: Equatable {
 
     /// Specification of a list of selection ranges.
     ///
@@ -495,7 +495,6 @@ extension CodeEditor: NSViewRepresentable {
       context.coordinator.info.selectionSummary = Info.SelectionSummary(selections: position.selections,
                                                                         with: codeStorageDelegate.lineMap)
     }
-
 
     scrollView.verticalScrollPosition = position.verticalScrollPosition
 

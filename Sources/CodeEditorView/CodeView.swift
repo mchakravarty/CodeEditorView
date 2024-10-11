@@ -756,7 +756,7 @@ final class CodeView: NSTextView {
   }
 }
 
-class CodeViewDelegate: NSObject, NSTextViewDelegate {
+final class CodeViewDelegate: NSObject, NSTextViewDelegate {
 
   // Hooks for events
   //
@@ -770,7 +770,8 @@ class CodeViewDelegate: NSObject, NSTextViewDelegate {
                 toCharacterRanges newSelectedCharRanges: [NSValue])
   -> [NSValue]
   {
-    guard let codeStorageDelegeate = textView.textStorage?.delegate as? CodeStorageDelegate
+    guard let codeStorageDelegeate = textView.textStorage?.delegate as? CodeStorageDelegate,
+          textView is CodeView    // Don't execute this for the minimap view
     else { return newSelectedCharRanges }
 
     // If token completion added characters, we don't want to include them in the advance of the insertion point.
@@ -780,6 +781,7 @@ class CodeViewDelegate: NSObject, NSTextViewDelegate {
     {
 
       let insertionPointWithoutCompletion = selectionRange.location - codeStorageDelegeate.tokenCompletionCharacters
+      codeStorageDelegeate.tokenCompletionCharacters = 0
       return [NSRange(location: insertionPointWithoutCompletion, length: 0) as NSValue]
 
     } else { return newSelectedCharRanges }
