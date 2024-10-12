@@ -193,6 +193,7 @@ final class CompletionPanel: NSPanel {
       return true
     }
 
+    @MainActor
     override func keyDown(with event: NSEvent) {
       guard let window = window as? CompletionPanel else { super.keyDown(with: event); return }
 
@@ -299,9 +300,8 @@ final class CompletionPanel: NSPanel {
   override var canBecomeKey: Bool { true }
 
   override func close() {
-
     // We cancel the completion process if the window gets closed (and the `progressHandler` is still active (i.e., it
-    // is non-`nil`.
+    // is non-`nil`).
     if isKeyWindow { progressHandler?(.cancel) }
     super.close()
   }
@@ -341,12 +341,15 @@ final class CompletionPanel: NSPanel {
 
     // Update the view and show the window if and only if there are completion items to show.
     if completions.items.isEmpty { close() }
-    else if !isVisible {
+    else {
 
       hostingView.rootView = CompletionView(completions: completions, selection: selection)
-      makeKeyAndOrderFront(nil)
-      makeFirstResponder(contentView)
+      if !isVisible {
 
+        makeKeyAndOrderFront(nil)
+        makeFirstResponder(contentView)
+
+      }
     }
   }
 }
@@ -417,7 +420,6 @@ extension CodeView {
 
       case .input(let event):
         self?.interpretKeyEvents([event])
-        break
       }
     }
   }
@@ -431,7 +433,8 @@ extension CodeView {
 
     do {
 
-      let completions = try await languageService.completions(at: location, reason: .standard)
+      let reason: CompletionTriggerReason = if completionPanel.isKeyWindow { .incomplete } else { .standard },
+          completions                     = try await languageService.completions(at: location, reason: reason)
       try Task.checkCancellation()   // may have been cancelled in the meantime due to further user action
       show(completions: completions, for: rangeForUserCompletion)
 
@@ -468,6 +471,7 @@ extension CodeView {
   func considerCompletionFor(range: NSRange) {
     guard let codeStorageDelegate = optCodeStorage?.delegate as? CodeStorageDelegate else { return }
 
+
     // Stop any already running completion task
     completionTask?.cancel()
 
@@ -478,7 +482,7 @@ extension CodeView {
         // Delay completion a bit at the start of a word (the user may still be typing) unless the completion window
         // is already open.
         // NB: throws if task gets cancelled in the meantime.
-        if range.length < 3 && !completionPanel.isKeyWindow { try await Task.sleep(until: .now + .seconds(0.5)) }
+        if range.length < 3 && !completionPanel.isKeyWindow { try await Task.sleep(until: .now + .seconds(0.2)) }
 
         // Trigger completion
         try await computeAndShowCompletions(at: range.max)

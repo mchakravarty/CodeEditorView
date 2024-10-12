@@ -141,11 +141,11 @@ public struct Completions {
 extension Completions.Completion: Comparable {
 
   public static func == (lhs: Completions.Completion, rhs: Completions.Completion) -> Bool {
-    lhs.sortText == lhs.sortText
+    lhs.sortText == rhs.sortText
   }
 
   public static func < (lhs: Completions.Completion, rhs: Completions.Completion) -> Bool {
-    lhs.sortText < lhs.sortText
+    lhs.sortText < rhs.sortText
   }
 }
 
