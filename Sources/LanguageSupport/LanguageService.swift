@@ -90,6 +90,11 @@ public struct Completions {
     /// Characters that commit to this completion when typed while the completion is selected.
     ///
     public let commitCharacters: [Character]
+    
+    /// An optional callback that yields a refined version of the same completion item; i.e., a version that has a more
+    /// informative row and/or documentation view.
+    ///
+    public let refine: (() async throws -> Completion?)
 
     public init(id: Int,
                 rowView: @escaping (Bool) -> any View,
@@ -99,7 +104,8 @@ public struct Completions {
                 filterText: String,
                 insertText: String,
                 insertRange: NSRange?,
-                commitCharacters: [Character])
+                commitCharacters: [Character],
+                refine: @escaping (() async throws -> Completion?))
     {
       self.id                = id
       self.rowView           = rowView
@@ -110,6 +116,7 @@ public struct Completions {
       self.insertText        = insertText
       self.insertRange       = insertRange
       self.commitCharacters  = commitCharacters
+      self.refine            = refine
     }
   }
 

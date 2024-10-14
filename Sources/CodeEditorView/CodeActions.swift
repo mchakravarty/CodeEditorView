@@ -156,13 +156,16 @@ final class CompletionPanel: NSPanel {
           .focused($isFocused)
 
         Divider()
-          .overlay(.gray)
+          .overlay(.gray.opacity(0.5))
           .frame(height: 0.5)
 
         if let selectedCompletion = (completions.items.first{ $0.id == selection.selection }) {
-          HStack {
-            AnyView(selectedCompletion.documentationView)
-            Spacer()
+          ScrollView {
+            HStack {
+              AnyView(selectedCompletion.documentationView)
+              Spacer()
+            }
+            .padding()
           }
           .padding()
           .frame(maxWidth: .infinity)
@@ -171,7 +174,7 @@ final class CompletionPanel: NSPanel {
 
       }
       .ignoresSafeArea()
-      .frame(maxWidth: .infinity, minHeight: 100, maxHeight: 400)
+      .frame(maxWidth: .infinity, minHeight: 100, maxHeight: 500)
       .clipShape(RoundedRectangle(cornerRadius: 10))
       .overlay {
         RoundedRectangle(cornerRadius: 10)
@@ -343,12 +346,26 @@ final class CompletionPanel: NSPanel {
     if completions.items.isEmpty { close() }
     else {
 
-      hostingView.rootView = CompletionView(completions: completions, selection: selection)
+      hostingView.rootView = CompletionView(completions: self.completions, selection: selection)
       if !isVisible {
 
         makeKeyAndOrderFront(nil)
         makeFirstResponder(contentView)
 
+      }
+
+      // Refine all refinable items.
+      Task { @MainActor in
+        for item in self.completions.items.enumerated() {
+          if let refinedItem = try? await item.element.refine() {
+            self.completions.items[item.offset] = refinedItem
+            // This doesn't trigger an update (maybe, because only `AnyView` subviews change?)...
+//            hostingView.rootView = CompletionView(completions: completions, selection: selection)
+          }
+        }
+        // ...hence, we update the whole thing.
+        contentView = HostedCompletionView(rootView: CompletionView(completions: self.completions,
+                                                                    selection: selection))
       }
     }
   }
@@ -367,7 +384,8 @@ final class CompletionPanel: NSPanel {
                                                          filterText: "foo",
                                                          insertText: "foo",
                                                          insertRange: NSRange(location: 0, length: 1),
-                                                         commitCharacters: []),
+                                                         commitCharacters: [],
+                                                         refine: { nil }),
                                   Completions.Completion(id: 2,
                                                          rowView: { _ in Text("fop") },
                                                          documentationView: Text("Second best function!"),
@@ -376,7 +394,8 @@ final class CompletionPanel: NSPanel {
                                                          filterText: "fop",
                                                          insertText: "fop",
                                                          insertRange: NSRange(location: 0, length: 1),
-                                                         commitCharacters: []),
+                                                         commitCharacters: [],
+                                                         refine: { nil }),
                                   Completions.Completion(id: 3,
                                                          rowView: { _ in Text("fabc") },
                                                          documentationView: Text("My best function!"),
@@ -385,9 +404,10 @@ final class CompletionPanel: NSPanel {
                                                          filterText: "fabc",
                                                          insertText: "fabc",
                                                          insertRange: NSRange(location: 0, length: 1),
-                                                         commitCharacters: []),
+                                                         commitCharacters: [],
+                                                         refine: { nil }),
                                 ])
-  return CompletionPanel.CompletionView(completions: completions, selection: selection)
+  CompletionPanel.CompletionView(completions: completions, selection: selection)
 }
 
 extension CodeView {
