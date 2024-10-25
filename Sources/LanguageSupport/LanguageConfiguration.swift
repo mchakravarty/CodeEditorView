@@ -482,7 +482,7 @@ extension LanguageConfiguration {
     if supportsCurlyBrackets {
       codeTokens.append(contentsOf:
                           [ TokenDescription(regex: /{/, singleLexeme: "{", action: token(.curlyBracketOpen))
-                          , TokenDescription(regex: /}/, singleLexeme: "}", action: token(.squareBracketClose))
+                          , TokenDescription(regex: /}/, singleLexeme: "}", action: token(.curlyBracketClose))
                           ])
     }
     if let regex = stringRegex { codeTokens.append(TokenDescription(regex: regex, action: token(.string))) }
