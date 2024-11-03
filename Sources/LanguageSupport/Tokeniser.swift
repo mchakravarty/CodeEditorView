@@ -40,6 +40,9 @@ public struct TokenDescription<TokenType, StateType> {
 
   /// If the token has only got a single lexeme, it is specified here.
   ///
+  /// When using a ``LanguageConfiguration`` which allows case-insensitive reserved identifiers, the contents will
+  /// be converted to a lower-case representation for comparison.
+  ///
   public let singleLexeme: String?
 
   /// The action to take when the token gets matched.
@@ -146,11 +149,16 @@ public struct Tokeniser<TokenType: Equatable, StateType: TokeniserState> {
   /// Sub-tokeniser for all states of the compound tokeniser.
   ///
   let states: [StateType.StateTag: State]
+  
+  /// Whether reserved identifiers are case-sensitive
+  ///
+  let caseInsensitiveReservedIdentifiers: Bool
 
   /// Create a tokeniser from the given token dictionary.
   ///
   /// - Parameters:
   ///   - tokenMap: The token dictionary determining the lexemes to match and their token type.
+  ///   - caseInsensitiveReservedIdentifiers: Whether reserved identifiers should be matched case-insensitively
   /// - Returns: A tokeniser that matches all lexemes contained in the token dictionary.
   ///
   /// The tokeniser is based on an eager regular expression matcher. Hence, it will match the first matching alternative
@@ -165,7 +173,7 @@ public struct Tokeniser<TokenType: Equatable, StateType: TokeniserState> {
   /// the token body— are marked with the same token attribute, but without being identified as a lexeme head. This
   /// distinction is crucial to be able to distinguish the boundaries of multiple successive tokens of the same type.
   ///
-  public init?(for tokenMap: TokenDictionary<TokenType, StateType>)
+  public init?(for tokenMap: TokenDictionary<TokenType, StateType>, caseInsensitiveReservedIdentifiers: Bool = false)
   {
     func combine(alternatives: [TokenDescription<TokenType, StateType>]) -> Regex<Substring>? {
       switch alternatives.count {
@@ -202,8 +210,10 @@ public struct Tokeniser<TokenType: Equatable, StateType: TokeniserState> {
           singleLexemeTokensRegex = combine(alternatives: singleLexemeTokens),
           multiLexemeTokensRegex  = combineWithCapture(alternatives: multiLexemeTokens)
 
-      let stringTokenTypes: [(String, TokenAction<TokenType, StateType>)] = singleLexemeTokens.compactMap {
-        if let lexeme = $0.singleLexeme { (lexeme, $0.action) } else { nil }
+      let stringTokenTypes: [(String, TokenAction<TokenType, StateType>)] = singleLexemeTokens.compactMap { token in
+        guard let lexeme = token.singleLexeme else { return nil }
+        let lexemeToUse = caseInsensitiveReservedIdentifiers ? lexeme.lowercased() : lexeme
+        return (lexemeToUse, token.action)
       }
       let patternTokenTypes = multiLexemeTokens.map{ $0.action }
 
@@ -231,6 +241,7 @@ public struct Tokeniser<TokenType: Equatable, StateType: TokeniserState> {
     }
 
     states = tokenMap.compactMapValues{ tokeniser(for: $0) }
+    self.caseInsensitiveReservedIdentifiers = caseInsensitiveReservedIdentifiers
     if states.isEmpty { logger.debug("failed to compile regexp"); return nil }
   }
 }
@@ -268,8 +279,13 @@ extension StringProtocol {
 
       var tokenAction: TokenAction<TokenType, StateType>?
       if result[1].range != nil {     // that is the capture for the whole lot of single lexeme tokens
-
-        tokenAction = stateTokeniser.stringTokenTypes[String(self[result.range])]
+        
+        let lookupString = if tokeniser.caseInsensitiveReservedIdentifiers {
+          String(self[result.range]).lowercased()
+        } else {
+          String(self[result.range])
+        }
+        tokenAction = stateTokeniser.stringTokenTypes[lookupString]
 
       } else {
 

@@ -174,6 +174,10 @@ public struct LanguageConfiguration {
   ///
   public let supportsCurlyBrackets: Bool
 
+  /// Whether reserved identifiers are case-sensitive.
+  ///
+  public let caseInsensitiveReservedIdentifiers: Bool
+
   /// Regular expression matching strings
   ///
   public let stringRegex: Regex<Substring>?
@@ -219,6 +223,7 @@ public struct LanguageConfiguration {
   public init(name: String,
               supportsSquareBrackets: Bool,
               supportsCurlyBrackets: Bool,
+              caseInsensitiveReservedIdentifiers: Bool = false,
               stringRegex: Regex<Substring>?,
               characterRegex: Regex<Substring>?,
               numberRegex: Regex<Substring>?,
@@ -233,6 +238,7 @@ public struct LanguageConfiguration {
     self.name                   = name
     self.supportsSquareBrackets = supportsSquareBrackets
     self.supportsCurlyBrackets  = supportsCurlyBrackets
+    self.caseInsensitiveReservedIdentifiers = caseInsensitiveReservedIdentifiers
     self.stringRegex            = stringRegex
     self.characterRegex         = characterRegex
     self.numberRegex            = numberRegex
@@ -504,7 +510,8 @@ extension LanguageConfiguration {
     if let regex = identifierRegex { codeTokens.append(TokenDescription(regex: regex, action: token(.identifier(nil)))) }
     if let regex = operatorRegex { codeTokens.append(TokenDescription(regex: regex, action: token(.operator(nil)))) }
     for reserved in reservedIdentifiers {
-      codeTokens.append(TokenDescription(regex: Regex{ Anchor.wordBoundary; reserved; Anchor.wordBoundary },
+      let regex = Regex{ Anchor.wordBoundary; reserved; Anchor.wordBoundary }.ignoresCase(caseInsensitiveReservedIdentifiers)
+      codeTokens.append(TokenDescription(regex: regex,
                                          singleLexeme: reserved,
                                          action: token(.keyword)))
     }

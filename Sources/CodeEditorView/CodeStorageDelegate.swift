@@ -180,7 +180,8 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
 
   init(with language: LanguageConfiguration, setText: @escaping (String) -> Void) {
     self.language  = language
-    self.tokeniser = Tokeniser(for: language.tokenDictionary)
+    self.tokeniser = Tokeniser(for: language.tokenDictionary,
+                               caseInsensitiveReservedIdentifiers: language.caseInsensitiveReservedIdentifiers)
     self.setText   = setText
     super.init()
   }
@@ -211,7 +212,8 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
     // If the actual language changes and not just the language service, re-tokenise the code storage.
     if currentLanguage.name != language.name {
 
-      self.tokeniser = Tokeniser(for: language.tokenDictionary)
+      self.tokeniser = Tokeniser(for: language.tokenDictionary,
+                                 caseInsensitiveReservedIdentifiers: language.caseInsensitiveReservedIdentifiers)
       let _ = tokenise(range: NSRange(location: 0, length: codeStorage.length), in: codeStorage)
 
     }
