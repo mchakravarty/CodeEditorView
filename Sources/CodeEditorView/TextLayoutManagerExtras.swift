@@ -349,11 +349,14 @@ extension NSTextLayoutManager {
       {
         // This seems the most reliable way to force a redraw of the affected (visible) area.
         let range = textContentStorage.range(for: visibleTextRange)
-        textContentStorage.processEditing(for: textStorage, 
-                                          edited: .editedAttributes,
-                                          range: range,
-                                          changeInLength: 0,
-                                          invalidatedRange: range)
+
+// FIXME: This code has been disabled, because it interferes with the setting of the `selectedRanges` (specifically, the
+// FIXME: insertion point) from macOS 15.1 (maybe already 15.0) onwards — see Issue #114.
+//        textContentStorage.processEditing(for: textStorage,
+//                                          edited: .editedAttributes,
+//                                          range: range,
+//                                          changeInLength: 0,
+//                                          invalidatedRange: range)
       }
     }
   }

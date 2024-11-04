@@ -517,7 +517,7 @@ class CodeContentStorage: NSTextContentStorage {
         for textLayoutManager in textLayoutManagers {
           
           // NB: We do not want to call `NSTextLayoutManager.invalidateRenderingAttributes(for:)` as that removes all
-          //     rendering attributes *without* calling the rendnering attribute validator to set the new attributes.
+          //     rendering attributes *without* calling the rendering attribute validator to set the new attributes.
 
           textLayoutManager.redisplayRenderingAttributes(for: additionalInvalidationTextRange)
         }
