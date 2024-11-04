@@ -5,6 +5,7 @@
 //  Created by Manuel M T Chakravarty on 25/03/2023.
 //
 
+import RegexBuilder
 import XCTest
 @testable import CodeEditorView
 @testable import LanguageSupport
@@ -223,6 +224,79 @@ test */
     XCTAssertEqual(lineMap.lookup(line: 0)?.info?.commentRanges, [NSRange(location: 16, length: 12)])
     XCTAssertEqual(lineMap.lookup(line: 1)?.info?.commentRanges, [NSRange(location: 0, length: 7)])
   }
+  
+  func testCaseInsensitiveReservedIdentifiersUnspecified() throws {
+    let lowerCaseCode = "struct SomeType {}"
+    let codeStorageDelegate = CodeStorageDelegate(with: .swift(), setText: { _ in }),
+        codeStorage         = CodeStorage(theme: .defaultLight)
+    codeStorage.delegate = codeStorageDelegate
+    
+    codeStorage.setAttributedString(NSAttributedString(string: lowerCaseCode))  // this triggers tokenisation
+    
+    let lowerCaseLineMap = codeStorageDelegate.lineMap
+    XCTAssertEqual(lowerCaseLineMap.lines.count, 1)    // code starts at line 1
+    XCTAssertEqual(lowerCaseLineMap.lookup(line: 0)?.info?.tokens,
+                   [ Tokeniser.Token(token: .keyword, range: NSRange(location: 0, length: 6))
+                   , Tokeniser.Token(token: .identifier(.none), range: NSRange(location: 7, length: 8))
+                   , Tokeniser.Token(token: .curlyBracketOpen, range: NSRange(location: 16, length: 1))
+                   , Tokeniser.Token(token: .curlyBracketClose, range: NSRange(location: 17, length: 1))])
+    
+    let upperCaseCode = "STRUCT SomeType {}"
+    codeStorage.setAttributedString(NSAttributedString(string: upperCaseCode))  // this triggers tokenisation
+    
+    let upperCaseLineMap = codeStorageDelegate.lineMap
+    XCTAssertEqual(upperCaseLineMap.lines.count, 1)    // code starts at line 1
+    XCTAssertEqual(upperCaseLineMap.lookup(line: 0)?.info?.tokens,
+                   [ Tokeniser.Token(token: .identifier(.none), range: NSRange(location: 0, length: 6))
+                   , Tokeniser.Token(token: .identifier(.none), range: NSRange(location: 7, length: 8))
+                   , Tokeniser.Token(token: .curlyBracketOpen, range: NSRange(location: 16, length: 1))
+                   , Tokeniser.Token(token: .curlyBracketClose, range: NSRange(location: 17, length: 1))])
+  }
+  
+  func testCaseInsensitiveReservedIdentifiersFalse() throws {
+    let lowerCaseCode = "struct SomeType {}"
+    let codeStorageDelegate = CodeStorageDelegate(with: .structCaseSensitive, setText: { _ in }),
+        codeStorage         = CodeStorage(theme: .defaultLight)
+    codeStorage.delegate = codeStorageDelegate
+    
+    codeStorage.setAttributedString(NSAttributedString(string: lowerCaseCode))  // this triggers tokenisation
+    
+    let lowerCaseLineMap = codeStorageDelegate.lineMap
+    XCTAssertEqual(lowerCaseLineMap.lines.count, 1)    // code starts at line 1
+    XCTAssertEqual(lowerCaseLineMap.lookup(line: 0)?.info?.tokens,
+                   [ Tokeniser.Token(token: .keyword, range: NSRange(location: 0, length: 6))
+                   , Tokeniser.Token(token: .identifier(.none), range: NSRange(location: 7, length: 8))
+                   , Tokeniser.Token(token: .curlyBracketOpen, range: NSRange(location: 16, length: 1))
+                   , Tokeniser.Token(token: .curlyBracketClose, range: NSRange(location: 17, length: 1))])
+    
+    let upperCaseCode = "STRUCT SomeType {}"
+    codeStorage.setAttributedString(NSAttributedString(string: upperCaseCode))  // this triggers tokenisation
+    
+    let upperCaseLineMap = codeStorageDelegate.lineMap
+    XCTAssertEqual(upperCaseLineMap.lines.count, 1)    // code starts at line 1
+    XCTAssertEqual(upperCaseLineMap.lookup(line: 0)?.info?.tokens,
+                   [ Tokeniser.Token(token: .identifier(.none), range: NSRange(location: 0, length: 6))
+                   , Tokeniser.Token(token: .identifier(.none), range: NSRange(location: 7, length: 8))
+                   , Tokeniser.Token(token: .curlyBracketOpen, range: NSRange(location: 16, length: 1))
+                   , Tokeniser.Token(token: .curlyBracketClose, range: NSRange(location: 17, length: 1))])
+  }
+  
+  func testCaseInsensitiveReservedIdentifiersTrue() throws {
+    let code = "STRUCT SomeType {}"
+    let codeStorageDelegate = CodeStorageDelegate(with: .structCaseInsensitive, setText: { _ in }),
+        codeStorage         = CodeStorage(theme: .defaultLight)
+    codeStorage.delegate = codeStorageDelegate
+    
+    codeStorage.setAttributedString(NSAttributedString(string: code))  // this triggers tokenisation
+    
+    let lineMap = codeStorageDelegate.lineMap
+    XCTAssertEqual(lineMap.lines.count, 1)    // code starts at line 1
+    XCTAssertEqual(lineMap.lookup(line: 0)?.info?.tokens,
+                   [ Tokeniser.Token(token: .keyword, range: NSRange(location: 0, length: 6))
+                   , Tokeniser.Token(token: .identifier(.none), range: NSRange(location: 7, length: 8))
+                   , Tokeniser.Token(token: .curlyBracketOpen, range: NSRange(location: 16, length: 1))
+                   , Tokeniser.Token(token: .curlyBracketClose, range: NSRange(location: 17, length: 1))])
+  }
 
   static var allTests = [
     ("testSimpleTokenise", testSimpleTokenise),
@@ -232,5 +306,55 @@ test */
     ("testTokeniseCommentAtEndMulti", testTokeniseCommentAtEndMulti),
     ("testTokeniseNestedComment", testTokeniseNestedComment),
     ("testTokeniseMultiLineNestedComment", testTokeniseMultiLineNestedComment),
+    ("testCaseInsensitiveReservedIdentifiersUnspecified", testCaseInsensitiveReservedIdentifiersUnspecified),
+    ("testCaseInsensitiveReservedIdentifiersFalse", testCaseInsensitiveReservedIdentifiersFalse),
+    ("testCaseInsensitiveReservedIdentifiersTrue", testCaseInsensitiveReservedIdentifiersTrue),
   ]
+}
+
+extension LanguageConfiguration {
+  private static let plainIdentifierRegex: Regex<Substring> = Regex {
+    identifierHeadCharacters
+    ZeroOrMore {
+      identifierCharacters
+    }
+  }
+  
+  fileprivate static var structCaseSensitive: LanguageConfiguration {
+    LanguageConfiguration(
+      name: "StructCaseUnspecified",
+      supportsSquareBrackets: true,
+      supportsCurlyBrackets: true,
+      caseInsensitiveReservedIdentifiers: false,
+      stringRegex: nil,
+      characterRegex: nil,
+      numberRegex: nil,
+      singleLineComment: nil,
+      nestedComment: nil,
+      identifierRegex: plainIdentifierRegex,
+      operatorRegex: nil,
+      reservedIdentifiers: ["struct"],
+      reservedOperators: [],
+      languageService: nil
+    )
+  }
+  
+  fileprivate static var structCaseInsensitive: LanguageConfiguration {
+    LanguageConfiguration(
+      name: "StructCaseInsensitive",
+      supportsSquareBrackets: true,
+      supportsCurlyBrackets: true,
+      caseInsensitiveReservedIdentifiers: true,
+      stringRegex: nil,
+      characterRegex: nil,
+      numberRegex: nil,
+      singleLineComment: nil,
+      nestedComment: nil,
+      identifierRegex: plainIdentifierRegex,
+      operatorRegex: nil,
+      reservedIdentifiers: ["struct"],
+      reservedOperators: [],
+      languageService: nil
+    )
+  }
 }
