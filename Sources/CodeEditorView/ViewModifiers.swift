@@ -57,7 +57,7 @@ extension View {
 }
 
 
-#if os(iOS) || os(visionOS)
+#if os(iOS)
 
 // MARK: -
 // MARK: Dedecting device rotation
