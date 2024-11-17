@@ -53,6 +53,8 @@ extension LanguageConfiguration {
                                  languageService: languageService)
   }
   
+  // See `sqlite3CtypeMap` in:
+  // https://sqlite.org/src/file?name=ext/misc/normalize.c&ci=trunk
   private static let sqliteIdentifierHeadCharacters: CharacterClass = CharacterClass(
     "a"..."z",
     "A"..."Z",
@@ -66,6 +68,7 @@ extension LanguageConfiguration {
     .anyOf("\u{24}")
   )
   
+  // https://sqlite.org/lang_keywords.html
   private static let sqliteReservedIdentifiers = [
     "abort",
     "action",
@@ -216,6 +219,7 @@ extension LanguageConfiguration {
     "without",
   ]
   
+  // https://www.sqlite.org/lang_expr.html#operators_and_parse_affecting_attributes
   private static let sqliteReservedOperators = [
     "~", "+", "-",
     "||", "->", "->>",
