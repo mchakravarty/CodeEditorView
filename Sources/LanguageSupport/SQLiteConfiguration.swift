@@ -11,6 +11,8 @@ import RegexBuilder
 extension LanguageConfiguration {
   
   public static func sqlite(_ languageService: LanguageService? = nil) -> LanguageConfiguration {
+    
+    // https://www.sqlite.org/syntax/numeric-literal.html
     let numberRegex: Regex<Substring> = Regex {
       Optionally("-")
       ChoiceOf {
