@@ -652,7 +652,7 @@ final class CodeView: NSTextView {
     // We need to re-tile the subviews whenever the frame of the text view changes.
     frameChangedNotificationObserver
       = NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification,
-                                               object: enclosingScrollView,
+                                               object: viewLayout.scrollable ? enclosingScrollView : self,
                                                queue: .main){ [weak self] _ in
 
         // NB: When resizing the window, where the text container doesn't completely fill the text view (i.e., the text
@@ -985,15 +985,28 @@ extension CodeView {
     // NB: Since macOS 14, we need to explicitly set clipping; otherwise, views will draw outside of the bounds of the
     //     scroll view. We need to do this vor each view, as it is not guaranteed that they share a container view.
     if let view = gutterView, view.superview == nil {
-      enclosingScrollView?.addFloatingSubview(view, for: .horizontal)
-      view.superview?.clipsToBounds = true
+        if viewLayout.scrollable {
+            enclosingScrollView?.addFloatingSubview(view, for: .horizontal)
+        } else {
+            self.addSubview(view)
+        }
+      
+        view.superview?.clipsToBounds = true
     }
     if let view = minimapDividerView, view.superview == nil {
-      enclosingScrollView?.addFloatingSubview(view, for: .horizontal)
+        if viewLayout.scrollable {
+            enclosingScrollView?.addFloatingSubview(view, for: .horizontal)
+        } else {
+            self.addSubview(view)
+        }
       view.superview?.clipsToBounds = true
     }
     if let view = minimapView, view.superview == nil {
-      enclosingScrollView?.addFloatingSubview(view, for: .horizontal)
+        if viewLayout.scrollable {
+            enclosingScrollView?.addFloatingSubview(view, for: .horizontal)
+        } else {
+            self.addSubview(view)
+        }
       view.superview?.clipsToBounds = true
     }
 #endif
@@ -1056,7 +1069,9 @@ extension CodeView {
     showsHorizontalScrollIndicator = !viewLayout.wrapText
     if viewLayout.wrapText && frame.size.width != visibleWidth { frame.size.width = visibleWidth }  // don't update frames in vain
 #elseif os(macOS)
-    enclosingScrollView?.hasHorizontalScroller = !viewLayout.wrapText
+      if viewLayout.scrollable {
+          enclosingScrollView?.hasHorizontalScroller = !viewLayout.wrapText
+      }
     isHorizontallyResizable                    = !viewLayout.wrapText
     if !isHorizontallyResizable && frame.size.width != visibleWidth { frame.size.width = visibleWidth }  // don't update frames in vain
 #endif
