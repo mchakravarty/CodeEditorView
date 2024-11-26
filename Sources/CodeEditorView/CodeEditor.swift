@@ -418,11 +418,11 @@ extension CodeEditor: UIViewRepresentable {
       context.coordinator.info.language = language.name
     }
       
-      CodeEditor.recalculateHeight(view: codeView, result: $dynamicViewHeight)
+      CodeEditor.recalculateHeight(view: textView, result: $dynamicViewHeight)
   }
     
-    fileprivate static func recalculateHeight(view: UIView, result: Binding<CGFloat>) {
-        let latestSize = view.sizeThatFits(CGSize(width: view.frame.width, height: .greatestFiniteMagnitude))
+    fileprivate static func recalculateHeight(view: UIScrollView, result: Binding<CGFloat>) {
+        let latestSize = view.contentSize
                 DispatchQueue.main.async {
                     result.wrappedValue = latestSize.height
                     print(#function, latestSize.height)

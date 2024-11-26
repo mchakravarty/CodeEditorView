@@ -8,7 +8,7 @@ import SwiftUI
 import LanguageSupport
 import Combine
 
-struct SizedCodeEditor: View {
+public struct SizedCodeEditor: View {
     let language:            LanguageConfiguration
     let layout:              CodeEditor.LayoutConfiguration
     let breakUndoCoalescing: PassthroughSubject<(), Never>?
@@ -40,7 +40,7 @@ struct SizedCodeEditor: View {
         self.setInfo             = setInfo
     }
     
-    var body: some View {
+    public var body: some View {
         CodeEditor(text: $text, position: $position, messages: $messages, language: language, layout: layout, breakUndoCoalescing: breakUndoCoalescing, setActions: setActions, setInfo: setInfo, dynamicHeight: $height)
             .frame(minHeight: height, maxHeight: height)
     }
