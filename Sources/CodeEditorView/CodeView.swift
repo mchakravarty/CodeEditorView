@@ -194,7 +194,7 @@ final class CodeView: UITextView {
     // Line wrapping
     textContainerInset                  = .zero
     textContainer.widthTracksTextView  = false   // we need to be able to control the size (see `tile()`)
-    textContainer.heightTracksTextView = false
+    textContainer.heightTracksTextView = !viewLayout.scrollable
     textContainer.lineBreakMode        = .byWordWrapping
 
     // Add the view delegate
@@ -997,7 +997,7 @@ extension CodeView {
         if viewLayout.scrollable {
             enclosingScrollView?.addFloatingSubview(view, for: .horizontal)
         } else {
-            self.addSubview(view)
+           self.addSubview(view)
         }
       view.superview?.clipsToBounds = true
     }
@@ -1018,9 +1018,9 @@ extension CodeView {
         gutterWidthInCharacters = CGFloat(7),
         gutterWidth             = ceil(fontWidth * gutterWidthInCharacters),
         minimumHeight           = max(contentSize.height, documentVisibleRect.height),
+        
         gutterSize              = CGSize(width: gutterWidth, height: minimumHeight),
         lineFragmentPadding     = CGFloat(5)
-
     if gutterView?.frame.size != gutterSize { gutterView?.frame = CGRect(origin: .zero, size: gutterSize) }
 
     // Compute sizes of the minimap text view and gutter
@@ -1066,7 +1066,9 @@ extension CodeView {
     }
 
 #if os(iOS) || os(visionOS)
-    showsHorizontalScrollIndicator = !viewLayout.wrapText
+      if viewLayout.scrollable {
+          showsHorizontalScrollIndicator = !viewLayout.wrapText
+      }
     if viewLayout.wrapText && frame.size.width != visibleWidth { frame.size.width = visibleWidth }  // don't update frames in vain
 #elseif os(macOS)
       if viewLayout.scrollable {

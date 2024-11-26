@@ -302,7 +302,7 @@ extension NSTextView: TextView {
     return lineRanges.reduce(Set<Int>()){ $0.union($1) }
   }
 
-  var documentVisibleRect: CGRect { enclosingScrollView?.documentVisibleRect ?? bounds }
+    var documentVisibleRect: CGRect { enclosingScrollView?.documentVisibleRect ?? CGRect(origin: .zero, size: visibleRect.size) }
 
   var contentSize: CGSize { bounds.size }
 }
