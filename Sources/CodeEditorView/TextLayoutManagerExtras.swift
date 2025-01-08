@@ -322,42 +322,19 @@ extension NSTextLayoutManager {
     }
   }
   
-  /// Notifies the layout manager that the rendering attributes in the given range need to be validated and redisplayed.
+  /// Notifies the layout manager that the old rendering attributes in the given range need to be invalidated and
+  /// sets new rendering attributes.
   ///
   /// - Parameter for: The range whose attributes need to be validated and redeisplayed.
   ///
-  /// NB: This may be a large range. In this case, the work should be cut up to avoid unresponsiveness.
+  /// TODO: This may be a large range. In this case, the work should maybe be cut up to avoid unresponsiveness.
   ///
   func redisplayRenderingAttributes(for textRange: NSTextRange) {
+    invalidateRenderingAttributes(for: textRange)
     enumerateTextLayoutFragments(in: textRange) { textLayoutFragment in
 
-      // We spawn a task per layout fragment to cut up the work.
-      Task { @MainActor in   // The non-sendable warnings are bogus as this goes to the `MainActor`.
-        renderingAttributesValidator?(self, textLayoutFragment)
-      }
+      renderingAttributesValidator?(self, textLayoutFragment)
       return true
-    }
-
-    // FIXME: Ensure that all the tasks with `renderingAttributesValidator` have complete before running the following.
-    // FIXME: Well actually, only those within the viewport, for better responsiveness!
-    let visibleTextRange = if let viewportRange = textViewportLayoutController.viewportRange
-                           { textRange.intersection(viewportRange) ?? textRange } else { textRange  }
-    // NB: Setting rendering attributes does not trigger redrawing of the affected area. We need to do that explicitly.
-    Task { @MainActor in   // The non-sendable warnings are bogus as this goes to the `MainActor`.
-      if let textContentStorage = textContentManager as? NSTextContentStorage,
-         let textStorage        = textContentStorage.textStorage
-      {
-        // This seems the most reliable way to force a redraw of the affected (visible) area.
-        let range = textContentStorage.range(for: visibleTextRange)
-
-// FIXME: This code has been disabled, because it interferes with the setting of the `selectedRanges` (specifically, the
-// FIXME: insertion point) from macOS 15.1 (maybe already 15.0) onwards — see Issue #114.
-//        textContentStorage.processEditing(for: textStorage,
-//                                          edited: .editedAttributes,
-//                                          range: range,
-//                                          changeInLength: 0,
-//                                          invalidatedRange: range)
-      }
     }
   }
 }

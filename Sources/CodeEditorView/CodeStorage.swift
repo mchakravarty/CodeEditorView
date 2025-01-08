@@ -84,7 +84,7 @@ class CodeStorage: NSTextStorage {
 
       let extendedRange = NSRange(location: range.location, length: 2)
       textStorage.replaceCharacters(in: extendedRange, with: "")
-      edited(.editedCharacters, range: extendedRange, changeInLength: -2)
+      edited([.editedCharacters, .editedAttributes], range: extendedRange, changeInLength: -2)
 
     } else {
 
@@ -512,13 +512,10 @@ class CodeContentStorage: NSTextContentStorage {
         } else { invalidationRange }
 
       if additionalInvalidationRange.length > 0 && invalidationLines > 1,
-         let additionalInvalidationTextRange = textRange(for: additionalInvalidationRange)
+        let additionalInvalidationTextRange = textRange(for: additionalInvalidationRange)
       {
         for textLayoutManager in textLayoutManagers {
           
-          // NB: We do not want to call `NSTextLayoutManager.invalidateRenderingAttributes(for:)` as that removes all
-          //     rendering attributes *without* calling the rendering attribute validator to set the new attributes.
-
           textLayoutManager.redisplayRenderingAttributes(for: additionalInvalidationTextRange)
         }
       }

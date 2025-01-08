@@ -21,10 +21,12 @@ protocol TextView {
   associatedtype Font
 
   // This is necessary as these members are optional in AppKit and not optional in UIKit.
-  var optTextLayoutManager:  NSTextLayoutManager?  { get }
   var optTextContainer:      NSTextContainer?      { get }
-  var optTextContentStorage: NSTextContentStorage? { get }
   var optCodeStorage:        CodeStorage?          { get }
+
+  // FIXME: Get rid of the `opt`-prefix. It's not necessary for TextKit 2 objects.
+  var optTextLayoutManager:  NSTextLayoutManager?  { get }
+  var optTextContentStorage: NSTextContentStorage? { get }
 
   var textBackgroundColor: Color? { get }
   var textFont:            Font? { get }
