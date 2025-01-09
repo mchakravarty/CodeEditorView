@@ -6,15 +6,108 @@
 //
 //  This file implements common code editing operations.
 
-#if os(macOS)
-import AppKit
-#elseif os(iOS) || os(visionOS)
-import UIKit
-#endif
+import SwiftUI
 
+
+// MARK: -
+// MARK: Actions and commands
+
+//extension CodeView {
+//
+//#if os(macOS)
+//  override func performKeyEquivalent(with event: NSEvent) -> Bool {
+//
+//    if event.charactersIgnoringModifiers == "/"
+//        && event.modifierFlags.intersection([.command, .control, .option]) == .command
+//    {
+//
+//      comment()
+//      return true
+//
+//    } else {
+//      return super.performKeyEquivalent(with: event)
+//    }
+//  }
+//#endif
+//}
+
+/// Adds an "Editor" menu with code editing commands and adds a duplicate command to the pasteboard commands.
+///
+public struct CodeEditingCommands: Commands {
+
+  public init() { }
+
+  public var body: some Commands {
+
+    CommandGroup(after: .pasteboard) {
+      CodeEditingDuplicateCommandView()
+    }
+
+    CommandMenu("Editor") {
+      CodeEditingCommandsView()
+    }
+  }
+}
+
+/// Menu item for the duplicate command.
+///
+public struct CodeEditingDuplicateCommandView: View {
+
+  public init() { }
+
+  public var body: some View {
+
+    Button("Duplicate") {
+#if os(macOS)
+      NSApplication.shared.sendAction(#selector(CodeEditorActions.duplicate(_:)), to: nil, from: nil)
+#elseif os(iOS) || os(visionOS)
+      UIApplication.shared.sendAction(#selector(CodeEditorActions.duplicate(_:)), to: nil, from: nil, for: nil)
+#endif
+    }
+    .keyboardShortcut("D", modifiers: [.command])
+  }
+}
+
+/// Code editing commands that can, for example, be used in a `CommandMenu` or `CommandGroup`.
+///
+public struct CodeEditingCommandsView: View {
+
+  public init() { }
+
+  public var body: some View {
+
+    Button("Comment Selection") {
+#if os(macOS)
+      NSApplication.shared.sendAction(#selector(CodeEditorActions.commentSelection(_:)), to: nil, from: nil)
+#elseif os(iOS) || os(visionOS)
+      UIApplication.shared.sendAction(#selector(CodeEditorActions.commentSelection(_:)), to: nil, from: nil, for: nil)
+#endif
+    }
+    .keyboardShortcut("/", modifiers: [.command])
+  }
+}
+
+/// Protocol with all code editor actions for maximum flexibility in invoking them via the responder chain.
+///
+@objc public protocol CodeEditorActions {
+
+  func duplicate(_ sender: Any?)
+  func commentSelection(_ sender: Any?)
+}
+
+extension CodeView: CodeEditorActions {
+
+  @objc func duplicate(_ sender: Any?) { duplicate() }
+  @objc func commentSelection(_ sender: Any?) { comment() }
+}
+
+
+
+// MARK: -
+// MARK: Selections
 
 extension NSRange {
-  
+
   /// Adjusts the selection represneted by `self` in accordance with replacing the characters in the given range with
   /// the given number of replacement characters.
   ///
@@ -67,27 +160,12 @@ extension NSRange {
   }
 }
 
-extension CodeView {
 
-#if os(macOS)
-  override func performKeyEquivalent(with event: NSEvent) -> Bool {
-
-    if event.charactersIgnoringModifiers == "/"
-        && event.modifierFlags.intersection([.command, .control, .option]) == .command
-    {
-
-      comment()
-      return true
-
-    } else {
-      return super.performKeyEquivalent(with: event)
-    }
-  }
-#endif
-}
+// MARK: -
+// MARK: Editing functionality
 
 extension CodeView {
-  
+
   /// Comment or uncomment the selection or multiple lines.
   ///
   /// For each selection range in the current selection, proceed as follows:
@@ -183,20 +261,10 @@ extension CodeView {
     }
 
     textContentStorage.performEditingTransaction {
-
-      // NB: It is crucial to process selected ranges in reverse order as any text change invalidates ranges in the line
-      //     map after the change.
-#if os(macOS)
-      let ranges = selectedRanges.reversed()
-#elseif os(iOS) || os(visionOS)
-      let ranges = [NSValue(range: selectedRange)]
-#endif
-      var newSelected: [NSRange] = []
-      for rangeAsValue in ranges {
-        let range = rangeAsValue.rangeValue
+      processSelectedRanges { range in
 
         let lines = codeStorageDelegate.lineMap.linesContaining(range: range)
-        guard let firstLine = lines.first else { continue }
+        guard let firstLine = lines.first else { return range }
 
         var newRange = range
         if range.length == 0 {
@@ -211,11 +279,7 @@ extension CodeView {
         } else if lines.count == 1 {
 
           // Case 2 of the specification
-          guard let theLine = codeStorageDelegate.lineMap.lookup(line: firstLine)
-          else {
-            newSelected.append(range)
-            continue
-          }
+          guard let theLine = codeStorageDelegate.lineMap.lookup(line: firstLine) else { return range }
           let lineLocation = range.location - theLine.range.location
           if let commentRange = isCommentBracketed(range: range, on: firstLine) {
             newRange = uncommentBracket(range: range, in: commentRange)
@@ -242,11 +306,7 @@ extension CodeView {
           // Case 3 of the specification
           // NB: It is crucial to process lines in reverse order as any text change invalidates ranges in the line map
           //     after the change.
-          guard let lastLine = lines.last
-          else {
-            newSelected.append(range)
-            continue
-          }
+          guard let lastLine = lines.last else { return range }
           if isCommented(line: firstLine) && isCommented(line: lastLine) {
             for line in lines.reversed() { newRange = uncomment(line: line, with: newRange) }
           } else {
@@ -254,13 +314,69 @@ extension CodeView {
           }
 
         }
-        newSelected.append(newRange)
+        return newRange
       }
-#if os(macOS)
-      if !newSelected.isEmpty { selectedRanges = newSelected.map{ NSValue(range: $0) } }
-#elseif os(iOS) || os(visionOS)
-      if let selection = newSelected.first { selectedRange = selection }
-#endif
     }
+  }
+
+  func duplicate() {
+    guard let textContentStorage  = optTextContentStorage,
+          let codeStorage         = optCodeStorage,
+          let codeStorageDelegate = codeStorage.delegate as? CodeStorageDelegate
+    else { return }
+
+    /// Duplicate the given range right after the end of the original range and eturn the range of the duplicate.
+    ///
+    func duplicate(range: NSRange) -> NSRange {
+
+      guard let text = codeStorage.string[range] else { return range }
+      codeStorage.replaceCharacters(in: NSRange(location: range.max, length: 0), with: String(text))
+      return NSRange(location: range.max, length: range.length)
+    }
+
+    textContentStorage.performEditingTransaction {
+      processSelectedRanges { range in
+
+        if range.length == 0 {
+
+          guard let line      = codeStorageDelegate.lineMap.lineOf(index: range.location),
+                let lineRange = codeStorageDelegate.lineMap.lookup(line: line)?.range
+          else { return range }
+          let _ = duplicate(range: lineRange)
+          return NSRange(location: range.location + lineRange.length, length: 0)
+
+        } else {
+          return duplicate(range: range)
+        }
+      }
+    }
+  }
+
+  /// Execute a block for each selected range, from back to front.
+  ///
+  /// - Parameter block: The block to be executed for each selection range, which may modify the underlying text storage
+  ///     and returns a new selection range.
+  ///
+  func processSelectedRanges(with block: (NSRange) -> NSRange) {
+
+    // NB: It is crucial to process selected ranges in reverse order as any text change invalidates ranges in the line
+    //     map after the change.
+#if os(macOS)
+    let ranges = selectedRanges.reversed()
+#elseif os(iOS) || os(visionOS)
+    let ranges = [NSValue(range: selectedRange)]
+#endif
+    var newSelected: [NSRange] = []
+    for rangeAsValue in ranges {
+      let range = rangeAsValue.rangeValue
+
+      let newRange = block(range)
+      newSelected.append(newRange)
+    }
+#if os(macOS)
+    if !newSelected.isEmpty { selectedRanges = newSelected.map{ NSValue(range: $0) } }
+#elseif os(iOS) || os(visionOS)
+    if let selection = newSelected.first { selectedRange = selection }
+#endif
   }
 }
