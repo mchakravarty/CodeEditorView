@@ -24,6 +24,180 @@ import LanguageSupport
 ///
 public struct CodeEditor {
 
+  /// Specification of a text editing position; i.e., text selection and scroll position.
+  ///
+  public struct Position: Equatable {
+
+    /// Specification of a list of selection ranges.
+    ///
+    /// * A range with a zero length indicates an insertion point.
+    /// * An empty array, corresponds to an insertion point at position 0.
+    /// * On iOS, this can only always be one range.
+    ///
+    public var selections: [NSRange]
+
+    /// The editor vertical scroll position.
+    ///
+    public var verticalScrollPosition: CGFloat
+
+    public init(selections: [NSRange], verticalScrollPosition: CGFloat) {
+      self.selections             = selections
+      self.verticalScrollPosition = verticalScrollPosition
+    }
+
+    public init() {
+      self.init(selections: [.zero], verticalScrollPosition: 0)
+    }
+  }
+
+  let language:            LanguageConfiguration
+  let layout:              LayoutConfiguration?
+  let breakUndoCoalescing: PassthroughSubject<(), Never>?
+  let setActionsParam:     SetActions?
+  let setInfoParam:        SetInfo?
+
+  @Binding private var text:     String
+  @Binding private var position: Position
+  @Binding private var messages: Set<TextLocated<Message>>
+
+  @Environment(\.codeEditorLayoutConfiguration)      private var layoutConfiguration
+  @Environment(\.codeEditorIndentationConfiguration) private var indentationConfiguration
+  @Environment(\.codeEditorSetActions)               private var setActions
+  @Environment(\.codeEditorSetInfo)                  private var setInfo
+
+  // Values passed as parameters using the deprecated initialiser have got priority for backwards-campatibility.
+  var definitiveLayout: LayoutConfiguration { return layout ?? layoutConfiguration }
+  var definitiveSetActions: SetActions { return setActionsParam ?? setActions }
+  var definitiveSetInfo: SetInfo { return setInfoParam ?? setInfo }
+
+  /// Creates a fully configured code editor.
+  ///
+  /// - Parameters:
+  ///   - text: Binding to the edited text.
+  ///   - position: Binding to the current edit position.
+  ///   - messages: Binding to the messages reported at the appropriate lines of the edited text. NB: Messages
+  ///               processing and display is relatively expensive. Hence, there should only be a limited number of
+  ///               simultaneous messages and they shouldn't change too frequently.
+  ///   - language: Language configuration for highlighting and similar.
+  ///   - layout: Layout configuration determining the visible elements of the editor view.
+  ///   - breakUndoCoalescing: Trigger indicating when to break undo coalescing to avoid coalescing undos across
+  ///       saves.
+  ///   - setActions: Callback that lets the code editor update the context about the available code editing actions.
+  ///       Some actions can be temporarily unavailable and the context can use that, e.g., to enable and disable
+  ///       corresponding menu or toolbar options.
+  ///   - setInfo: Callback that lets the code editor update the context about informational aspects of the current
+  ///       editor state, such as the current line and column position of the insertion point. In contrast to
+  ///       `position`, this is summarised information suitable for consumption by the user.
+  ///
+  @available(*, deprecated, message: "Use environment values for 'layout', 'breakUndoCoalescing', 'setActions', and 'setInfo")
+  public init(text:                Binding<String>,
+              position:            Binding<Position>,
+              messages:            Binding<Set<TextLocated<Message>>>,
+              language:            LanguageConfiguration = .none,
+              layout:              LayoutConfiguration = .standard,
+              breakUndoCoalescing: PassthroughSubject<(), Never>? = nil,
+              setActions:          ((Actions) -> Void)? = nil,
+              setInfo:             ((Info) -> Void)? = nil)
+  {
+    self._text               = text
+    self._position           = position
+    self._messages           = messages
+    self.language            = language
+    self.layout              = layout
+    self.breakUndoCoalescing = breakUndoCoalescing
+    self.setActionsParam     = setActions.flatMap{ SetActions($0) }
+    self.setInfoParam        = setInfo.flatMap{ SetInfo($0) }
+  }
+
+  /// Creates a fully configured code editor.
+  ///
+  /// - Parameters:
+  ///   - text: Binding to the edited text.
+  ///   - position: Binding to the current edit position.
+  ///   - messages: Binding to the messages reported at the appropriate lines of the edited text. NB: Messages
+  ///               processing and display is relatively expensive. Hence, there should only be a limited number of
+  ///               simultaneous messages and they shouldn't change too frequently.
+  ///   - language: Language configuration for highlighting and similar.
+  ///   - breakUndoCoalescing: Trigger indicating when to break undo coalescing to avoid coalescing undos across
+  ///       saves.
+  ///
+  public init(text:                Binding<String>,
+              position:            Binding<Position>,
+              messages:            Binding<Set<TextLocated<Message>>>,
+              language:            LanguageConfiguration = .none,
+              breakUndoCoalescing: PassthroughSubject<(), Never>? = nil)
+  {
+    self._text               = text
+    self._position           = position
+    self._messages           = messages
+    self.language            = language
+    self.layout              = nil
+    self.breakUndoCoalescing = breakUndoCoalescing
+    self.setActionsParam     = nil
+    self.setInfoParam        = nil
+  }
+
+  public class _Coordinator {
+    @Binding fileprivate var text:     String
+    @Binding fileprivate var position: Position
+
+    fileprivate var setActions: SetActions
+    fileprivate var setInfo:    SetInfo
+
+    /// In order to avoid update cycles, where view code tries to update SwiftUI state variables (such as the view's
+    /// bindings) during a SwiftUI view update, we use `updatingView` as a flag that indicates whether the view is
+    /// being updated, and hence, whether state updates ought to be avoided or delayed.
+    ///
+    fileprivate var updatingView = false
+
+    /// The current set of code actions, which, on setting, are immediately propagated to the context.
+    ///
+    fileprivate var actions: Actions = Actions() {
+      didSet {
+        setActions(actions)
+      }
+    }
+
+    /// The current editor info, which, on setting, is immediately propagated to the context.
+    ///
+    fileprivate var info: Info = Info() {
+      didSet {
+        setInfo(info)
+      }
+    }
+
+    init(text: Binding<String>,
+         position: Binding<Position>,
+         setAction: SetActions,
+         setInfo: SetInfo)
+    {
+      self._text      = text
+      self._position  = position
+      self.setActions = setAction
+      self.setInfo    = setInfo
+    }
+    
+    /// Update the bindings and callbacks that parameterise the editor view to be able to update them during a view
+    /// update.
+    ///
+    func updateBindings(text: Binding<String>,
+                        position: Binding<Position>,
+                        setAction: SetActions,
+                        setInfo: SetInfo)
+    {
+      self._text      = text
+      self._position  = position
+      self.setActions = setAction
+      self.setInfo    = setInfo
+    }
+  }
+}
+
+
+// MARK: Layout configuration
+
+extension CodeEditor {
+
   /// Specification of the editor layout.
   ///
   public struct LayoutConfiguration: Equatable, RawRepresentable {
@@ -61,39 +235,133 @@ public struct CodeEditor {
       self.wrapText    = rawValue[rawValue.index(after: rawValue.startIndex)] == "t"
     }
   }
+}
 
-  /// Specification of a text editing position; i.e., text selection and scroll position.
-  ///
-  public struct Position: Equatable {
+extension EnvironmentValues {
 
-    /// Specification of a list of selection ranges.
-    ///
-    /// * A range with a zero length indicates an insertion point.
-    /// * An empty array, corresponds to an insertion point at position 0.
-    /// * On iOS, this can only always be one range.
-    ///
-    public var selections: [NSRange]
+  @Entry public var codeEditorLayoutConfiguration: CodeEditor.LayoutConfiguration = .standard
+}
 
-    /// The editor vertical scroll position.
-    ///
-    public var verticalScrollPosition: CGFloat
 
-    public init(selections: [NSRange], verticalScrollPosition: CGFloat) {
-      self.selections             = selections
-      self.verticalScrollPosition = verticalScrollPosition
+// MARK: Indentation configuration
+
+extension CodeEditor {
+
+  public struct IndentationConfiguration: Equatable, RawRepresentable {
+
+    public enum Preference: Equatable {
+      case preferSpaces
+      case preferTabs
+
+      init (tag: String) {
+        switch tag {
+        case "s": self = .preferSpaces
+        case "t": self = .preferTabs
+        default:  self = .preferSpaces
+        }
+      }
+
+      var tag: String {
+        switch self {
+        case .preferSpaces: return "s"
+        case .preferTabs:   return "t"
+        }
+      }
     }
 
-    public init() {
-      self.init(selections: [.zero], verticalScrollPosition: 0)
+    public enum TabKey: Equatable {
+      case identsInWhitespace
+      case indentsAlways
+      case insertsTab
+
+      init(tag: String) {
+        switch tag {
+        case "w": self = .identsInWhitespace
+        case "a": self = .indentsAlways
+        case "t": self = .insertsTab
+        default:  self = .identsInWhitespace
+        }
+      }
+
+      var tag: String {
+        switch self {
+        case .identsInWhitespace: return "w"
+        case .indentsAlways:      return "a"
+        case .insertsTab:         return "t"
+        }
+      }
+    }
+
+    /// Prefer identation by tabs or spaces.
+    ///
+    public var preference: Preference
+    
+    /// Number of spaces for one tab character.
+    ///
+    public var tabWidth: Int
+    
+    /// Number of spaces to indent nested code.
+    ///
+    public var indentWidth: Int
+    
+    /// Specifies the behaviour of the tab key.
+    ///
+    public var tabKey: TabKey
+    
+    /// Whether to indent the cursor after moving to a new line on typing return.
+    ///
+    public var indentOnReturn: Bool
+
+    public init (preference: Preference, tabWidth: Int, indentWidth: Int, tabKey: TabKey, indentOnReturn: Bool) {
+      self.preference     = preference
+      self.tabWidth       = tabWidth
+      self.indentWidth    = indentWidth
+      self.tabKey         = tabKey
+      self.indentOnReturn = indentOnReturn
+    }
+
+    public static let standard = IndentationConfiguration(preference: .preferSpaces,
+                                                          tabWidth: 2,
+                                                          indentWidth: 2,
+                                                          tabKey: .identsInWhitespace,
+                                                          indentOnReturn: true)
+
+    // MARK: For 'RawRepresentable'
+
+    public var rawValue: String {
+      "\(preference.tag),\(tabWidth),\(indentWidth),\(tabKey.tag),\(indentOnReturn ? "t" : "f")"
+    }
+
+    public init?(rawValue: String) {
+      let pieces = rawValue.split(separator: ",")
+      guard pieces.count == 5
+      else { return nil }
+
+      self.preference     = Preference(tag: String(pieces[0]))
+      self.tabWidth       = Int(pieces[1]) ?? 2
+      self.indentWidth    = Int(pieces[2]) ?? 2
+      self.tabKey         = TabKey(tag: String(pieces[3]))
+      self.indentOnReturn = pieces[4] == "t"
     }
   }
+}
+
+extension EnvironmentValues {
+
+  @Entry public var codeEditorIndentationConfiguration: CodeEditor.IndentationConfiguration = .standard
+}
+
+
+// MARK: Code actions
+
+extension CodeEditor {
 
   /// Collects all currently available code actions.
   ///
   public struct Actions {
 
     public struct Language {
-      
+
       /// The name of the language.
       ///
       public let name: String
@@ -102,7 +370,7 @@ public struct CodeEditor {
       ///
       public var extraActions: [ExtraAction] = []
     }
-    
+
     /// Language-specific actions, if any.
     ///
     public var language: Language = Language(name: "Text")
@@ -115,11 +383,39 @@ public struct CodeEditor {
     ///
     public var completions: (() -> Void)?
   }
-  
+}
+
+extension CodeEditor {
+
+  public struct SetActions {
+    let setActions: (Actions) -> Void
+
+    public static let ignore: SetActions = .init({ _ in })
+
+    public init(_ setActions: @escaping (Actions) -> Void) {
+      self.setActions = setActions
+    }
+
+    func callAsFunction(_ actions: Actions) {
+      setActions(actions)
+    }
+  }
+}
+
+extension EnvironmentValues {
+
+  @Entry public var codeEditorSetActions: CodeEditor.SetActions = .ignore
+}
+
+
+// MARK: Editor state information
+
+extension CodeEditor {
+
   /// User-level info about the editor state.
-  /// 
+  ///
   public struct Info {
-    
+
     /// Summarises the current selection state.
     ///
     public enum SelectionSummary {
@@ -180,110 +476,30 @@ public struct CodeEditor {
       self.selectionSummary = selectionSummary
     }
   }
+}
 
-  let language:            LanguageConfiguration
-  let layout:              LayoutConfiguration
-  let breakUndoCoalescing: PassthroughSubject<(), Never>?
-  let setActions:          ((Actions) -> Void)?
-  let setInfo:             ((Info) -> Void)?
+extension CodeEditor {
 
-  @Binding private var text:     String
-  @Binding private var position: Position
-  @Binding private var messages: Set<TextLocated<Message>>
+  public struct SetInfo {
+    let setInfo: (Info) -> Void
 
-  /// Creates a fully configured code editor.
-  ///
-  /// - Parameters:
-  ///   - text: Binding to the edited text.
-  ///   - position: Binding to the current edit position.
-  ///   - messages: Binding to the messages reported at the appropriate lines of the edited text. NB: Messages
-  ///               processing and display is relatively expensive. Hence, there should only be a limited number of
-  ///               simultaneous messages and they shouldn't change too frequently.
-  ///   - language: Language configuration for highlighting and similar.
-  ///   - layout: Layout configuration determining the visible elements of the editor view.
-  ///   - breakUndoCoalescing: Trigger indicating when to break undo coalescing to avoid coalescing undos across
-  ///       saves.
-  ///   - setActions: Callback that lets the code editor update the context about the available code editing actions.
-  ///       Some actions can be temporarily unavailable and the context can use that, e.g., to enable and disable
-  ///       corresponding menu or toolbar options.
-  ///   - setInfo: Callback that lets the code editor update the context about informational aspects of the current
-  ///       editor state, such as the current line and column position of the insertion point. In contrast to
-  ///       `position`, this is summarised information suitable for consumption by the user.
-  ///
-  public init(text:                Binding<String>,
-              position:            Binding<Position>,
-              messages:            Binding<Set<TextLocated<Message>>>,
-              language:            LanguageConfiguration = .none,
-              layout:              LayoutConfiguration = .standard,
-              breakUndoCoalescing: PassthroughSubject<(), Never>? = nil,
-              setActions:          ((Actions) -> Void)? = nil,
-              setInfo:             ((Info) -> Void)? = nil)
-  {
-    self._text               = text
-    self._position           = position
-    self._messages           = messages
-    self.language            = language
-    self.layout              = layout
-    self.breakUndoCoalescing = breakUndoCoalescing
-    self.setActions          = setActions
-    self.setInfo             = setInfo
-  }
+    public static let ignore: SetInfo = .init({ _ in })
 
-  public class _Coordinator {
-    @Binding fileprivate var text:     String
-    @Binding fileprivate var position: Position
-
-    fileprivate var setActions: ((Actions) -> Void)?
-    fileprivate var setInfo:    ((Info) -> Void)?
-
-    /// In order to avoid update cycles, where view code tries to update SwiftUI state variables (such as the view's
-    /// bindings) during a SwiftUI view update, we use `updatingView` as a flag that indicates whether the view is
-    /// being updated, and hence, whether state updates ought to be avoided or delayed.
-    ///
-    fileprivate var updatingView = false
-
-    /// The current set of code actions, which, on setting, are immediately propagated to the context.
-    ///
-    fileprivate var actions: Actions = Actions() {
-      didSet {
-        setActions?(actions)
-      }
+    public init(_ setInfo: @escaping (Info) -> Void) {
+      self.setInfo = setInfo
     }
 
-    /// The current editor info, which, on setting, is immediately propagated to the context.
-    ///
-    fileprivate var info: Info = Info() {
-      didSet {
-        setInfo?(info)
-      }
-    }
-
-    init(text: Binding<String>,
-         position: Binding<Position>,
-         setAction: ((Actions) -> Void)?,
-         setInfo: ((Info) -> Void)?)
-    {
-      self._text      = text
-      self._position  = position
-      self.setActions = setAction
-      self.setInfo    = setInfo
-    }
-    
-    /// Update the bindings and callbacks that parameterise the editor view to be able to update them during a view
-    /// update.
-    ///
-    func updateBindings(text: Binding<String>,
-                        position: Binding<Position>,
-                        setAction: ((Actions) -> Void)?,
-                        setInfo: ((Info) -> Void)?)
-    {
-      self._text      = text
-      self._position  = position
-      self.setActions = setAction
-      self.setInfo    = setInfo
+    func callAsFunction(_ info: Info) {
+      setInfo(info)
     }
   }
 }
+
+extension EnvironmentValues {
+
+  @Entry public var codeEditorSetInfo: CodeEditor.SetInfo = .ignore
+}
+
 
 #if os(iOS) || os(visionOS)
 
@@ -310,7 +526,8 @@ extension CodeEditor: UIViewRepresentable {
 
     let codeView = CodeView(frame: CGRect(x: 0, y: 0, width: 100, height: 40),
                             with: language,
-                            viewLayout: layout,
+                            viewLayout: definitiveLayout,
+                            indentation: indentationConfiguration,
                             theme: context.environment.codeEditorTheme,
                             setText: setText(_:),
                             setMessages: { messages = $0 })
@@ -386,7 +603,8 @@ extension CodeEditor: UIViewRepresentable {
       textView.verticalScrollPosition = position.verticalScrollPosition
     }
     if theme.id != codeView.theme.id { codeView.theme = theme }
-    if layout != codeView.viewLayout { codeView.viewLayout = layout }
+    if definitiveLayout != codeView.viewLayout { codeView.viewLayout = definitiveLayout }
+    if indentationConfiguration != codeView.indentation { codeView.indentation = indentationConfiguration }
     // Equality on language configurations implies the same name and the same language service.
     if language != codeView.language {
       codeView.language                 = language
@@ -454,7 +672,8 @@ extension CodeEditor: NSViewRepresentable {
     // Set up text view with gutter
     let codeView = CodeView(frame: CGRect(x: 0, y: 0, width: 100, height: 40),
                             with: language,
-                            viewLayout: layout,
+                            viewLayout: definitiveLayout,
+                            indentation: indentationConfiguration,
                             theme: context.environment.codeEditorTheme,
                             setText: setText(_:),
                             setMessages: { messages = $0 })
@@ -578,7 +797,8 @@ extension CodeEditor: NSViewRepresentable {
       scrollView.verticalScrollPosition = position.verticalScrollPosition
     }
     if theme.id != codeView.theme.id { codeView.theme = theme }
-    if layout != codeView.viewLayout { codeView.viewLayout = layout }
+    if definitiveLayout != codeView.viewLayout { codeView.viewLayout = definitiveLayout }
+    if indentationConfiguration != codeView.indentation { codeView.indentation = indentationConfiguration }
     // Equality on language configurations implies the same name and the same language service.
     if language != codeView.language {
       codeView.language                 = language
