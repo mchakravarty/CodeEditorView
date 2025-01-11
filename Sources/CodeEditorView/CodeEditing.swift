@@ -49,6 +49,14 @@ public struct CodeEditingCommands: Commands {
   }
 }
 
+private func send(_ action: Selector) {
+#if os(macOS)
+  NSApplication.shared.sendAction(action, to: nil, from: nil)
+#elseif os(iOS) || os(visionOS)
+  UIApplication.shared.sendAction(action, to: nil, from: nil, for: nil)
+#endif
+}
+
 /// Menu item for the duplicate command.
 ///
 public struct CodeEditingDuplicateCommandView: View {
@@ -58,11 +66,7 @@ public struct CodeEditingDuplicateCommandView: View {
   public var body: some View {
 
     Button("Duplicate") {
-#if os(macOS)
-      NSApplication.shared.sendAction(#selector(CodeEditorActions.duplicate(_:)), to: nil, from: nil)
-#elseif os(iOS) || os(visionOS)
-      UIApplication.shared.sendAction(#selector(CodeEditorActions.duplicate(_:)), to: nil, from: nil, for: nil)
-#endif
+      send(#selector(CodeEditorActions.duplicate(_:)))
     }
     .keyboardShortcut("D", modifiers: [.command])
   }
@@ -76,12 +80,19 @@ public struct CodeEditingCommandsView: View {
 
   public var body: some View {
 
+    Button("Shift Left") {
+      send(#selector(CodeEditorActions.shiftLeft(_:)))
+    }
+    .keyboardShortcut("[", modifiers: [.command])
+    Button("Shift Right") {
+      send(#selector(CodeEditorActions.shiftRight(_:)))
+    }
+    .keyboardShortcut("]", modifiers: [.command])
+
+    Divider()
+
     Button("Comment Selection") {
-#if os(macOS)
-      NSApplication.shared.sendAction(#selector(CodeEditorActions.commentSelection(_:)), to: nil, from: nil)
-#elseif os(iOS) || os(visionOS)
-      UIApplication.shared.sendAction(#selector(CodeEditorActions.commentSelection(_:)), to: nil, from: nil, for: nil)
-#endif
+      send(#selector(CodeEditorActions.commentSelection(_:)))
     }
     .keyboardShortcut("/", modifiers: [.command])
   }
@@ -92,12 +103,16 @@ public struct CodeEditingCommandsView: View {
 @objc public protocol CodeEditorActions {
 
   func duplicate(_ sender: Any?)
+  func shiftLeft(_ sender: Any?)
+  func shiftRight(_ sender: Any?)
   func commentSelection(_ sender: Any?)
 }
 
 extension CodeView: CodeEditorActions {
 
   @objc func duplicate(_ sender: Any?) { duplicate() }
+  @objc func shiftLeft(_ sender: Any?) { shiftLeftOrRight(doShiftLeft: true) }
+  @objc func shiftRight(_ sender: Any?) { shiftLeftOrRight(doShiftLeft: false) }
   @objc func commentSelection(_ sender: Any?) { comment() }
 }
 
@@ -164,7 +179,96 @@ extension NSRange {
 // MARK: -
 // MARK: Editing functionality
 
+extension CodeEditor.IndentationConfiguration {
+
+  var defaultIndentation: String {
+    switch preference {
+    case .preferSpaces:
+      String(repeating: " ", count: indentWidth)
+    case .preferTabs:
+      String(repeating: "\t", count: indentWidth / tabWidth) + String(repeating: " ", count: indentWidth % tabWidth)
+    }
+  }
+}
+
 extension CodeView {
+  
+  /// Shift all lines that are part of the current selection one indentation level to the left or right.
+  ///
+  func shiftLeftOrRight(doShiftLeft: Bool) {
+    guard let textContentStorage  = optTextContentStorage,
+          let codeStorage         = optCodeStorage,
+          let codeStorageDelegate = codeStorage.delegate as? CodeStorageDelegate
+    else { return }
+
+    func shift(line: Int, adjusting range: NSRange) -> NSRange {
+      guard let theLine = codeStorageDelegate.lineMap.lookup(line: line)
+      else { return range }
+
+      if doShiftLeft {
+
+        var location        = theLine.range.location
+        var length          = 0
+        var remainingIndent = indentation.indentWidth
+        var reminder        = ""
+        while remainingIndent > 0 {
+
+          guard let characterRange = Range<String.Index>(NSRange(location: location, length: 1), in: codeStorage.string)
+          else { return range }
+          let character = codeStorage.string[characterRange]
+          if character == " " {
+
+            remainingIndent -= 1
+            length          += 1
+
+          } else if character == "\t" {
+
+            let tabWidth  = indentation.tabWidth,
+                tabIndent = if length % tabWidth == 0 { tabWidth } else { tabWidth - length % tabWidth }
+            if tabIndent > remainingIndent {
+
+              // We got a tab character, but the remaining identation to remove is less than the tabs indentation at
+              // this point => replace the tab by as many spaces as indentation needs to remain.
+              remainingIndent = 0
+              reminder += String(repeating: " ", count: tabIndent - remainingIndent)
+
+            } else {
+              remainingIndent -= tabIndent
+            }
+            length += 1
+
+          } else {
+            // Stop if we hit a character that is neither a space or tab character.
+            remainingIndent = 0
+          }
+          location += 1
+        }
+
+        let replacementRange = NSRange(location: theLine.range.location, length: length)
+        codeStorage.replaceCharacters(in: replacementRange, with: reminder)
+        return range.adjustSelection(forReplacing: replacementRange, by: reminder.utf16.count)
+
+      } else {
+
+        let replacementRange = NSRange(location: theLine.range.location, length: 0)
+        codeStorage.replaceCharacters(in: replacementRange, with: indentation.defaultIndentation)
+        return range.adjustSelection(forReplacing: replacementRange, by: 2)
+
+      }
+    }
+
+    textContentStorage.performEditingTransaction {
+      processSelectedRanges { range in
+
+        let lines = codeStorageDelegate.lineMap.linesContaining(range: range)
+        var newRange = range
+        for line in lines {
+          newRange = shift(line: line, adjusting: newRange)
+        }
+        return newRange
+      }
+    }
+  }
 
   /// Comment or uncomment the selection or multiple lines.
   ///
