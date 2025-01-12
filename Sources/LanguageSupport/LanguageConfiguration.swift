@@ -178,6 +178,10 @@ public struct LanguageConfiguration {
   ///
   public let caseInsensitiveReservedIdentifiers: Bool
 
+  /// Whether indentation affects scoping.
+  ///
+  public let indentationSensitiveScoping: Bool
+
   /// Regular expression matching strings
   ///
   public let stringRegex: Regex<Substring>?
@@ -213,7 +217,7 @@ public struct LanguageConfiguration {
   /// Reserved operators (this does not include contextual operators)
   ///
   public let reservedOperators: [String]
-
+  
   /// Dynamic language service that provides advanced syntactic as well as semantic information.
   ///
   public let languageService: LanguageService?
@@ -224,6 +228,7 @@ public struct LanguageConfiguration {
               supportsSquareBrackets: Bool,
               supportsCurlyBrackets: Bool,
               caseInsensitiveReservedIdentifiers: Bool = false,
+              indentationSensitiveScoping: Bool = false,
               stringRegex: Regex<Substring>?,
               characterRegex: Regex<Substring>?,
               numberRegex: Regex<Substring>?,
@@ -235,25 +240,26 @@ public struct LanguageConfiguration {
               reservedOperators: [String],
               languageService: LanguageService? = nil)
   {
-    self.name                   = name
-    self.supportsSquareBrackets = supportsSquareBrackets
-    self.supportsCurlyBrackets  = supportsCurlyBrackets
+    self.name                               = name
+    self.supportsSquareBrackets             = supportsSquareBrackets
+    self.supportsCurlyBrackets              = supportsCurlyBrackets
     self.caseInsensitiveReservedIdentifiers = caseInsensitiveReservedIdentifiers
-    self.stringRegex            = stringRegex
-    self.characterRegex         = characterRegex
-    self.numberRegex            = numberRegex
-    self.singleLineComment      = singleLineComment
-    self.nestedComment          = nestedComment
-    self.identifierRegex        = identifierRegex
-    self.operatorRegex          = operatorRegex
-    self.reservedIdentifiers    = reservedIdentifiers
-    self.reservedOperators      = reservedOperators
-    self.languageService        = languageService
+    self.indentationSensitiveScoping        = indentationSensitiveScoping
+    self.stringRegex                        = stringRegex
+    self.characterRegex                     = characterRegex
+    self.numberRegex                        = numberRegex
+    self.singleLineComment                  = singleLineComment
+    self.nestedComment                      = nestedComment
+    self.identifierRegex                    = identifierRegex
+    self.operatorRegex                      = operatorRegex
+    self.reservedIdentifiers                = reservedIdentifiers
+    self.reservedOperators                  = reservedOperators
+    self.languageService                    = languageService
   }
 
   /// Defines a language configuration.
   ///
-  /// This string flavour intialiser exists mainly for backwards compatibility. Avoid it if possible.
+  /// This string flavour initialiser exists mainly for backwards compatibility. Avoid it if possible.
   ///
   @available(*, deprecated, message: "Use Regex")
   public init(name: String,

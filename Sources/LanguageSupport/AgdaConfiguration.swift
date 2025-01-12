@@ -47,6 +47,7 @@ extension LanguageConfiguration {
     return LanguageConfiguration(name: "Agda",
                                  supportsSquareBrackets: false,
                                  supportsCurlyBrackets: true,
+                                 indentationSensitiveScoping: true,
                                  stringRegex: /\"(?:\\\"|[^\"])*+\"/,
                                  characterRegex: /'(?:\\'|[^']|\\[^']*+)'/,
                                  numberRegex: numberRegex,

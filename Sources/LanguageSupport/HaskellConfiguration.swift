@@ -48,6 +48,7 @@ extension LanguageConfiguration {
     return LanguageConfiguration(name: "Haskell",
                                  supportsSquareBrackets: true,
                                  supportsCurlyBrackets: true,
+                                 indentationSensitiveScoping: true,
                                  stringRegex: /\"(?:\\\"|[^\"])*+\"/,
                                  characterRegex: /'(?:\\'|[^']|\\[^']*+)'/,
                                  numberRegex: numberRegex,
