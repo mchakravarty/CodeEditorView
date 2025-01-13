@@ -80,6 +80,10 @@ public struct CodeEditingCommandsView: View {
 
   public var body: some View {
 
+    Button("Re-Indent") {
+      send(#selector(CodeEditorActions.reindent(_:)))
+    }
+    .keyboardShortcut("I", modifiers: [.control])
     Button("Shift Left") {
       send(#selector(CodeEditorActions.shiftLeft(_:)))
     }
@@ -103,6 +107,7 @@ public struct CodeEditingCommandsView: View {
 @objc public protocol CodeEditorActions {
 
   func duplicate(_ sender: Any?)
+  func reindent(_ sender: Any?)
   func shiftLeft(_ sender: Any?)
   func shiftRight(_ sender: Any?)
   func commentSelection(_ sender: Any?)
@@ -111,12 +116,37 @@ public struct CodeEditingCommandsView: View {
 extension CodeView: CodeEditorActions {
 
   @objc func duplicate(_ sender: Any?) { duplicate() }
+  @objc func reindent(_ sender: Any?) { reindent() }
   @objc func shiftLeft(_ sender: Any?) { shiftLeftOrRight(doShiftLeft: true) }
   @objc func shiftRight(_ sender: Any?) { shiftLeftOrRight(doShiftLeft: false) }
   @objc func commentSelection(_ sender: Any?) { comment() }
 }
 
+// MARK: -
+// MARK: Override tab key behaviour
 
+extension CodeView {
+
+#if os(macOS)
+
+  override public func keyDown(with event: NSEvent) {
+
+    if event.keyCode == keyCodeTab { // tab key
+      insertTab()
+    } else {
+      super.keyDown(with: event)
+    }
+  }
+
+#elseif os(iOS) || os(visionOS)
+
+  override var keyCommands: [UIKeyCommand] {
+    [ UIKeyCommand(input: "\t", modifierFlags: [], action: #selecctor(insertTab))
+    ]
+  }
+
+#endif
+}
 
 // MARK: -
 // MARK: Selections
@@ -180,14 +210,51 @@ extension NSRange {
 // MARK: Editing functionality
 
 extension CodeEditor.IndentationConfiguration {
-
-  var defaultIndentation: String {
+  
+  /// String of whitespace that indents from the start of the line to the first indentation point.
+  ///
+  var defaultIndentation: String { indentation(for: indentWidth) }
+  
+  /// Yield the whitespace string realising the indentation up to `column` under the current configuration.
+  ///
+  /// - Parameter column: The desired indentation.
+  /// - Returns: A string that realises that indentation.
+  ///
+  func indentation(for column: Int) -> String {
     switch preference {
     case .preferSpaces:
-      String(repeating: " ", count: indentWidth)
+      String(repeating: " ", count: column)
     case .preferTabs:
-      String(repeating: "\t", count: indentWidth / tabWidth) + String(repeating: " ", count: indentWidth % tabWidth)
+      String(repeating: "\t", count: column / tabWidth) + String(repeating: " ", count: column % tabWidth)
     }
+  }
+
+  /// Determine the column index of the first character that is neither a tab or space character in the given line
+  /// string or the end index of the line.
+  ///
+  /// - Parameter line: The string containing the characters of the line.
+  /// - Returns: The (character) index of the first character that is neither space nor tab or the end index of the line.
+  ///
+  /// NB: If the line contains only space and tab characters, the result will be the length of the string.
+  ///
+  func currentIndentation(in line: any StringProtocol) -> Int {
+
+    let index = (line.firstIndex{ !($0 == " " || $0 == "\t") }) ?? line.endIndex
+    return index.utf16Offset(in: line)
+  }
+
+  /// Determine the column index of the first character that is neither a tab or space character in the given line
+  /// string if there is any.
+  ///
+  /// - Parameter line: The string containing the characters of the line.
+  /// - Returns: The (character) index of the first character that is neither space nor tab or nil if there is no such
+  ///     character or if that character is a whitespace (notably a newline charachter).
+  ///
+  func startOfText(in line: any StringProtocol) -> Int? {
+
+    if let index = (line.firstIndex{ !($0 == " " || $0 == "\t") }) {
+      if line[index].isWhitespace { return nil } else { return index.utf16Offset(in: line) }
+    } else { return nil }
   }
 }
 
@@ -453,6 +520,170 @@ extension CodeView {
           return duplicate(range: range)
         }
       }
+    }
+  }
+  
+  /// Indent all lines currently selected.
+  ///
+  func reindent() {
+    guard let textContentStorage = optTextContentStorage else { return }
+
+    textContentStorage.performEditingTransaction {
+      processSelectedRanges { reindent(range: $0) }
+    }
+  }
+
+  private func reindent(range: NSRange) -> NSRange {
+
+    guard let codeStorage         = optCodeStorage,
+          let codeStorageDelegate = codeStorage.delegate as? CodeStorageDelegate else {
+      return range
+    }
+
+    // Determine the column index of the first character that is neither a space nor a tab character. It can be a
+    // newline or the end of the line.
+    func currentIndentation(of line: Int) -> Int? {
+
+      guard let lineInfo  = codeStorageDelegate.lineMap.lookup(line: line),
+            let textRange = Range<String.Index>(lineInfo.range, in: codeStorage.string)
+      else { return nil }
+      return indentation.currentIndentation(in: codeStorage.string[textRange])
+    }
+
+    // Determine the column index of the first non-whitespace character.
+    func startOfText(of line: Int) -> Int? {
+
+      guard let lineInfo  = codeStorageDelegate.lineMap.lookup(line: line),
+            let textRange = Range<String.Index>(lineInfo.range, in: codeStorage.string)
+      else { return nil }
+      return indentation.startOfText(in: codeStorage.string[textRange]) ?? 0
+    }
+
+    func predictedIndentation(for line: Int) -> Int {
+      if language.indentationSensitiveScoping {
+
+        // FIXME: We might want to cache that information.
+
+        var scannedLine = line
+        while scannedLine >= 0 {
+
+          if let index = startOfText(of: scannedLine) { return index }
+          else {
+            scannedLine -= 1
+          }
+
+        }
+        return 0
+
+      } else {
+
+        // FIXME: Only languages in the C tradition use curly braces for scoping. Needs to be more flexible.
+        guard let lineInfo = codeStorageDelegate.lineMap.lookup(line: line) else { return 0 }
+        return (lineInfo.info?.curlyBracketDepthStart ?? 0) * indentation.indentWidth
+
+      }
+    }
+
+    let lines = codeStorageDelegate.lineMap.linesContaining(range: range)
+    guard let firstLine = lines.first else { return range }
+
+    if range.length == 0 {
+
+      let desiredIndent = predictedIndentation(for: firstLine)
+      guard let currentIndent = currentIndentation(of: firstLine),
+            let lineInfo      = codeStorageDelegate.lineMap.lookup(line: firstLine)
+      else { return range }
+      codeStorage.replaceCharacters(in: NSRange(location: lineInfo.range.location, length: currentIndent),
+                                    with: indentation.indentation(for: desiredIndent))
+      return NSRange(location: lineInfo.range.location + desiredIndent, length: 0)
+
+    } else {
+
+      var newRange = range
+      for line in lines {
+
+        let desiredIndent = predictedIndentation(for: line)
+        guard let currentIndent = currentIndentation(of: line),
+              let lineInfo      = codeStorageDelegate.lineMap.lookup(line: line)
+        else { return newRange }
+        let replacementRange = NSRange(location: lineInfo.range.location, length: currentIndent),
+            indentString     = indentation.indentation(for: desiredIndent)
+        codeStorage.replaceCharacters(in: replacementRange, with: indentString)
+        newRange = newRange.adjustSelection(forReplacing: replacementRange, by: indentString.count)
+
+      }
+      return newRange
+
+    }
+  }
+
+  /// Implements the indentation behaviour for the tab key.
+  ///
+  /// * Whether to insert a tab character or spaces depends on the indentation configuration, which also determines tab
+  ///   and indentation width.
+  /// * Depending on the setting, inserting a tab triggers indenting the current line or actually inserting a tab
+  ///   equivalent.
+  /// * If the selection has length greater 0, a tab equivalent is always inserted.
+  /// * If the selection spans multiple lines, the lines are always indented.
+  ///
+  func insertTab() {
+
+    guard let textContentStorage  = optTextContentStorage,
+          let codeStorage         = optCodeStorage,
+          let codeStorageDelegate = codeStorage.delegate as? CodeStorageDelegate
+    else { return }
+    
+    // Determine the column index of the first character that is neither a space nor a tab character. It can be a
+    // newline or the end of the line.
+    func currentIndentation(of line: Int) -> Int? {
+
+      guard let lineInfo  = codeStorageDelegate.lineMap.lookup(line: line),
+            let textRange = Range<String.Index>(lineInfo.range, in: codeStorage.string)
+      else { return nil }
+      return indentation.currentIndentation(in: codeStorage.string[textRange])
+    }
+
+    func insertTab(in range: NSRange) -> NSRange {
+
+      let nextTabStopIndex = (range.location / indentation.tabWidth + 1) * indentation.tabWidth
+      let replacementString = if indentation.preference == .preferTabs { "\t" }
+                              else { String(repeating: " ", count: nextTabStopIndex - range.location) }
+      codeStorage.replaceCharacters(in: range, with: replacementString)
+
+      return NSRange(location: range.location + replacementString.utf16.count, length: 0)
+    }
+
+    switch indentation.tabKey {
+
+    case .identsInWhitespace:
+      textContentStorage.performEditingTransaction {
+        processSelectedRanges { range in
+
+          if range.length > 0 { return insertTab(in: range) }
+          else {
+
+            guard let firstLine   = codeStorageDelegate.lineMap.lineOf(index: range.location),
+                  let lineInfo    = codeStorageDelegate.lineMap.lookup(line: firstLine),
+                  let indentDepth = currentIndentation(of: firstLine)
+            else { return range }
+            let newRange = if range.location - lineInfo.range.location < indentDepth { reindent(range: range) }
+                          else { insertTab(in: range) }
+            return newRange
+
+          }
+        }
+      }
+
+    case .indentsAlways:
+      textContentStorage.performEditingTransaction {
+        processSelectedRanges { reindent(range: $0) }
+      }
+
+    case .insertsTab:
+      textContentStorage.performEditingTransaction {
+        processSelectedRanges { insertTab(in: $0) }
+      }
+
     }
   }
 

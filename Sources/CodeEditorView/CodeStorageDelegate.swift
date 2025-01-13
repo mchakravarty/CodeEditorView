@@ -98,7 +98,9 @@ struct LineInfo {
   // FIXME: we are not currently using the following three variables (they are maintained, but they are never useful).
   var roundBracketDiff:  Int   // increase or decrease of the nesting level of round brackets on this line
   var squareBracketDiff: Int   // increase or decrease of the nesting level of square brackets on this line
-  var curlyBracketDiff:  Int   // increase or decrease of the nesting level of curly brackets on this line
+
+  var curlyBracketDepthStart: Int   // nesting level of curly brackets aty the start of this line
+  var curlyBracketDepthEnd:   Int   // nesting level of curly brackets aty the end of this line
 
   /// The tokens extracted from the text on this line.
   ///
@@ -415,7 +417,8 @@ extension CodeStorageDelegate {
     (for line: Int,
      tokens: Tokens,
      commentDepth: inout Int,
-     lastCommentStart: inout Int?)
+     lastCommentStart: inout Int?,
+     curlyBracketDepth: inout Int)
     {
 
       if let lineRange = lineMap.lookup(line: line)?.range {
@@ -443,7 +446,8 @@ extension CodeStorageDelegate {
                                         commentDepthEnd: 0,
                                         roundBracketDiff: 0,
                                         squareBracketDiff: 0,
-                                        curlyBracketDiff: 0,
+                                        curlyBracketDepthStart: curlyBracketDepth,
+                                        curlyBracketDepthEnd: 0,
                                         tokens: localisedTokens,
                                         commentRanges: [])
         tokenLoop: for token in localisedTokens {
@@ -463,10 +467,10 @@ extension CodeStorageDelegate {
             lineInfo.squareBracketDiff -= 1
 
           case .curlyBracketOpen:
-            lineInfo.curlyBracketDiff += 1
+            curlyBracketDepth += 1
 
           case .curlyBracketClose:
-            lineInfo.curlyBracketDiff -= 1
+            curlyBracketDepth -= 1
 
           case .singleLineComment:  // set comment attribute from token start token to the end of this line
             let commentStart = token.range.location
@@ -504,7 +508,8 @@ extension CodeStorageDelegate {
         }
 
         // Retain computed line information
-        lineInfo.commentDepthEnd = commentDepth
+        lineInfo.commentDepthEnd      = commentDepth
+        lineInfo.curlyBracketDepthEnd = curlyBracketDepth
         lineMap.setInfoOf(line: line, to: lineInfo)
       }
     }
@@ -533,13 +538,16 @@ extension CodeStorageDelegate {
                    .tokenise(with: tokeniser, state: initialTokeniserState)
                    .map{ $0.shifted(by: range.location) }       // adjust tokens to be relative to the whole `string`
 
+    let initialCurlyBracketDepth = lineMap.lookup(line: lines.startIndex - 1)?.info?.curlyBracketDepthEnd ?? 0
+
     // For all lines in range, collect the tokens line by line, while keeping track of nested comments
     //
     // - `lastCommentStart` keeps track of the last start of an *outermost* nested comment.
     //
-    var commentDepth     = initialCommentDepth
-    var lastCommentStart = initialCommentDepth > 0 ? lineMap.lookup(line: lines.startIndex)?.range.location : nil
-    var remainingTokens  = tokens
+    var commentDepth      = initialCommentDepth
+    var lastCommentStart  = initialCommentDepth > 0 ? lineMap.lookup(line: lines.startIndex)?.range.location : nil
+    var curlyBracketDepth = initialCurlyBracketDepth
+    var remainingTokens   = tokens
     for line in lines {
 
       guard let lineRange = lineMap.lookup(line: line)?.range else { continue }
@@ -547,7 +555,8 @@ extension CodeStorageDelegate {
       tokeniseAndUpdateInfo(for: line,
                             tokens: thisLinesTokens,
                             commentDepth: &commentDepth,
-                            lastCommentStart: &lastCommentStart)
+                            lastCommentStart: &lastCommentStart,
+                            curlyBracketDepth: &curlyBracketDepth)
       remainingTokens.removeFirst(thisLinesTokens.count)
 
     }
@@ -580,7 +589,8 @@ extension CodeStorageDelegate {
         tokeniseAndUpdateInfo(for: currentLine,
                               tokens: tokens,
                               commentDepth: &commentDepth,
-                              lastCommentStart: &lastCommentStart)
+                              lastCommentStart: &lastCommentStart,
+                              curlyBracketDepth: &curlyBracketDepth)
 
         // Keep track of the trailing range to report back to the caller.
         highlightingRange = NSUnionRange(highlightingRange, lineEntry.range)

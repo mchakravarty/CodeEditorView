@@ -119,11 +119,6 @@ public enum CompletionProgress {
   case input(NSEvent)
 }
 
-private let keyCodeReturn: UInt16    = 0x24
-private let keyCodeESC: UInt16       = 0x35
-private let keyCodeDownArrow: UInt16 = 0x7D
-private let keyCodeUpArrow: UInt16   = 0x7E
-
 /// Panel used to display compeltions.
 ///
 final class CompletionPanel: NSPanel {
