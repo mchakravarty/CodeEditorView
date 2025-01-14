@@ -598,9 +598,10 @@ extension CodeView {
       guard let currentIndent = currentIndentation(of: firstLine),
             let lineInfo      = codeStorageDelegate.lineMap.lookup(line: firstLine)
       else { return range }
+      let indentString = indentation.indentation(for: desiredIndent)
       codeStorage.replaceCharacters(in: NSRange(location: lineInfo.range.location, length: currentIndent),
-                                    with: indentation.indentation(for: desiredIndent))
-      return NSRange(location: lineInfo.range.location + desiredIndent, length: 0)
+                                    with: indentString)
+      return NSRange(location: lineInfo.range.location + indentString.count, length: 0)
 
     } else {
 
@@ -732,9 +733,10 @@ extension CodeView {
     textContentStorage.performEditingTransaction {
       processSelectedRanges { range in
 
-        let desiredIndent = if indentation.indentOnReturn { predictedIndentation(after: range.location) } else { 0 }
-        codeStorage.replaceCharacters(in: range, with: "\n" + indentation.indentation(for: desiredIndent))
-        return NSRange(location: range.location + 1 + desiredIndent, length: 0)
+        let desiredIndent = if indentation.indentOnReturn { predictedIndentation(after: range.location) } else { 0 },
+            indentString  = indentation.indentation(for: desiredIndent)
+        codeStorage.replaceCharacters(in: range, with: "\n" + indentString)
+        return NSRange(location: range.location + 1 + indentString.count, length: 0)
 
       }
     }
