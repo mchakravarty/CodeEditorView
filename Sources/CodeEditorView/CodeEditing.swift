@@ -8,6 +8,8 @@
 
 import SwiftUI
 
+import LanguageSupport
+
 
 // MARK: -
 // MARK: Actions and commands
@@ -131,8 +133,11 @@ extension CodeView {
 
   override public func keyDown(with event: NSEvent) {
 
-    if event.keyCode == keyCodeTab { // tab key
+    let noModifiers = event.modifierFlags.intersection([.shift, .control, .option, .command]) == []
+    if event.keyCode == keyCodeTab && noModifiers {
       insertTab()
+    } else if event.keyCode == keyCodeReturn && noModifiers {
+      insertReturn()
     } else {
       super.keyDown(with: event)
     }
@@ -684,6 +689,54 @@ extension CodeView {
         processSelectedRanges { insertTab(in: $0) }
       }
 
+    }
+  }
+
+  func insertReturn () {
+
+    guard let textContentStorage  = optTextContentStorage,
+          let codeStorage         = optCodeStorage,
+          let codeStorageDelegate = codeStorage.delegate as? CodeStorageDelegate
+    else { return }
+
+    func predictedIndentation(after index: Int) -> Int {
+      guard let line     = codeStorageDelegate.lineMap.lineOf(index: index),
+            let lineInfo = codeStorageDelegate.lineMap.lookup(line: line)
+      else { return 0 }
+      let columnIndex = index - lineInfo.range.lowerBound
+
+      if language.indentationSensitiveScoping {
+
+        let range = NSRange(location: lineInfo.range.lowerBound, length: index - lineInfo.range.lowerBound)
+        guard let stringRange = Range<String.Index>(range, in: codeStorage.string) else { return 0 }
+        let indentString = codeStorage.string[stringRange].prefix(while: { $0 == " " || $0 == "\t" })
+        return indentString.count
+
+      } else {
+
+        // FIXME: Only languages in the C tradition use curly braces for scoping. Needs to be more flexible.
+        guard let info = lineInfo.info else { return 0 }
+        let curlyBracketDepth = info.curlyBracketDepthStart,
+            initialTokens     = info.tokens.prefix{ $0.range.lowerBound < columnIndex },
+            openCurlyBrackets = initialTokens.reduce(0) {
+              $0 + ($1.token == LanguageConfiguration.Token.curlyBracketOpen ? 1 : 0)
+            },
+            closeCurlyBrackets = initialTokens.reduce(0) {
+              $0 + ($1.token == LanguageConfiguration.Token.curlyBracketClose ? 1 : 0)
+            }
+        return (curlyBracketDepth + openCurlyBrackets - closeCurlyBrackets) * indentation.indentWidth
+
+      }
+    }
+
+    textContentStorage.performEditingTransaction {
+      processSelectedRanges { range in
+
+        let desiredIndent = if indentation.indentOnReturn { predictedIndentation(after: range.location) } else { 0 }
+        codeStorage.replaceCharacters(in: range, with: "\n" + indentation.indentation(for: desiredIndent))
+        return NSRange(location: range.location + 1 + desiredIndent, length: 0)
+
+      }
     }
   }
 
