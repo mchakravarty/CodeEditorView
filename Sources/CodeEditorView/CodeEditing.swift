@@ -117,11 +117,15 @@ public struct CodeEditingCommandsView: View {
 
 extension CodeView: CodeEditorActions {
 
-  @objc func duplicate(_ sender: Any?) { duplicate() }
-  @objc func reindent(_ sender: Any?) { reindent() }
-  @objc func shiftLeft(_ sender: Any?) { shiftLeftOrRight(doShiftLeft: true) }
-  @objc func shiftRight(_ sender: Any?) { shiftLeftOrRight(doShiftLeft: false) }
-  @objc func commentSelection(_ sender: Any?) { comment() }
+#if os(macOS)
+  @objc public func duplicate(_ sender: Any?) { duplicate(sender) }
+#elseif os(iOS) || os(visionOS)
+  @objc public override func duplicate(_ sender: Any?) { duplicate() }
+#endif
+  @objc public func reindent(_ sender: Any?) { reindent() }
+  @objc public func shiftLeft(_ sender: Any?) { shiftLeftOrRight(doShiftLeft: true) }
+  @objc public func shiftRight(_ sender: Any?) { shiftLeftOrRight(doShiftLeft: false) }
+  @objc public func commentSelection(_ sender: Any?) { comment() }
 }
 
 // MARK: -
@@ -146,7 +150,7 @@ extension CodeView {
 #elseif os(iOS) || os(visionOS)
 
   override var keyCommands: [UIKeyCommand] {
-    [ UIKeyCommand(input: "\t", modifierFlags: [], action: #selecctor(insertTab))
+    [ UIKeyCommand(input: "\t", modifierFlags: [], action: #selector(insertTab))
     ]
   }
 
@@ -632,7 +636,7 @@ extension CodeView {
   /// * If the selection has length greater 0, a tab equivalent is always inserted.
   /// * If the selection spans multiple lines, the lines are always indented.
   ///
-  func insertTab() {
+  @objc func insertTab() {
 
     guard let textContentStorage  = optTextContentStorage,
           let codeStorage         = optCodeStorage,
