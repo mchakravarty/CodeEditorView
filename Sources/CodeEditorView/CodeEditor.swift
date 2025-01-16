@@ -574,7 +574,10 @@ extension CodeEditor: UIViewRepresentable {
     let theme     = context.environment.codeEditorTheme,
         selection = position.selections.first ?? .zero
 
-    context.coordinator.updateBindings(text: $text, position: $position, setAction: setActions, setInfo: setInfo)
+    context.coordinator.updateBindings(text: $text,
+                                       position: $position,
+                                       setAction: definitiveSetActions,
+                                       setInfo: definitiveSetInfo)
     if codeView.lastMessages != messages { codeView.update(messages: messages) }
     if text != codeView.text {  // Hoping for the string comparison fast path...
 
@@ -613,7 +616,7 @@ extension CodeEditor: UIViewRepresentable {
   }
 
   public func makeCoordinator() -> Coordinator {
-    return Coordinator(text: $text, position: $position, setAction: setActions, setInfo: setInfo)
+    return Coordinator(text: $text, position: $position, setAction: definitiveSetActions, setInfo: definitiveSetInfo)
   }
 
   public final class Coordinator: _Coordinator {
@@ -768,7 +771,10 @@ extension CodeEditor: NSViewRepresentable {
     let theme      = context.environment.codeEditorTheme,
         selections = position.selections.map{ NSValue(range: $0) }
 
-    context.coordinator.updateBindings(text: $text, position: $position, setAction: setActions, setInfo: setInfo)
+    context.coordinator.updateBindings(text: $text,
+                                       position: $position,
+                                       setAction: definitiveSetActions,
+                                       setInfo: definitiveSetInfo)
     if codeView.lastMessages != messages { codeView.update(messages: messages) }
     if text != codeView.string {  // Hoping for the string comparison fast path...
 
@@ -807,7 +813,7 @@ extension CodeEditor: NSViewRepresentable {
   }
 
   public func makeCoordinator() -> Coordinator {
-    return Coordinator(text: $text, position: $position, setAction: setActions, setInfo: setInfo)
+    return Coordinator(text: $text, position: $position, setAction: definitiveSetActions, setInfo: definitiveSetInfo)
   }
 
   public final class Coordinator: _Coordinator {
