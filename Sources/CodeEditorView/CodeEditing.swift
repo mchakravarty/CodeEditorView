@@ -654,10 +654,14 @@ extension CodeView {
     }
 
     func insertTab(in range: NSRange) -> NSRange {
+      guard let firstLine   = codeStorageDelegate.lineMap.lineOf(index: range.location),
+            let lineInfo    = codeStorageDelegate.lineMap.lookup(line: firstLine)
+      else { return range }
 
-      let nextTabStopIndex = (range.location / indentation.tabWidth + 1) * indentation.tabWidth
-      let replacementString = if indentation.preference == .preferTabs { "\t" }
-                              else { String(repeating: " ", count: nextTabStopIndex - range.location) }
+      let column            = range.location - lineInfo.range.location,
+          nextTabStopIndex  = (column / indentation.tabWidth + 1) * indentation.tabWidth,
+          replacementString = if indentation.preference == .preferTabs { "\t" }
+                              else { String(repeating: " ", count: nextTabStopIndex - column) }
       codeStorage.replaceCharacters(in: range, with: replacementString)
 
       return NSRange(location: range.location + replacementString.utf16.count, length: 0)
