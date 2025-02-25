@@ -34,6 +34,7 @@ extension UIScrollView {
 
 extension NSScrollView {
 
+  @MainActor
   var verticalScrollPosition: CGFloat {
     get { documentVisibleRect.origin.y }
     set {

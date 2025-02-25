@@ -790,7 +790,7 @@ extension CodeEditor: NSViewRepresentable {
         }
 
     // Report the initial message set
-    DispatchQueue.main.async{ codeView.update(messages: messages) }
+    Task { @MainActor in codeView.update(messages: messages) }
 
     // Break undo coalescing whenever we get a trigger over the corresponding subject.
     context.coordinator.breakUndoCoalescingCancellable = breakUndoCoalescing?.sink { [weak codeView] _ in
@@ -805,7 +805,10 @@ extension CodeEditor: NSViewRepresentable {
                                           completions: { [weak codeView] in codeView?.completionAction() })
 
     let coordinator = context.coordinator
-    context.coordinator.extraActionsCancellable = codeView.optLanguageService?.extraActions
+    if let extraActions = codeView.optLanguageService?.extraActions.value {
+      coordinator.actions.language.extraActions = extraActions
+    }
+    coordinator.extraActionsCancellable = language.languageService?.extraActions
       .receive(on: DispatchQueue.main)
       .sink { [coordinator] actions in
 
@@ -863,8 +866,25 @@ extension CodeEditor: NSViewRepresentable {
     if indentationConfiguration != codeView.indentation { codeView.indentation = indentationConfiguration }
     // Equality on language configurations implies the same name and the same language service.
     if language != codeView.language {
+
+      let languageServiceChanged = language.languageService !== codeView.language.languageService
       codeView.language                 = language
       context.coordinator.info.language = language.name
+
+      if languageServiceChanged {
+
+        let coordinator = context.coordinator
+        if let extraActions = codeView.optLanguageService?.extraActions.value {
+          coordinator.actions.language.extraActions = extraActions
+        }
+        coordinator.extraActionsCancellable = language.languageService?.extraActions
+          .receive(on: DispatchQueue.main)
+          .sink { [coordinator] actions in
+
+            coordinator.actions.language.extraActions = actions
+          }
+
+      }
     }
   }
 
@@ -900,6 +920,7 @@ extension CodeEditor: NSViewRepresentable {
       }
     }
 
+    @MainActor
     func scrollPositionDidChange(_ scrollView: NSScrollView) {
       guard !updatingView else { return }
 
