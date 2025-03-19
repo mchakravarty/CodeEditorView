@@ -118,7 +118,7 @@ public struct CodeEditingCommandsView: View {
 extension CodeView: CodeEditorActions {
 
 #if os(macOS)
-  @objc public func duplicate(_ sender: Any?) { duplicate(sender) }
+  @objc public func duplicate(_ sender: Any?) { duplicate() }
 #elseif os(iOS) || os(visionOS)
   @objc public override func duplicate(_ sender: Any?) { duplicate() }
 #endif
