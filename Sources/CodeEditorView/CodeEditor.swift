@@ -140,6 +140,7 @@ public struct CodeEditor {
   public class _Coordinator {
     @Binding fileprivate var text:     String
     @Binding fileprivate var position: Position
+    @Binding fileprivate var messages: Set<TextLocated<Message>>
 
     fileprivate var setActions: SetActions
     fileprivate var setInfo:    SetInfo
@@ -168,11 +169,13 @@ public struct CodeEditor {
 
     init(text: Binding<String>,
          position: Binding<Position>,
+         messages: Binding<Set<TextLocated<Message>>>,
          setAction: SetActions,
          setInfo: SetInfo)
     {
       self._text      = text
       self._position  = position
+      self._messages  = messages
       self.setActions = setAction
       self.setInfo    = setInfo
     }
@@ -182,11 +185,13 @@ public struct CodeEditor {
     ///
     func updateBindings(text: Binding<String>,
                         position: Binding<Position>,
+                        messages: Binding<Set<TextLocated<Message>>>,
                         setAction: SetActions,
                         setInfo: SetInfo)
     {
       self._text      = text
       self._position  = position
+      self._messages  = messages
       self.setActions = setAction
       self.setInfo    = setInfo
     }
@@ -586,7 +591,7 @@ extension CodeEditor: UIViewRepresentable {
                             indentation: indentationConfiguration,
                             theme: context.environment.codeEditorTheme,
                             setText: setText(_:),
-                            setMessages: { messages = $0 })
+                            setMessages: { context.coordinator.messages = $0 })
 
     // NB: We are not setting `codeView.text` here. That will happen via `updateUIView(:)`.
     // This implies that we must take care to not report that initial updates as a change to any connected language
@@ -632,6 +637,7 @@ extension CodeEditor: UIViewRepresentable {
 
     context.coordinator.updateBindings(text: $text,
                                        position: $position,
+                                       messages: $messages,
                                        setAction: definitiveSetActions,
                                        setInfo: definitiveSetInfo)
     if codeView.lastMessages != messages { codeView.update(messages: messages) }
@@ -672,7 +678,11 @@ extension CodeEditor: UIViewRepresentable {
   }
 
   public func makeCoordinator() -> Coordinator {
-    return Coordinator(text: $text, position: $position, setAction: definitiveSetActions, setInfo: definitiveSetInfo)
+    return Coordinator(text: $text,
+                       position: $position,
+                       messages: $messages,
+                       setAction: definitiveSetActions,
+                       setInfo: definitiveSetInfo)
   }
 
   public final class Coordinator: _Coordinator {
@@ -729,13 +739,14 @@ extension CodeEditor: NSViewRepresentable {
     scrollView.autoresizingMask    = [.width, .height]
 
     // Set up text view with gutter
+    // NB: Update with `setMessages` must go via the coordinator to work with view updates changing the binding.
     let codeView = CodeView(frame: CGRect(x: 0, y: 0, width: 100, height: 40),
                             with: language,
                             viewLayout: definitiveLayout,
                             indentation: indentationConfiguration,
                             theme: context.environment.codeEditorTheme,
                             setText: setText(_:),
-                            setMessages: { messages = $0 })
+                            setMessages: { context.coordinator.messages = $0 })
     codeView.isVerticallyResizable   = true
     codeView.isHorizontallyResizable = false
     codeView.autoresizingMask        = .width
@@ -832,6 +843,7 @@ extension CodeEditor: NSViewRepresentable {
 
     context.coordinator.updateBindings(text: $text,
                                        position: $position,
+                                       messages: $messages,
                                        setAction: definitiveSetActions,
                                        setInfo: definitiveSetInfo)
     if codeView.lastMessages != messages { codeView.update(messages: messages) }
@@ -889,7 +901,11 @@ extension CodeEditor: NSViewRepresentable {
   }
 
   public func makeCoordinator() -> Coordinator {
-    return Coordinator(text: $text, position: $position, setAction: definitiveSetActions, setInfo: definitiveSetInfo)
+    return Coordinator(text: $text,
+                       position: $position,
+                       messages: $messages,
+                       setAction: definitiveSetActions,
+                       setInfo: definitiveSetInfo)
   }
 
   public final class Coordinator: _Coordinator {
