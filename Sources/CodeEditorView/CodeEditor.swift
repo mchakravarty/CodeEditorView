@@ -640,7 +640,6 @@ extension CodeEditor: UIViewRepresentable {
                                        messages: $messages,
                                        setAction: definitiveSetActions,
                                        setInfo: definitiveSetInfo)
-    if codeView.lastMessages != messages { codeView.update(messages: messages) }
     if text != codeView.text {  // Hoping for the string comparison fast path...
 
       if language.languageService !== codeView.language.languageService {
@@ -656,6 +655,7 @@ extension CodeEditor: UIViewRepresentable {
 //      }
 
     }
+    if codeView.lastMessages != messages { codeView.update(messages: messages) }
     if selection != codeView.selectedRange {
       codeView.selectedRange = selection
       if let codeStorageDelegate = codeView.optCodeStorage?.delegate as? CodeStorageDelegate
@@ -846,7 +846,6 @@ extension CodeEditor: NSViewRepresentable {
                                        messages: $messages,
                                        setAction: definitiveSetActions,
                                        setInfo: definitiveSetInfo)
-    if codeView.lastMessages != messages { codeView.update(messages: messages) }
     if text != codeView.string {  // Hoping for the string comparison fast path...
 
       if language.languageService !== codeView.language.languageService {
@@ -862,6 +861,7 @@ extension CodeEditor: NSViewRepresentable {
       }
 
     }
+    if codeView.lastMessages != messages { codeView.update(messages: messages) }
     if selections != codeView.selectedRanges {
       codeView.selectedRanges = selections
       if let codeStorageDelegate = codeView.optCodeStorage?.delegate as? CodeStorageDelegate
