@@ -645,7 +645,9 @@ extension CodeEditor: UIViewRepresentable {
       if language.languageService !== codeView.language.languageService {
         (codeView.optCodeStorage?.delegate as? CodeStorageDelegate)?.skipNextChangeNotificationToLanguageService = true
       }
-      codeView.text = text
+      Task { @MainActor in
+        codeView.text = text
+      }
 //      // FIXME: Stupid hack to force redrawing when the language doesn't change. (A language change already forces
 //      // FIXME: redrawing.)
 //      if language == codeView.language {
