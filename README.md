@@ -23,9 +23,8 @@ The following is the default light theme on iOS.
 Typical usage of the view is as follows.
 
 ```swift
-
 import SwiftUI
-import CodeEditor
+import CodeEditorView
 import LanguageSupport
 
 struct ContentView: View {
@@ -36,7 +35,7 @@ struct ContentView: View {
   @Environment(\.colorScheme) private var colorScheme: ColorScheme
 
   var body: some View {
-    CodeEditor(text: $text, position: $position, messages: $messages, language: .swift)
+    CodeEditor(text: $text, position: $position, messages: $messages, language: .swift())
       .environment(\.codeEditorTheme,
                    colorScheme == .dark ? Theme.defaultDark : Theme.defaultLight)
   }
