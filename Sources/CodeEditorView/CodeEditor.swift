@@ -242,24 +242,10 @@ extension CodeEditor {
   }
 }
 
-#if canImport(SwiftUI, _version: 6)
 extension EnvironmentValues {
 
   @Entry public var codeEditorLayoutConfiguration: CodeEditor.LayoutConfiguration = .standard
 }
-#else
-public struct CodeEditorLayoutConfiguration: EnvironmentKey {
-  public static var defaultValue: CodeEditor.LayoutConfiguration = .standard
-}
-
-extension EnvironmentValues {
-
-  public var codeEditorLayoutConfiguration: CodeEditor.LayoutConfiguration {
-    get { self[CodeEditorLayoutConfiguration.self] }
-    set { self[CodeEditorLayoutConfiguration.self] = newValue }
-  }
-}
-#endif
 
 
 // MARK: Indentation configuration
@@ -365,24 +351,10 @@ extension CodeEditor {
   }
 }
 
-#if canImport(SwiftUI, _version: 6)
 extension EnvironmentValues {
 
   @Entry public var codeEditorIndentationConfiguration: CodeEditor.IndentationConfiguration = .standard
 }
-#else
-public struct CodeEditorIndentationConfiguration: EnvironmentKey {
-  public static var defaultValue: CodeEditor.IndentationConfiguration = .standard
-}
-
-extension EnvironmentValues {
-
-  public var codeEditorIndentationConfiguration: CodeEditor.IndentationConfiguration {
-    get { self[CodeEditorIndentationConfiguration.self] }
-    set { self[CodeEditorIndentationConfiguration.self] = newValue }
-  }
-}
-#endif
 
 
 // MARK: Code actions
@@ -435,24 +407,10 @@ extension CodeEditor {
   }
 }
 
-#if canImport(SwiftUI, _version: 6)
 extension EnvironmentValues {
 
   @Entry public var codeEditorSetActions: CodeEditor.SetActions = .ignore
 }
-#else
-public struct CodeEditorSetActions: EnvironmentKey {
-  public static var defaultValue: CodeEditor.SetActions = .ignore
-}
-
-extension EnvironmentValues {
-
-  public var codeEditorSetActions: CodeEditor.SetActions {
-    get { self[CodeEditorSetActions.self] }
-    set { self[CodeEditorSetActions.self] = newValue }
-  }
-}
-#endif
 
 
 // MARK: Editor state information
@@ -542,24 +500,10 @@ extension CodeEditor {
   }
 }
 
-#if canImport(SwiftUI, _version: 6)
 extension EnvironmentValues {
 
   @Entry public var codeEditorSetInfo: CodeEditor.SetInfo = .ignore
 }
-#else
-public struct CodeEditorSetInfo: EnvironmentKey {
-  public static var defaultValue: CodeEditor.SetInfo = .ignore
-}
-
-extension EnvironmentValues {
-
-  public var codeEditorSetInfo: CodeEditor.SetInfo {
-    get { self[CodeEditorSetInfo.self] }
-    set { self[CodeEditorSetInfo.self] = newValue }
-  }
-}
-#endif
 
 
 #if os(iOS) || os(visionOS)
