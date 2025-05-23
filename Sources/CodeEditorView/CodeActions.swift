@@ -484,13 +484,29 @@ extension CodeView {
   ///     reported by the text view.
   ///
   func considerCompletionFor(range: NSRange) {
-    guard let codeStorageDelegate = optCodeStorage?.delegate as? CodeStorageDelegate else { return }
 
+    /// We don't want to automatically trigger completion for ranges that do not produce sensible results, such as
+    /// ranges of purely numeric characters.
+    ///
+    func rangeIncludesCompletionCharacter() -> Bool {
+      guard let codeStorage = optCodeStorage,
+            let substring   = codeStorage.string[range]
+      else { return false }
+
+      // FIXME: For languages with user-definable symbol identifiers, it would make sense to trigger auto-completion for
+      // FIXME: ranges that consist of symbols only, but, e.g., the Haskell Language Server doesn't seem to return
+      // FIXME: sensible results. This ought to be improved.
+
+      // For now, we look for at least one letter.
+      return substring.unicodeScalars.first{ CharacterSet.letters.contains($0) } != nil
+    }
+
+    guard let codeStorageDelegate = optCodeStorage?.delegate as? CodeStorageDelegate else { return }
 
     // Stop any already running completion task
     completionTask?.cancel()
 
-    if range.length > 0 && codeStorageDelegate.processingOneCharacterAddition {
+    if range.length > 0 && codeStorageDelegate.processingOneCharacterAddition && rangeIncludesCompletionCharacter() {
 
       completionTask = Task {
 
