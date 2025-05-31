@@ -384,7 +384,7 @@ extension StatefulMessageView {
   class HostingView: OSView {
     private var hostingView: OSHostingView<StatefulMessageView>?
 
-    private let messages:     [Message]
+    private let messages:     [(Int, Message)]
     private let theme:        Message.Theme
     private var background:   Color
     private let fontSize:     CGFloat
@@ -407,7 +407,7 @@ extension StatefulMessageView {
       didSet { reconfigure() }
     }
 
-    init(messages: [Message],
+    init(messages: [(Int, Message)],
          theme: @escaping Message.Theme,
          background: Color,
          geometry: MessageView.Geometry,
@@ -428,7 +428,7 @@ extension StatefulMessageView {
 #endif
       translatesAutoresizingMaskIntoConstraints = false
 
-      hostingView = OSHostingView(rootView: StatefulMessageView(messages: messages,
+      hostingView = OSHostingView(rootView: StatefulMessageView(messages: messages.map(\.1),
                                                                 theme: theme,
                                                                 geometry: geometry,
                                                                 background: background,
@@ -459,7 +459,7 @@ extension StatefulMessageView {
     }
 
     private func reconfigure() {
-      self.hostingView?.rootView = StatefulMessageView(messages: messages,
+      self.hostingView?.rootView = StatefulMessageView(messages: messages.map(\.1),
                                                        theme: theme,
                                                        geometry: geometry,
                                                        background: background,

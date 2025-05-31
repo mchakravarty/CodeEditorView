@@ -57,7 +57,8 @@ enum CommentStyle {
 struct LineInfo {
 
   /// Structure characterising a bundle of messages reported for a single line. It features a stable identity to be able
-  /// to associate display information in separate structures.
+  /// to associate display information in separate structures. Messages are paired with the zero-based column index to
+  /// which they refer.
   ///
   /// NB: We don't identify a message bundle by the line number on which it appears, because edits further up can
   ///     increase and decrease the line number of a given bundle. We need a stable identifier.
@@ -66,9 +67,9 @@ struct LineInfo {
     let id: UUID
 
     private(set)
-    var messages: [Message]
+    var messages: [(Int, Message)]
 
-    init(messages: [Message]) {
+    init(messages: [(Int, Message)]) {
       self.id       = UUID()
       self.messages = messages
     }
@@ -77,8 +78,8 @@ struct LineInfo {
     ///
     /// - Parameter message: The message to add.
     ///
-    mutating func add(message: Message) {
-      if let idx = messages.firstIndex(of: message) {
+    mutating func add(message: (Int, Message)) {
+      if let idx = messages.firstIndex(where: {$0.1 == message.1}) {
         messages[idx] = message
       } else {
         messages.append(message)
@@ -86,7 +87,7 @@ struct LineInfo {
     }
 
     mutating func remove(message: Message) {
-      if let idx = messages.firstIndex(of: message) {
+      if let idx = messages.firstIndex(where: {$0.1 == message}) {
         messages.remove(at: idx)
       }
     }
@@ -140,8 +141,8 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
 
   private(set) var lineMap = LineMap<LineInfo>(string: "")
 
-  /// The message bundle IDs that got invalidated by the last editing operation because the lines to which they were
-  /// attached got changed.
+  /// The message bundle IDs that got invalidated by the last editing operation because the code that they refer to got
+  /// changed.
   ///
   private(set) var lastInvalidatedMessageIDs: [LineInfo.MessageBundle.ID] = []
 
@@ -229,6 +230,13 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
                    range editedRange: NSRange,
                    changeInLength delta: Int)
   {
+    func messageAffectedByEditFor(line: Int) -> Bool {
+      // `true` iff the affected range of each message is in its entirety before (to the left) of the `editedRange`.
+      if let (range, info) = lineMap.lookup(line: line) {
+        info?.messages?.messages.allSatisfy{ $0.0 + $0.1.length < editedRange.location - range.location } ?? false
+      } else { false }
+    }
+
     tokenInvalidationRange = nil
     tokenInvalidationLines = nil
     guard let codeStorage = textStorage as? CodeStorage else { return }
@@ -246,7 +254,13 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
 
     // Determine the ids of message bundles that are invalidated by this edit.
     let lines = lineMap.linesAffected(by: editedRange, changeInLength: delta)
-    lastInvalidatedMessageIDs = lines.compactMap{ lineMap.lookup(line: $0)?.info?.messages?.id  }
+    lastInvalidatedMessageIDs = lines.compactMap { line in
+      if line == lines.first {
+        if messageAffectedByEditFor(line: line) { lineMap.lookup(line: line)?.info?.messages?.id } else { nil }
+      } else {
+        lineMap.lookup(line: line)?.info?.messages?.id
+      }
+    }
 
     let endColumn = if let beforeLine     = lines.last,
                        let beforeLineInfo = lineMap.lookup(line: beforeLine)
@@ -827,15 +841,16 @@ extension CodeStorageDelegate {
   func add(message: TextLocated<Message>) -> LineInfo.MessageBundle? {
     guard var info = lineMap.lookup(line: message.location.zeroBasedLine)?.info else { return nil }
 
+    let columnMessage = (message.location.zeroBasedColumn, message.entity)
     if info.messages != nil {
 
       // Add a message to an existing message bundle for this line
-      info.messages?.add(message: message.entity)
+      info.messages?.add(message: columnMessage)
 
     } else {
 
       // Create a new message bundle for this line with the new message
-      info.messages = LineInfo.MessageBundle(messages: [message.entity])
+      info.messages = LineInfo.MessageBundle(messages: [columnMessage])
 
     }
     lineMap.setInfoOf(line: message.location.zeroBasedLine, to: info)

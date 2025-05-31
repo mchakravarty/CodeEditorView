@@ -274,7 +274,7 @@ final class CodeView: UITextView {
     self.documentVisibleBox = documentVisibleBox
 
     // We need to check whether we need to look up completions or cancel a running completion process after every text
-    // change. We also need to remove evicted message views.
+    // change.  We also need to invalidate the views of all in the meantime invalidated message views.
     textDidChangeObserver
       = NotificationCenter.default.addObserver(forName: UITextView.textDidChangeNotification, 
                                                object: self,
@@ -675,7 +675,7 @@ final class CodeView: NSTextView {
       }
 
     // We need to check whether we need to look up completions or cancel a running completion process after every text
-    // change. We also need to remove evicted message views.
+    // change. We also need to invalidate the views of all in the meantime invalidated message views.
     didChangeNotificationObserver
       = NotificationCenter.default.addObserver(forName: NSText.didChangeNotification, object: self, queue: .main){ [weak self] _ in
 
@@ -1237,7 +1237,7 @@ extension CodeView {
   ///
   func update(messages: Set<TextLocated<Message>>) {
 
-    // FIXME: Retracting all and then adding them again my be bad with animation of we re-add many of the same.
+    // FIXME: Retracting all and then adding them again my be bad with animation if we re-add many of the same.
     retractMessages()
     for message in messages { report(message: message) }
 
@@ -1284,7 +1284,7 @@ extension CodeView {
     let background  = SwiftUI.Color(backgroundColor)
     #endif
 
-    let messageView = StatefulMessageView.HostingView(messages: messageBundle.messages,
+    let messageView = StatefulMessageView.HostingView(messages: messageBundle.messages.sorted{  $0.0 < $1.0 },
                                                       theme: messageTheme,
                                                       background: background,
                                                       geometry: MessageView.Geometry(lineWidth: 100,
@@ -1293,10 +1293,10 @@ extension CodeView {
                                                                                      popupOffset: 16),
                                                       fontSize: font?.pointSize ?? OSFont.systemFontSize,
                                                       colourScheme: theme.colourScheme),
-        principalCategory = messagesByCategory(messageBundle.messages)[0].key,
+        principalCategory = messagesByCategory(messageBundle.messages.map(\.1))[0].key,
         colour            = messageTheme(principalCategory).colour,
         backgroundView    = CodeBackgroundHighlightView(color: colour.withAlphaComponent(0.1)),
-        telescope: Int?   = if messageBundle.messages.count == 1 { messageBundle.messages[0].telescope } else { nil }
+        telescope: Int?   = if messageBundle.messages.count == 1 { messageBundle.messages[0].1.telescope } else { nil }
 
     messageViews[messageBundle.id] = MessageInfo(view: messageView,
                                                  backgroundView: backgroundView,
