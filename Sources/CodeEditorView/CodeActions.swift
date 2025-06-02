@@ -119,7 +119,7 @@ public enum CompletionProgress {
   case input(NSEvent)
 }
 
-/// Panel used to display compeltions.
+/// Panel used to display completions.
 ///
 final class CompletionPanel: NSPanel {
 
@@ -133,11 +133,12 @@ final class CompletionPanel: NSPanel {
     @ViewBuilder
     var completionsList: some View {
 
-      if completions.items.isEmpty { Text("No completions").padding() }
+      if completions.items.isEmpty { Text("No Completions").padding() }
       else {
         List(completions.items, selection: $selection.selection) { item in
           AnyView(item.rowView(selection.selection == item.id))
             .lineLimit(1)
+            .truncationMode(.middle)
             .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
             .listRowSeparator(.hidden)
         }
@@ -145,31 +146,46 @@ final class CompletionPanel: NSPanel {
     }
 
     var body: some View {
-      VStack(alignment: .leading, spacing: 0) {
+      Group {
+        if completions.items.isEmpty {
 
-        completionsList
-          .focused($isFocused)
+          Text("No Completions")
+            .focusable(true)
+            .focusEffectDisabled()
+            .frame(width: 200, height: 50)
+            .background(Color(nsColor: .windowBackgroundColor))
+            .focused($isFocused)
 
-        Divider()
-          .overlay(.gray.opacity(0.5))
-          .frame(height: 0.5)
+        } else {
 
-        if let selectedCompletion = (completions.items.first{ $0.id == selection.selection }) {
-          ScrollView {
-            HStack {
-              AnyView(selectedCompletion.documentationView)
-              Spacer()
+          VStack(alignment: .leading, spacing: 0) {
+
+            completionsList
+              .focused($isFocused)
+
+            Divider()
+              .overlay(.gray.opacity(0.5))
+              .frame(height: 0.5)
+
+            if let selectedCompletion = (completions.items.first{ $0.id == selection.selection }) {
+              ScrollView {
+                HStack {
+                  AnyView(selectedCompletion.documentationView)
+                  Spacer()
+                }
+                .padding([.top, .bottom], 2)
+              }
+              .padding([.leading], 8)
+              .frame(maxWidth: .infinity, minHeight: 100)
             }
-            .padding()
-          }
-          .padding()
-          .frame(maxWidth: .infinity)
-          .background(Color(nsColor: .windowBackgroundColor))
-        }
 
+          }
+          .frame(minWidth: 400, maxWidth: .infinity, minHeight: 300, maxHeight: 500)
+          .background(Color(nsColor: .windowBackgroundColor))
+
+        }
       }
       .ignoresSafeArea()
-      .frame(maxWidth: .infinity, minHeight: 100, maxHeight: 500)
       .clipShape(RoundedRectangle(cornerRadius: 10))
       .overlay {
         RoundedRectangle(cornerRadius: 10)
@@ -311,6 +327,7 @@ final class CompletionPanel: NSPanel {
   ///   - screenRect: The rectangle enclosing the range of characters that form the prefix of the word that is being
   ///       completed. If no `rect` is provided, it is assumed that the last provided one is still valid. The
   ///       rectangle is in screen coordinates.
+  ///   - explicitTrigger: The completion computation was explicitly triggered.
   ///   - handler: Closure used to report progress in the completion interaction back to the code view.
   ///
   /// The completion panel gets aligned such that `rect` leading aligns with the completion labels in the completion
@@ -318,6 +335,7 @@ final class CompletionPanel: NSPanel {
   ///
   func set(completions: Completions,
            anchoredAt screenRect: CGRect? = nil,
+           explicitTrigger: Bool,
            handler: @escaping (CompletionProgress) -> Void)
   {
     var completions = completions
@@ -338,7 +356,7 @@ final class CompletionPanel: NSPanel {
                           else { completions.items.first?.id }
 
     // Update the view and show the window if and only if there are completion items to show.
-    if completions.items.isEmpty { close() }
+    if completions.items.isEmpty && !explicitTrigger { close() }
     else {
 
       hostingView.rootView = CompletionView(completions: self.completions, selection: selection)
@@ -413,12 +431,14 @@ extension CodeView {
   /// - Parameters:
   ///   - completions: The new list of completions to be displayed.
   ///   - range: The characters range at whose leading edge the completion panel is to be aligned.
+  ///   - explicitTrigger: The completion computation was explicitly triggered.
   ///
   @MainActor
-  func show(completions: Completions, for range: NSRange) {
+  func show(completions: Completions, for range: NSRange, explicitTrigger: Bool) {
 
     completionPanel.set(completions: completions, 
-                        anchoredAt: firstRect(forCharacterRange: range, actualRange: nil)) { 
+                        anchoredAt: firstRect(forCharacterRange: range, actualRange: nil),
+                        explicitTrigger: explicitTrigger) {
       [weak self] completionProgress in
 
       switch completionProgress {
@@ -441,9 +461,11 @@ extension CodeView {
 
   /// Actually do query the language service for code completions and display them.
   ///
-  /// - Parameter location: The character location for which code completions are requested.
+  /// - Parameters:
+  ///   - location: The character location for which code completions are requested.
+  ///   - explicitTrigger: The completion computation was explicitly triggered.
   ///
-  func computeAndShowCompletions(at location: Int) async throws {
+  func computeAndShowCompletions(at location: Int, explicitTrigger: Bool) async throws {
     guard let languageService = optLanguageService else { return }
 
     do {
@@ -451,12 +473,12 @@ extension CodeView {
       let reason: CompletionTriggerReason = if completionPanel.isKeyWindow { .incomplete } else { .standard },
           completions                     = try await languageService.completions(at: location, reason: reason)
       try Task.checkCancellation()   // may have been cancelled in the meantime due to further user action
-      show(completions: completions, for: rangeForUserCompletion)
+      show(completions: completions, for: rangeForUserCompletion, explicitTrigger: explicitTrigger)
 
     } catch let error { logger.trace("Completion action failed: \(error.localizedDescription)") }
   }
   
-  /// Excplicitly user initiated completion action by a command or trigger character.
+  /// Explicitly user initiated completion action by a command or trigger character.
   ///
   func completionAction() {
 
@@ -472,7 +494,7 @@ extension CodeView {
     } else {
 
       completionTask = Task {
-        try await computeAndShowCompletions(at: selectedRange().location)
+        try await computeAndShowCompletions(at: selectedRange().location, explicitTrigger: true)
       }
 
     }
@@ -481,7 +503,8 @@ extension CodeView {
   /// This function needs to be invoked whenever the completion range changes; i.e., once a text change has been made.
   ///
   /// - Parameter range: The current completion range (range of partial word in front of the insertion point) as
-  ///     reported by the text view.
+  ///       reported by the text view.
+
   ///
   func considerCompletionFor(range: NSRange) {
 
@@ -516,7 +539,7 @@ extension CodeView {
         if range.length < 3 && !completionPanel.isKeyWindow { try await Task.sleep(until: .now + .seconds(0.2)) }
 
         // Trigger completion
-        try await computeAndShowCompletions(at: range.max)
+        try await computeAndShowCompletions(at: range.max, explicitTrigger: false)
       }
 
     } else if range.length == 0 && completionPanel.isKeyWindow {
