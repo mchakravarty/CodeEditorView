@@ -493,8 +493,13 @@ extension CodeView {
 
     } else {
 
-      completionTask = Task {
-        try await computeAndShowCompletions(at: selectedRange().location, explicitTrigger: true)
+      let location = selectedRange().location
+      if let codeStorageDelegate = optCodeStorage?.delegate as? CodeStorageDelegate,
+         !codeStorageDelegate.lineMap.isWithinComment(range: NSRange(location: location, length: 0))
+      {
+        completionTask = Task {
+          try await computeAndShowCompletions(at: location, explicitTrigger: true)
+        }
       }
 
     }
@@ -504,7 +509,6 @@ extension CodeView {
   ///
   /// - Parameter range: The current completion range (range of partial word in front of the insertion point) as
   ///       reported by the text view.
-
   ///
   func considerCompletionFor(range: NSRange) {
 
@@ -529,7 +533,10 @@ extension CodeView {
     // Stop any already running completion task
     completionTask?.cancel()
 
-    if range.length > 0 && codeStorageDelegate.processingOneCharacterAddition && rangeIncludesCompletionCharacter() {
+    let withinComment = codeStorageDelegate.lineMap.isWithinComment(range: NSRange(location: range.max, length: 0))
+    if range.length > 0 && !withinComment && codeStorageDelegate.processingOneCharacterAddition
+        && rangeIncludesCompletionCharacter()
+    {
 
       completionTask = Task {
 

@@ -124,6 +124,28 @@ struct LineInfo {
 
 
 // MARK: -
+// MARK: Helper functions for `LineMap<LineInfo>`
+
+extension LineMap<LineInfo> {
+  
+  /// Checks whether the given range lies entirely within a comment range.
+  ///
+  /// - Parameter range: The range to query for.
+  /// - Returns: Whether `range` lines within a comment range.
+  /// 
+  func isWithinComment(range: NSRange) -> Bool {
+    guard let (line, position) = lineAndPositionOf(index: range.location),
+          let (_, info)        = lookup(line: line),
+          let commentRanges    = info?.commentRanges
+    else { return false }
+
+    let lineRange = NSRange(location: position, length: range.length)
+    return commentRanges.contains{ $0.intersection(lineRange) == lineRange }
+  }
+}
+
+
+// MARK: -
 // MARK: Delegate class
 
 class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
