@@ -504,6 +504,10 @@ extension CodeView {
 
     }
   }
+  
+  /// FIXME: This is language dependent and should take the language configuration into account. (In Haskell, it
+  /// FIXME: should, .e.g., include "'" as well.)
+  private static let identifierCharacterSet = CharacterSet.alphanumerics.union(.init(charactersIn: "_"))
 
   /// This function needs to be invoked whenever the completion range changes; i.e., once a text change has been made.
   ///
@@ -513,9 +517,10 @@ extension CodeView {
   func considerCompletionFor(range: NSRange) {
 
     /// We don't want to automatically trigger completion for ranges that do not produce sensible results, such as
-    /// ranges of purely numeric characters.
+    /// ranges of purely numeric characters. Moreover, we do not automatically trigger completions for ranges that end
+    /// in the middle of an identifier.
     ///
-    func rangeIncludesCompletionCharacter() -> Bool {
+    func rangeContentsWarrantsAutoCompletion() -> Bool {
       guard let codeStorage = optCodeStorage,
             let substring   = codeStorage.string[range]
       else { return false }
@@ -525,7 +530,15 @@ extension CodeView {
       // FIXME: sensible results. This ought to be improved.
 
       // For now, we look for at least one letter.
-      return substring.unicodeScalars.first{ CharacterSet.letters.contains($0) } != nil
+      let atLeastOneLetter = substring.unicodeScalars.first{ CharacterSet.letters.contains($0) } != nil
+
+      let notInMiddleOfIndentifier = if let next = codeStorage.string[NSRange(location: range.max, length: 1)],
+                                        let nextCharacter = next.unicodeScalars.first
+                                     {
+                                       !CodeView.identifierCharacterSet.contains(nextCharacter)
+                                     } else { true }
+
+      return atLeastOneLetter && notInMiddleOfIndentifier
     }
 
     guard let codeStorageDelegate = optCodeStorage?.delegate as? CodeStorageDelegate else { return }
@@ -535,7 +548,7 @@ extension CodeView {
 
     let withinComment = codeStorageDelegate.lineMap.isWithinComment(range: NSRange(location: range.max, length: 0))
     if range.length > 0 && !withinComment && codeStorageDelegate.processingOneCharacterAddition
-        && rangeIncludesCompletionCharacter()
+        && rangeContentsWarrantsAutoCompletion()
     {
 
       completionTask = Task {
