@@ -45,10 +45,18 @@ final class InfoPopover: NSPopover {
   ///
   init(displaying view: any View, width: CGFloat) {
     super.init()
-    let rootView = ScrollView(.vertical){ AnyView(view).padding() }
-                     .frame(width: width, alignment: .topLeading)
-    contentViewController = NSHostingController(rootView: rootView)
-    contentViewController?.preferredContentSize = CGSize(width: width, height: width * 1.1)
+    let rootView = ViewThatFits(in: .vertical) {
+
+        // The info view without a scroll view if it is small enough to fit vertically.
+        AnyView(view).padding().fixedSize(horizontal: false, vertical: true)
+
+        // The info view wrapped in a scroll view if it exceeds the popover.
+        ScrollView(.vertical){ AnyView(view).padding() }
+      }
+      .frame(width: width)
+    let hostingController = NSHostingController(rootView: rootView)
+    hostingController.sizingOptions = [.standardBounds, .preferredContentSize]
+    contentViewController = hostingController
     behavior = .transient
   }
 
@@ -75,7 +83,9 @@ extension CodeView {
     self.infoPopover = infoPopover
 
     let screenRect         = firstRect(forCharacterRange: range, actualRange: nil),
-        nonEmptyScreenRect = NSRect(origin: screenRect.origin, size: CGSize(width: 1, height: 1)),
+        nonEmptyScreenRect = if screenRect.isEmpty {
+                               NSRect(origin: screenRect.origin, size: CGSize(width: 1, height: 1))
+                             } else { screenRect },
         windowRect         = window!.convertFromScreen(nonEmptyScreenRect)
 
     infoPopover.show(relativeTo: convert(windowRect, from: nil), of: self, preferredEdge: .maxY)
@@ -91,6 +101,7 @@ extension CodeView {
       do {
         if let info = try await languageService.info(at: range.location) {
 
+          showFindIndicator(for: info.anchor ?? range)
           show(infoPopover: InfoPopover(displaying: info.view, width: width), for: info.anchor ?? range)
 
         }
