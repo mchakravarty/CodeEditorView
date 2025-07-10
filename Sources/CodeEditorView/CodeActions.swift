@@ -54,6 +54,7 @@ final class InfoPopover: NSPopover {
         ScrollView(.vertical){ AnyView(view).padding() }
       }
       .frame(width: width)
+      .frame(maxHeight: 800)
       .environment(\.openURL, OpenURLAction{ url in
         print(url)
 //        Task {

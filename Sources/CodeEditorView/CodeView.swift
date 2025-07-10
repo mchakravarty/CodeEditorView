@@ -393,8 +393,9 @@ final class CodeView: NSTextView {
   var minimapDividerView:       NSBox?
 
   // Notification observer
-  private var frameChangedNotificationObserver: NSObjectProtocol?
-  private var didChangeNotificationObserver:    NSObjectProtocol?
+  private var frameChangedNotificationObserver:       NSObjectProtocol?
+  private var didChangeNotificationObserver:          NSObjectProtocol?
+  private var didChangeSelectionNotificationObserver: NSObjectProtocol?
 
   /// Contains the line on which the insertion point was located, the last time the selection range got set (if the
   /// selection was an insertion point at all; i.e., it's length was 0).
@@ -666,7 +667,7 @@ final class CodeView: NSTextView {
     frameChangedNotificationObserver
       = NotificationCenter.default.addObserver(forName: NSView.frameDidChangeNotification,
                                                object: enclosingScrollView,
-                                               queue: .main){ [weak self] _ in
+                                               queue: .main) { [weak self] _ in
 
         // NB: When resizing the window, where the text container doesn't completely fill the text view (i.e., the text
         //     is short), we need to explicitly redraw the gutter, as line wrapping may have changed, which affects
@@ -677,10 +678,22 @@ final class CodeView: NSTextView {
     // We need to check whether we need to look up completions or cancel a running completion process after every text
     // change. We also need to invalidate the views of all in the meantime invalidated message views.
     didChangeNotificationObserver
-      = NotificationCenter.default.addObserver(forName: NSText.didChangeNotification, object: self, queue: .main){ [weak self] _ in
+      = NotificationCenter.default.addObserver(forName: NSText.didChangeNotification,
+                                               object: self,
+                                               queue: .main) { [weak self] _ in
 
+//        self?.infoPopover?.close()
         self?.considerCompletionFor(range: self!.rangeForUserCompletion)
         self?.invalidateMessageViews(withIDs: self!.codeStorageDelegate.lastInvalidatedMessageIDs)
+      }
+
+    // Popups should disappear on cursor change.
+    didChangeSelectionNotificationObserver
+      = NotificationCenter.default.addObserver(forName: NSTextView.didChangeSelectionNotification,
+                                               object: self,
+                                               queue: .main) { [weak self] _ in
+
+        self?.infoPopover?.close()
       }
 
     Task {
@@ -731,6 +744,7 @@ final class CodeView: NSTextView {
   deinit {
     if let observer = frameChangedNotificationObserver { NotificationCenter.default.removeObserver(observer) }
     if let observer = didChangeNotificationObserver { NotificationCenter.default.removeObserver(observer) }
+    if let observer = didChangeSelectionNotificationObserver { NotificationCenter.default.removeObserver(observer) }
   }
 
 
