@@ -54,6 +54,14 @@ final class InfoPopover: NSPopover {
         ScrollView(.vertical){ AnyView(view).padding() }
       }
       .frame(width: width)
+      .environment(\.openURL, OpenURLAction{ url in
+        print(url)
+//        Task {
+//          try await NSWorkspace.shared.open([url], withApplicationAt: URL(fileURLWithPath: "/Applications/Safari.app"), configuration: .init())
+//        }
+//        return .systemAction(URL(string: "safari://")!)
+        return .handled
+      })
     let hostingController = NSHostingController(rootView: rootView)
     hostingController.sizingOptions = [.standardBounds, .preferredContentSize]
     contentViewController = hostingController
@@ -287,6 +295,10 @@ final class CompletionPanel: NSPanel {
   /// The observer for the 'didResignKeyNotification' notification.
   ///
   private var didResignObserver: NSObjectProtocol?
+  
+  /// The task resolving completion items (if active).
+  ///
+  private var resolveTask: Task<Void, any Error>?
 
   init() {
     hostingView = HostedCompletionView(rootView: CompletionView(completions: completions,
@@ -349,6 +361,9 @@ final class CompletionPanel: NSPanel {
            explicitTrigger: Bool,
            handler: @escaping (CompletionProgress) -> Void)
   {
+    // Cancel any still running reolve task before updating the completions that are being resolved; otherwise, we can
+    // get oout-of-bounds indexing.
+    resolveTask?.cancel()
     var completions = completions
 
     completions.items.sort()
@@ -379,12 +394,16 @@ final class CompletionPanel: NSPanel {
       }
 
       // Refine all refinable items.
-      Task { @MainActor in
+      resolveTask = Task { @MainActor [weak self] in
+        guard let self else { return }
         for item in self.completions.items.enumerated() {
           if let refinedItem = try? await item.element.refine() {
+
+            try Task.checkCancellation()    // NB: Important if a new completion request has been made in the meantime.
             self.completions.items[item.offset] = refinedItem
             // This doesn't trigger an update (maybe, because only `AnyView` subviews change?)...
-//            hostingView.rootView = CompletionView(completions: completions, selection: selection)
+            //            hostingView.rootView = CompletionView(completions: completions, selection: selection)
+
           }
         }
         // ...hence, we update the whole thing.
