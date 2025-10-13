@@ -86,10 +86,12 @@ public struct CodeEditingCommandsView: View {
       send(#selector(CodeEditorActions.reindent(_:)))
     }
     .keyboardShortcut("I", modifiers: [.control])
+
     Button("Shift Left") {
       send(#selector(CodeEditorActions.shiftLeft(_:)))
     }
     .keyboardShortcut("[", modifiers: [.command])
+
     Button("Shift Right") {
       send(#selector(CodeEditorActions.shiftRight(_:)))
     }
