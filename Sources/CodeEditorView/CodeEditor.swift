@@ -748,9 +748,11 @@ extension CodeEditor: NSViewRepresentable {
     Task { @MainActor in codeView.update(messages: messages) }
 
     // Break undo coalescing whenever we get a trigger over the corresponding subject.
-    context.coordinator.breakUndoCoalescingCancellable = breakUndoCoalescing?.sink { [weak codeView] _ in
-      codeView?.breakUndoCoalescing()
-    }
+    context.coordinator.breakUndoCoalescingCancellable = breakUndoCoalescing?
+                                                           .receive(on: RunLoop.main)
+                                                           .sink { [weak codeView] _ in
+                                                             codeView?.breakUndoCoalescing()
+                                                           }
 
     // Set the initial actions
     //
