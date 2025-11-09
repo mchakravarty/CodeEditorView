@@ -403,7 +403,6 @@ final class CompletionPanel: NSPanel {
       resolveTask = Task { @MainActor [weak self] in
         guard let self else { return }
         for item in self.viewState.completions.items.enumerated() {
-          print("*** resolve \(item.offset)")
           if let refinedItem = try? await item.element.refine() {
 
             try Task.checkCancellation()    // NB: Important if a new completion request has been made in the meantime.
