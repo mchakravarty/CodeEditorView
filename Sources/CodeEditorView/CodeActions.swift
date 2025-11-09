@@ -144,19 +144,17 @@ public enum CompletionProgress {
 final class CompletionPanel: NSPanel {
 
   struct CompletionView: View {
-    let completions: Completions
-
-    @ObservedObject var selection: ObservableSelection
+    @Bindable var viewState: ObservableViewState
 
     @FocusState private var isFocused: Bool
 
     @ViewBuilder
     var completionsList: some View {
 
-      if completions.items.isEmpty { Text("No Completions").padding() }
+      if viewState.completions.items.isEmpty { Text("No Completions").padding() }
       else {
-        List(completions.items, selection: $selection.selection) { item in
-          AnyView(item.rowView(selection.selection == item.id))
+        List(viewState.completions.items, selection: $viewState.selection) { item in
+          AnyView(item.rowView(viewState.selection == item.id))
             .lineLimit(1)
             .truncationMode(.middle)
             .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
@@ -167,7 +165,7 @@ final class CompletionPanel: NSPanel {
 
     var body: some View {
       Group {
-        if completions.items.isEmpty {
+        if viewState.completions.items.isEmpty {
 
           Text("No Completions")
             .focusable(true)
@@ -187,7 +185,7 @@ final class CompletionPanel: NSPanel {
               .overlay(.gray.opacity(0.5))
               .frame(height: 0.5)
 
-            if let selectedCompletion = (completions.items.first{ $0.id == selection.selection }) {
+            if let selectedCompletion = (viewState.completions.items.first{ $0.id == viewState.selection }) {
               ScrollView {
                 HStack {
                   AnyView(selectedCompletion.documentationView)
@@ -239,7 +237,7 @@ final class CompletionPanel: NSPanel {
       } else if event.keyCode == keyCodeReturn {
 
         // Commit to current completion
-        if let selectedCompletion = (window.completions.items.first{ $0.id == window.selection.selection }) {
+        if let selectedCompletion = (window.viewState.completions.items.first{ $0.id == window.viewState.selection }) {
 
           window.progressHandler?(.completion(selectedCompletion.insertText, selectedCompletion.insertRange))
 
@@ -269,17 +267,23 @@ final class CompletionPanel: NSPanel {
     }
   }
 
-  class ObservableSelection: ObservableObject {
-    @Published var selection: Int? = nil
+  /// This class encapsulates the state that may change while a completion panel is being displayed. It needs to be
+  /// observable, such that SwiftUI views update properly on states changes.
+  ///
+  @Observable
+  class ObservableViewState {
+    var selection:   Int?        = nil
+    var completions: Completions
+
+    init(completions: Completions = .none) {
+      self.selection   = nil
+      self.completions = completions
+    }
   }
 
-  /// The current set of completions.
+  /// The current set of completions and the `id` of the currently selected item from the completions.
   ///
-  private(set) var completions: Completions = .none
-  
-  /// The `id` of the currently selected item in `completions`.
-  ///
-  private(set) var selection: ObservableSelection = ObservableSelection()
+  private(set) var viewState: ObservableViewState = ObservableViewState()
 
   /// Whenever there is progress in the completion interaction, this is fed back to the code view by reporting
   /// progress via this handler.
@@ -302,8 +306,7 @@ final class CompletionPanel: NSPanel {
   private var resolveTask: Task<Void, any Error>?
 
   init() {
-    hostingView = HostedCompletionView(rootView: CompletionView(completions: completions,
-                                                                selection: ObservableSelection()))
+    hostingView = HostedCompletionView(rootView: CompletionView(viewState: viewState))
     hostingView.sizingOptions = [.maxSize, .minSize]
 
     super.init(contentRect: NSRect(x: 0, y: 0, width: 500, height: 300),
@@ -369,7 +372,7 @@ final class CompletionPanel: NSPanel {
 
     completions.items.sort()
 
-    self.completions     = completions
+    self.viewState       = ObservableViewState(completions: completions)
     self.progressHandler = handler
 
     if let screenRect {
@@ -379,37 +382,34 @@ final class CompletionPanel: NSPanel {
     }
 
     // The initial selection is the first item marked as selected, if any, or otherwise, the first item in the list.
-    selection.selection = if let selected = (completions.items.first{ $0.selected }) { selected.id }
+    viewState.selection = if let selected = (completions.items.first{ $0.selected }) { selected.id }
                           else { completions.items.first?.id }
 
     // Update the view and show the window if and only if there are completion items to show.
     if completions.items.isEmpty && !explicitTrigger { close() }
     else {
 
-      hostingView.rootView = CompletionView(completions: self.completions, selection: selection)
+      hostingView.rootView = CompletionView(viewState: self.viewState)
       if !isVisible {
 
         makeKeyAndOrderFront(nil)
-        makeFirstResponder(contentView)
+        Task {
+          makeFirstResponder(contentView)
+        }
 
       }
 
       // Refine all refinable items.
       resolveTask = Task { @MainActor [weak self] in
         guard let self else { return }
-        for item in self.completions.items.enumerated() {
+        for item in self.viewState.completions.items.enumerated() {
+          print("*** resolve \(item.offset)")
           if let refinedItem = try? await item.element.refine() {
 
             try Task.checkCancellation()    // NB: Important if a new completion request has been made in the meantime.
-            self.completions.items[item.offset] = refinedItem
-            // This doesn't trigger an update (maybe, because only `AnyView` subviews change?)...
-            //            hostingView.rootView = CompletionView(completions: completions, selection: selection)
-
+            self.viewState.completions.items[item.offset] = refinedItem
           }
         }
-        // ...hence, we update the whole thing.
-        contentView = HostedCompletionView(rootView: CompletionView(completions: self.completions,
-                                                                    selection: selection))
       }
     }
   }
@@ -417,41 +417,43 @@ final class CompletionPanel: NSPanel {
 
 
 #Preview {
-  @Previewable @StateObject var selection = CompletionPanel.ObservableSelection()
-  let completions = Completions(isIncomplete: false,
-                                items: [
-                                  Completions.Completion(id: 1,
-                                                         rowView: { _ in Text("foo") },
-                                                         documentationView: Text("Best function!"),
-                                                         selected: false,
-                                                         sortText: "foo",
-                                                         filterText: "foo",
-                                                         insertText: "foo",
-                                                         insertRange: NSRange(location: 0, length: 1),
-                                                         commitCharacters: [],
-                                                         refine: { nil }),
-                                  Completions.Completion(id: 2,
-                                                         rowView: { _ in Text("fop") },
-                                                         documentationView: Text("Second best function!"),
-                                                         selected: false,
-                                                         sortText: "fop",
-                                                         filterText: "fop",
-                                                         insertText: "fop",
-                                                         insertRange: NSRange(location: 0, length: 1),
-                                                         commitCharacters: [],
-                                                         refine: { nil }),
-                                  Completions.Completion(id: 3,
-                                                         rowView: { _ in Text("fabc") },
-                                                         documentationView: Text("My best function!"),
-                                                         selected: false,
-                                                         sortText: "fabc",
-                                                         filterText: "fabc",
-                                                         insertText: "fabc",
-                                                         insertRange: NSRange(location: 0, length: 1),
-                                                         commitCharacters: [],
-                                                         refine: { nil }),
-                                ])
-  CompletionPanel.CompletionView(completions: completions, selection: selection)
+  @Previewable @State var viewState
+    = CompletionPanel.ObservableViewState(completions:
+                                            Completions(isIncomplete: false,
+                                                        items: [
+                                                          Completions.Completion(id: 1,
+                                                                                 rowView: { _ in Text("foo") },
+                                                                                 documentationView: Text("Best function!"),
+                                                                                 selected: false,
+                                                                                 sortText: "foo",
+                                                                                 filterText: "foo",
+                                                                                 insertText: "foo",
+                                                                                 insertRange: NSRange(location: 0, length: 1),
+                                                                                 commitCharacters: [],
+                                                                                 refine: { nil }),
+                                                          Completions.Completion(id: 2,
+                                                                                 rowView: { _ in Text("fop") },
+                                                                                 documentationView: Text("Second best function!"),
+                                                                                 selected: false,
+                                                                                 sortText: "fop",
+                                                                                 filterText: "fop",
+                                                                                 insertText: "fop",
+                                                                                 insertRange: NSRange(location: 0, length: 1),
+                                                                                 commitCharacters: [],
+                                                                                 refine: { nil }),
+                                                          Completions.Completion(id: 3,
+                                                                                 rowView: { _ in Text("fabc") },
+                                                                                 documentationView: Text("My best function!"),
+                                                                                 selected: false,
+                                                                                 sortText: "fabc",
+                                                                                 filterText: "fabc",
+                                                                                 insertText: "fabc",
+                                                                                 insertRange: NSRange(location: 0, length: 1),
+                                                                                 commitCharacters: [],
+                                                                                 refine: { nil }),
+                                                        ]))
+
+  CompletionPanel.CompletionView(viewState: viewState)
 }
 
 extension CodeView {
@@ -556,8 +558,8 @@ extension CodeView {
             let substring   = codeStorage.string[range]
       else { return false }
 
-      // FIXME: For languages with user-definable symbol identifiers, it would make sense to trigger auto-completion for
-      // FIXME: ranges that consist of symbols only, but, e.g., the Haskell Language Server doesn't seem to return
+      // FIXME: For languages with user-definable symbol identifiers, it would make sense to trigger auto-completion
+      // FIXME: for ranges that consist of symbols only, but, e.g., the Haskell Language Server doesn't seem to return
       // FIXME: sensible results. This ought to be improved.
 
       // For now, we look for at least one letter.
