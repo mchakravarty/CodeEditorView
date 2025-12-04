@@ -152,9 +152,9 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
 
   private(set) var language:  LanguageConfiguration
   private      var tokeniser: LanguageConfiguration.Tokeniser?  // cache the tokeniser
-  
+
   /// Language service for this document if available.
-  /// 
+  ///
   var languageService: LanguageService? { language.languageService }
 
   /// Hook to propagate changes to the text store upwards in the view hierarchy.
@@ -172,20 +172,20 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
   /// together with its range until the next text change.
   ///
   private var lastTypedToken: LanguageConfiguration.Tokeniser.Token?
-  
+
   /// Indicates that the language service is not to be notified of the next text change. (This is useful during
   /// (re)initialisation.)
   ///
   var skipNextChangeNotificationToLanguageService: Bool = false
 
   /// Indicates whether the current editing round is for a wholesale replacement of the text.
-  /// 
+  ///
   private(set) var processingStringReplacement: Bool = false
 
   /// Indicates whether the current editing round is for a one-character addition to the text.
   ///
   private(set) var processingOneCharacterAddition: Bool = false
-  
+
   /// Contains the range of characters whose token information was invalidated by the last editing operation.
   ///
   private(set) var tokenInvalidationRange: NSRange? = nil
@@ -210,7 +210,7 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
     self.setText   = setText
     super.init()
   }
-  
+
   deinit {
     Task { [languageService] in
       try await languageService?.stop()
@@ -243,7 +243,7 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
 
     }
   }
-  
+
 
   // MARK: Delegate methods
 
@@ -283,12 +283,6 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
         lineMap.lookup(line: line)?.info?.messages?.id
       }
     }
-
-    let endColumn = if let beforeLine     = lines.last,
-                       let beforeLineInfo = lineMap.lookup(line: beforeLine)
-                    {
-                       editedRange.max - delta - beforeLineInfo.range.location
-                    } else { 0 }
 
     lineMap.updateAfterEditing(string: textStorage.string, range: editedRange, changeInLength: delta)
     var (affectedRange: highlightingRange, lines: highlightingLines) = tokenise(range: editedRange, in: textStorage)
@@ -347,27 +341,68 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
     // entered composing characters (i.e., the marked text).
     setText(textStorage.string)
 
-    if !skipNextChangeNotificationToLanguageService {
-
-      // Notify language service (if attached)
-      let text         = (textStorage.string as NSString).substring(with: editedRange),
-          afterLine    = lineMap.lineOf(index: editedRange.max),
-          lineChange   = if let afterLine,
-                            let beforeLine = lines.last { afterLine - beforeLine } else { 0 },
-          columnChange = if let afterLine,
-                            let info = lineMap.lookup(line: afterLine)
-                         {
-                           editedRange.max - info.range.location - endColumn
-                         } else { 0 }
-      Task { [editedRange, delta] in
-        try await languageService?.documentDidChange(position: editedRange.location,
-                                                     changeInLength: delta,
-                                                     lineChange: lineChange,
-                                                     columnChange: columnChange,
-                                                     newText: text)
-      }
-    } else { skipNextChangeNotificationToLanguageService = false }
+    // Notify language service (if attached)
+    notifyLanguageServiceOfChange(in: textStorage, range: editedRange, changeInLength: delta)
   }
+
+
+  // MARK: Language service notification
+
+  private func notifyLanguageServiceOfChange(in textStorage: NSTextStorage,
+                                             range editedRange: NSRange,
+                                             changeInLength delta: Int) {
+
+    // Notify language service (if attached)
+    let text         = (textStorage.string as NSString).substring(with: editedRange),
+        afterLine    = lineMap.lineOf(index: editedRange.max),
+        lines        = lineMap.linesAffected(by: editedRange, changeInLength: delta),
+        lineChange   = if let afterLine,
+                          let beforeLine = lines.last { afterLine - beforeLine } else { 0 },
+        endColumn    = if let beforeLine     = lines.last,
+                           let beforeLineInfo = lineMap.lookup(line: beforeLine)
+                           {
+                             editedRange.max - delta - beforeLineInfo.range.location
+                           } else { 0 },
+        columnChange = if let afterLine,
+                          let info = lineMap.lookup(line: afterLine)
+                          {
+                                editedRange.max - info.range.location - endColumn
+                              } else { 0 }
+
+    let skipDidChangeDocument = skipNextChangeNotificationToLanguageService
+    skipNextChangeNotificationToLanguageService = false
+    Task { [editedRange, delta, lines, weak languageService, weak self] in
+      guard let languageService else { return }
+
+      do {
+        // It is crucial to perform the change notification before requesting semantic tokens.
+        if !skipDidChangeDocument {
+          try await languageService.documentDidChange(position: editedRange.location,
+                                                      changeInLength: delta,
+                                                      lineChange: lineChange,
+                                                      columnChange: columnChange,
+                                                      newText: text)
+        }
+      } catch let err {
+
+        logger.trace("LSP: Could not deliver document change notification; restarting language service: \(err)")
+        Task {@MainActor [weak languageService] in
+          guard let self,
+                let languageService
+          else { return }
+
+          try await languageService.stop()
+          try await languageService.openDocument(with: textStorage.string,
+                                                 locationService: self.lineMapLocationConverter)
+        }
+
+      }
+
+      await self?.requestSemanticTokens(for: lines, in: textStorage)
+    }
+
+  }
+
 }
 
 
@@ -636,8 +671,6 @@ extension CodeStorageDelegate {
       currentLine += 1
     }
 
-    requestSemanticTokens(for: lines, in: textStorage)
-
     if visualDebugging {
       textStorage.addAttribute(.backgroundColor, value: visualDebuggingTrailingColour, range: highlightingRange)
       textStorage.addAttribute(.backgroundColor, value: visualDebuggingLinesColour, range: range)
@@ -653,43 +686,41 @@ extension CodeStorageDelegate {
   ///     lines: The lines for which semantic token information is requested.
   ///     textStorage: The text storage whose contents is being tokenised.
   ///
-  func requestSemanticTokens(for lines: Range<Int>, in textStorage: NSTextStorage) {
+  @MainActor
+  func requestSemanticTokens(for lines: Range<Int>, in textStorage: NSTextStorage) async {
     guard let firstLine = lines.first else { return }
 
-    Task {
-      do {
-        if let semanticTokens = try await languageService?.tokens(for: lines) {
+    do {
+      if let semanticTokens = try await languageService?.tokens(for: lines) {
 
-          guard lines.count == semanticTokens.count else {
-            logger.trace("Language service returned an array of incorrect length; expected \(lines.count), but got \(semanticTokens.count)")
-            return
-          }
+        try Task.checkCancellation()
 
-          // We need to avoid concurrent write access to the line map; hence, use the main actor.
-          Task { @MainActor in
-
-            // Merge the semantic tokens into the syntactic tokens per line
-            for i in 0..<lines.count {
-              merge(semanticTokens: semanticTokens[i], into: firstLine + i)
-            }
-
-            // Request redrawing for those lines
-            if let textStorageObserver = textStorage.textStorageObserver {
-              let range = lineMap.charRangeOf(lines: lines)
-              textStorageObserver.processEditing(for: textStorage,
-                                                 edited: .editedAttributes,
-                                                 range: range,
-                                                 changeInLength: 0,
-                                                 invalidatedRange: NSRange(location: 0, length: textStorage.string.count))
-                                                                   // ^^If we don't invalidate the whole text, we
-                                                                   // somehow lose highlighting for everything outside
-                                                                   // of the invalidated range.
-            }
-          }
-
+        guard lines.count == semanticTokens.count else {
+          logger.trace("Language service returned an array of incorrect length; expected \(lines.count), but got \(semanticTokens.count)")
+          return
         }
-      } catch let error { logger.trace("Failed to get semantic tokens for line range \(lines): \(error.localizedDescription)") }
-    }
+
+        // Merge the semantic tokens into the syntactic tokens per line
+        // NB: This function runs on the `MainActor`; hence, no concurrent write access to the line map.
+        for i in 0..<lines.count {
+          merge(semanticTokens: semanticTokens[i], into: firstLine + i)
+        }
+
+        // Request redrawing for those lines
+        if let textStorageObserver = textStorage.textStorageObserver {
+          let range = lineMap.charRangeOf(lines: lines)
+          textStorageObserver.processEditing(for: textStorage,
+                                             edited: .editedAttributes,
+                                             range: range,
+                                             changeInLength: 0,
+                                             invalidatedRange: NSRange(location: 0, length: textStorage.string.count))
+                                                               // ^^If we don't invalidate the whole text, we
+                                                               // somehow lose highlighting for everything outside
+                                                               // of the invalidated range.
+        }
+
+      }
+    } catch let error { logger.trace("Failed to get semantic tokens for line range \(lines): \(error.localizedDescription)") }
   }
 
   /// Merge semantic token information for one line into the line map.

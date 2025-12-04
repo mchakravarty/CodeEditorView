@@ -1411,7 +1411,7 @@ extension CodeView {
     switch event {
 
     case .tokensAvailable(lineRange: let lineRange):
-      codeStorageDelegate.requestSemanticTokens(for: lineRange, in: codeStorage)
+      Task { await codeStorageDelegate.requestSemanticTokens(for: lineRange, in: codeStorage) }
     }
   }
 }
