@@ -298,6 +298,51 @@ test */
                    , Tokeniser.Token(token: .curlyBracketClose, range: NSRange(location: 17, length: 1))])
   }
 
+  func testInsertNewlineAfterEmoji() throws {
+    // Test case for UTF-16 indexing issue with emojis
+    // The emoji 🏁 is 1 Character but 2 UTF-16 code units
+    // When inserting at the end, the UTF-16 offset differs from the Character offset
+    let code = "flag: 🏁 fumble"
+    let codeStorageDelegate = CodeStorageDelegate(with: .swift(), setText: { _ in }),
+        codeStorage         = CodeStorage(theme: .defaultLight)
+    codeStorage.delegate = codeStorageDelegate
+
+    codeStorage.setAttributedString(NSAttributedString(string: code))
+
+    // Verify initial state
+    XCTAssertEqual(code.count, 14)  // 14 Characters
+    XCTAssertEqual((code as NSString).length, 15)  // 15 UTF-16 code units
+
+    // Simulate inserting a newline at the very end (UTF-16 position 15)
+    // This should not crash
+    codeStorage.replaceCharacters(in: NSRange(location: 15, length: 0), with: "\n")
+
+    // Verify the insertion succeeded
+    XCTAssertEqual(codeStorage.string, "flag: 🏁 fumble\n")
+  }
+
+  func testInsertCharacterAfterMultipleEmojis() throws {
+    // Test with multiple emojis to stress test UTF-16 handling
+    let code = "🏁🎉🚀"
+    let codeStorageDelegate = CodeStorageDelegate(with: .swift(), setText: { _ in }),
+        codeStorage         = CodeStorage(theme: .defaultLight)
+    codeStorage.delegate = codeStorageDelegate
+
+    codeStorage.setAttributedString(NSAttributedString(string: code))
+
+    // 3 Characters, 6 UTF-16 code units
+    XCTAssertEqual(code.count, 3)
+    XCTAssertEqual((code as NSString).length, 6)
+
+    // Insert at the end - should not crash
+    codeStorage.replaceCharacters(in: NSRange(location: 6, length: 0), with: "x")
+    XCTAssertEqual(codeStorage.string, "🏁🎉🚀x")
+
+    // Insert in the middle after 🏁 (UTF-16 position 2)
+    codeStorage.replaceCharacters(in: NSRange(location: 2, length: 0), with: "y")
+    XCTAssertEqual(codeStorage.string, "🏁y🎉🚀x")
+  }
+
   static var allTests = [
     ("testSimpleTokenise", testSimpleTokenise),
     ("testTokeniseAllComment", testTokeniseAllComment),
@@ -309,6 +354,8 @@ test */
     ("testCaseInsensitiveReservedIdentifiersUnspecified", testCaseInsensitiveReservedIdentifiersUnspecified),
     ("testCaseInsensitiveReservedIdentifiersFalse", testCaseInsensitiveReservedIdentifiersFalse),
     ("testCaseInsensitiveReservedIdentifiersTrue", testCaseInsensitiveReservedIdentifiersTrue),
+    ("testInsertNewlineAfterEmoji", testInsertNewlineAfterEmoji),
+    ("testInsertCharacterAfterMultipleEmojis", testInsertCharacterAfterMultipleEmojis),
   ]
 }
 
