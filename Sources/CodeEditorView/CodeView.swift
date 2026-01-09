@@ -715,9 +715,6 @@ final class CodeView: NSTextView {
 
     if let languageService = codeStorageDelegate.languageService {
 
-      try await languageService.openDocument(with: textStorage.string,
-                                             locationService: codeStorageDelegate.lineMapLocationConverter)
-
       // Report diagnostic messages as they come in.
       diagnosticsCancellable = languageService.diagnostics
         .receive(on: DispatchQueue.main)
@@ -733,6 +730,10 @@ final class CodeView: NSTextView {
 
           self?.process(event: event)
         }
+
+      // NB: Do this only after setting up the diagnostics and events processing pipelines, so they can already be used.
+      try await languageService.openDocument(with: textStorage.string,
+                                             locationService: codeStorageDelegate.lineMapLocationConverter)
     }
   }
 
@@ -1402,8 +1403,8 @@ extension CodeView {
     }
   }
 
-  // MARK: Events
 
+  // MARK: Events
 
   func process(event: LanguageServiceEvent) {
     guard let codeStorage = optCodeStorage else { return }

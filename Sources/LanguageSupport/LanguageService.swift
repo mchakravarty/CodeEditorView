@@ -184,9 +184,9 @@ public struct ExtraAction {
 ///
 public enum LanguageServiceEvent {
 
-  /// New semantic token information is available for the given line range.
+  /// New semantic token information is available for the given line range (or the entire document in case of `nil`).
   ///
-  case tokensAvailable(lineRange: Range<Int>)
+  case tokensAvailable(lineRange: Range<Int>?)
 }
 
 /// Determines the capabilities and endpoints for language-dependent external services, such as an LSP server.

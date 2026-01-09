@@ -242,6 +242,9 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
       let _ = tokenise(range: NSRange(location: 0, length: codeStorage.length), in: codeStorage)
 
     }
+
+    // Also update semantic tokens (whether a language service is active will be checked inside this method).
+    Task { await requestSemanticTokens(in: codeStorage) }
   }
 
 
@@ -683,11 +686,12 @@ extension CodeStorageDelegate {
   /// information for those lines (maintained in the line map),
   ///
   /// - Parameters:
-  ///     lines: The lines for which semantic token information is requested.
-  ///     textStorage: The text storage whose contents is being tokenised.
+  ///   - lines: The lines for which semantic token information is requested. If `= nil`, all lines in the line map.
+  ///   - textStorage: The text storage whose contents is being tokenised.
   ///
   @MainActor
-  func requestSemanticTokens(for lines: Range<Int>, in textStorage: NSTextStorage) async {
+  func requestSemanticTokens(for lines: Range<Int>? = nil, in textStorage: NSTextStorage) async {
+    let lines = lines ?? lineMap.lines.indices
     guard let firstLine = lines.first else { return }
 
     do {
