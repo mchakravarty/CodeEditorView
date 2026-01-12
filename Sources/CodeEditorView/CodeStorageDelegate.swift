@@ -808,7 +808,9 @@ extension CodeStorageDelegate {
 
 
     let string             = codeStorage.string,
-        char               = string.utf16[string.index(string.startIndex, offsetBy: index)],
+        utf16View          = string.utf16,
+        utf16Index         = utf16View.index(utf16View.startIndex, offsetBy: index),
+        char               = utf16View[utf16Index],
         previousTypedToken = lastTypedToken,
         currentTypedToken  = codeStorage.tokenOnly(at: index)
 
