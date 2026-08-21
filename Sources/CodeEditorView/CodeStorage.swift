@@ -318,7 +318,11 @@ extension CodeStorage {
   /// The first enumerated token may have a starting location smaller than `location` (but it will extent until at least
   /// `location`). Enumeration proceeds until the end of the document or until `block` returns `false`.
   ///
-  func enumerateTokens(from location: Int, using block: (LineToken) -> Bool) {
+  // `upTo` bounds the line walk. Without a bound, the tail loop below only terminates through the
+  // block's return value, which is evaluated only when a token is found; on documents without any
+  // tokens (e.g. plain text) every call would walk the line map to the end of the document — O(n)
+  // per layout fragment and O(n²) across a full layout pass.
+  func enumerateTokens(from location: Int, upTo limit: Int? = nil, using block: (LineToken) -> Bool) {
 
     // Enumerate the comemnt ranges and tokens on one line and optionally skip everything before a given start
     // location. We can have tokens inside comment ranges. These tokens are being skipped. (We don't highlight inside
@@ -380,6 +384,9 @@ extension CodeStorage {
 
     for line in lineMap.lines[startLine + 1 ..< lineMap.lines.count] {
 
+      // Stop once the line starts at or beyond the requested upper bound.
+      if let limit, line.range.location >= limit { return }
+
       if let info = line.info {
 
         let doContinue = enumerate(tokens: info.tokens,
@@ -400,7 +407,8 @@ extension CodeStorage {
   ///   - block: A block invoked foro every range.
   ///
   func enumerateTokens(in range: NSRange, using block: (LineToken) -> Void) {
-    enumerateTokens(from: range.location) { token in
+    // Bound the walk to `range` — see `enumerateTokens(from:upTo:using:)`.
+    enumerateTokens(from: range.location, upTo: range.max) { token in
 
       block(token)
       return token.range.max < range.max
