@@ -174,6 +174,14 @@ public struct LanguageConfiguration {
   ///
   public let supportsCurlyBrackets: Bool
 
+  /// Whether round bracket characters act as brackets.
+  ///
+  /// When all bracket kinds are disabled and no other token patterns are configured (as in the
+  /// plain-text configuration `.none`), the token dictionary ends up empty, no `Tokeniser` is
+  /// created, and documents are not tokenised at all — avoiding a synchronous whole-document scan
+  /// on the main thread every time a document is set.
+  public let supportsRoundBrackets: Bool
+
   /// Whether reserved identifiers are case-sensitive.
   ///
   public let caseInsensitiveReservedIdentifiers: Bool
@@ -227,6 +235,7 @@ public struct LanguageConfiguration {
   public init(name: String,
               supportsSquareBrackets: Bool,
               supportsCurlyBrackets: Bool,
+              supportsRoundBrackets: Bool = true,
               caseInsensitiveReservedIdentifiers: Bool = false,
               indentationSensitiveScoping: Bool = false,
               stringRegex: Regex<Substring>?,
@@ -243,6 +252,7 @@ public struct LanguageConfiguration {
     self.name                               = name
     self.supportsSquareBrackets             = supportsSquareBrackets
     self.supportsCurlyBrackets              = supportsCurlyBrackets
+    self.supportsRoundBrackets              = supportsRoundBrackets
     self.caseInsensitiveReservedIdentifiers = caseInsensitiveReservedIdentifiers
     self.indentationSensitiveScoping        = indentationSensitiveScoping
     self.stringRegex                        = stringRegex
@@ -338,6 +348,7 @@ extension LanguageConfiguration {
   public static let none = LanguageConfiguration(name: "Text",
                                                  supportsSquareBrackets: false,
                                                  supportsCurlyBrackets: false,
+                                                 supportsRoundBrackets: false,
                                                  stringRegex: nil,
                                                  characterRegex: nil,
                                                  numberRegex: nil,
@@ -482,9 +493,13 @@ extension LanguageConfiguration {
 
     // Populate the token dictionary for the code state (tokenising plain code)
     //
-    var codeTokens = [ TokenDescription(regex: /\(/, singleLexeme: "(", action: token(.roundBracketOpen))
-                     , TokenDescription(regex: /\)/, singleLexeme: ")", action: token(.roundBracketClose))
-                     ]
+    var codeTokens = [TokenDescription<LanguageConfiguration.Token, LanguageConfiguration.State>]()
+    if supportsRoundBrackets {
+      codeTokens.append(contentsOf:
+                          [ TokenDescription(regex: /\(/, singleLexeme: "(", action: token(.roundBracketOpen))
+                          , TokenDescription(regex: /\)/, singleLexeme: ")", action: token(.roundBracketClose))
+                          ])
+    }
     if supportsSquareBrackets {
       codeTokens.append(contentsOf: 
                           [ TokenDescription(regex: /\[/, singleLexeme: "[", action: token(.squareBracketOpen))

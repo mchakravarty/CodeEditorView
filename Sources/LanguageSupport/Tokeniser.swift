@@ -242,7 +242,12 @@ public struct Tokeniser<TokenType: Equatable, StateType: TokeniserState> {
 
     states = tokenMap.compactMapValues{ tokeniser(for: $0) }
     self.caseInsensitiveReservedIdentifiers = caseInsensitiveReservedIdentifiers
-    if states.isEmpty { logger.debug("failed to compile regexp"); return nil }
+    if states.isEmpty {
+      // An empty token map (e.g. a plain-text configuration with all bracket kinds disabled)
+      // legitimately yields no tokeniser — only log when there was something to compile.
+      if !(tokenMap.allSatisfy{ $0.value.isEmpty }) { logger.debug("failed to compile regexp") }
+      return nil
+    }
   }
 }
 
