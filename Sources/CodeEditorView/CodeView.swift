@@ -204,6 +204,10 @@ final class CodeView: UITextView {
     smartDashesType        = .no
     smartInsertDeleteType  = .no
 
+    // The system find panel (⌘F and Find in the edit menu), as the macOS
+    // CodeView turns on AppKit's find bar.
+    isFindInteractionEnabled = true
+
     // Line wrapping
     textContainerInset                  = .zero
     textContainer.widthTracksTextView  = false   // we need to be able to control the size (see `tile()`)
