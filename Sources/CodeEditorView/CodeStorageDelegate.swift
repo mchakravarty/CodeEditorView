@@ -217,7 +217,7 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
 
   deinit {
     Task { [languageService] in
-      try await languageService?.stop()
+      try? await languageService?.stop()
     }
   }
 
@@ -400,17 +400,22 @@ class CodeStorageDelegate: NSObject, NSTextStorageDelegate {
                                                       columnChange: columnChange,
                                                       newText: text)
         }
-      } catch let err {
+      } catch {
 
-        logger.trace("LSP: Could not deliver document change notification; restarting language service: \(err)")
+        logger.trace("LSP: Could not deliver document change notification; restarting language service: \(error)")
         Task {@MainActor [weak languageService] in
           guard let self,
                 let languageService
           else { return }
 
-          try await languageService.stop()
-          try await languageService.openDocument(with: textStorage.string,
-                                                 locationService: self.lineMapLocationConverter)
+          do {
+            try await languageService.stop()
+            try await languageService.openDocument(with: textStorage.string,
+                                                   locationService: self.lineMapLocationConverter)
+            logger.trace("LSP: Sucessfully restarted language service")
+          } catch {
+            logger.trace("LSP: couldn't restart language service: \(error)")
+          }
         }
 
       }
